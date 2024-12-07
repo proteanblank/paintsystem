@@ -11,7 +11,75 @@ from bpy.props import (IntProperty,
 from bpy.types import (Operator,
                        Panel,
                        PropertyGroup,
-                       UIList)
+                       UIList,
+                       UILayout,)
+
+
+class PaintSystemLayer(PropertyGroup):
+    name: StringProperty(
+        name="Name",
+        description="Layer name",
+        default="Layer"
+    )
+    enabled: BoolProperty(
+        name="Enabled",
+        description="Toggle layer visibility",
+        default=True
+    )
+    opacity: FloatProperty(
+        name="Opacity",
+        description="Layer opacity",
+        min=0.0,
+        max=1.0,
+        default=1.0
+    )
+    clip_below: BoolProperty(
+        name="Clip Below",
+        description="Clip layers below this one",
+        default=False
+    )
+    blend_mode: EnumProperty(
+        name="Blend",
+        description="Blend mode for this layer",
+        items=[
+            ('MIX', "Mix", "Regular mixing"),
+            ('ADD', "Add", "Additive blending"),
+            ('MULTIPLY', "Multiply", "Multiplicative blending"),
+            ('SUBTRACT', "Subtract", "Subtractive blending"),
+            ('OVERLAY', "Overlay", "Overlay blending"),
+        ],
+        default='MIX'
+    )
+    type: EnumProperty(
+        name="Type",
+        description="Layer type",
+        items=[
+            ('IMAGE', "Image", "Image layer"),
+            ('FOLDER', "Folder", "Folder layer"),
+        ],
+        default='IMAGE'
+    )
+
+
+class PaintSystemImage(PaintSystemLayer):
+    image: PointerProperty(
+        name="Image",
+        type=bpy.types.Image
+    )
+
+
+class PaintSystemFolder(PaintSystemLayer):
+    layers: CollectionProperty(type=PaintSystemLayer)
+
+
+class PaintSystemLayers(PropertyGroup):
+    name: StringProperty(
+        name="Name",
+        description="Group name",
+        default="Group"
+    )
+    layers: CollectionProperty(type=PaintSystemLayer)
+    active_layer_index: IntProperty(name="Active Layer Index")
 
 
 class PAINTSYSTEM_OT_addPaintSystem(Operator):
@@ -223,10 +291,47 @@ class PAINTSYSTEM_OT_addLayer(Operator):
     bl_description = "Add a new layer"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
+    def get_next_layer_number(self, context):
+        mat = context.active_object.active_material
+        active_group_idx = int(mat.paint_system.active_group)
+        active_group = mat.paint_system.groups[active_group_idx]
+
+        # Find highest layer number
+        highest_num = 0
+        for layer in active_group.layers:
+            # Check if name matches pattern "Layer X"
+            if layer.name.startswith("Layer "):
+                try:
+                    num = int(layer.name.split(" ")[1])
+                    highest_num = max(highest_num, num)
+                except (IndexError, ValueError):
+                    continue
+
+        return highest_num + 1
+
     layer_name: StringProperty(
         name="Layer Name",
         description="Name for the new layer",
-        default="New Layer"
+        default="Layer 1"  # This will be updated in invoke
+    )
+    type: EnumProperty(
+        name="Layer Type",
+        description="Type of layer to add",
+        items=[
+            ('IMAGE', "Image", "Image layer"),
+            ('FOLDER', "Folder", "Folder layer"),
+        ],
+        default='IMAGE'
+    )
+    resolution: EnumProperty(
+        name="Resolution",
+        description="Resolution for the new layer",
+        items=[
+            ('1024', "1024", ""),
+            ('2048', "2048", ""),
+            ('4096', "4096", ""),
+            ('8192', "8192", ""),
+        ],
     )
 
     def execute(self, context):
@@ -237,12 +342,123 @@ class PAINTSYSTEM_OT_addLayer(Operator):
         active_group_idx = int(mat.paint_system.active_group)
         active_group = mat.paint_system.groups[active_group_idx]
 
-        # Add new layer at index 0
+        # Add new layer at active_layer_index
         new_layer = active_group.layers.add()
         new_layer.name = self.layer_name
-        # Move it to the beginning
-        active_group.layers.move(len(active_group.layers)-1, 0)
-        active_group.active_layer_index = 0
+        new_layer.type = self.type
+        # Move it to the active_layer_index
+        active_group.layers.move(len(active_group.layers) - 1,
+                                 active_group.active_layer_index)
+
+        # Force UI update
+        if context.area:
+            context.area.tag_redraw()
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        # Set default name based on highest layer number
+        next_num = self.get_next_layer_number(context)
+        self.layer_name = f"Layer {next_num}"
+
+        return context.window_manager.invoke_props_dialog(self, confirm_text="Add Layer")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "type")
+        layout.prop(self, "layer_name", text="Name")
+        if self.type == 'IMAGE':
+            layout.label(text="Resolution:")
+            layout.prop(self, "resolution", expand=True)
+
+
+class PAINTSYSTEM_OT_moveLayer(Operator):
+    """Move selected layers into a folder"""
+    bl_idname = "paint_system.move_layer"
+    bl_label = "Move Layer"
+    bl_description = "Move selected layers into a folder"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # Property to store target layer index
+    target_layer: IntProperty(
+        name="Target Layer",
+        description="Layer to move relative to",
+        default=0,
+        min=0
+    )
+
+    position: EnumProperty(
+        items=(
+            ('OVER', "Over", "Place layer above target"),
+            ('UNDER', "Under", "Place layer below target"),
+            ('INSIDE', "Inside", "Place layer inside target folder")
+        ),
+        default='INSIDE'
+    )
+
+    def get_layer_items(self, context):
+        mat = context.active_object.active_material
+        active_group_idx = int(mat.paint_system.active_group)
+        active_group = mat.paint_system.groups[active_group_idx]
+
+        # Get current layer index
+        current_idx = active_group.active_layer_index
+
+        # Create list of all layers except current one
+        items = []
+        for i, layer in enumerate(active_group.layers):
+            if i != current_idx:  # Skip current layer
+                items.append(
+                    (str(i), layer.name, f"Move relative to {layer.name}"))
+        return items
+
+    # Dynamic EnumProperty for target layer selection
+    target_layer_enum: EnumProperty(
+        name="Target Layer",
+        description="Layer to move relative to",
+        items=get_layer_items
+    )
+
+    @classmethod
+    def poll(cls, context):
+        mat = context.active_object.active_material
+        if not mat or not hasattr(mat, "paint_system"):
+            return False
+        active_group_idx = int(mat.paint_system.active_group)
+        active_group = mat.paint_system.groups[active_group_idx]
+        return len(active_group.layers) > 1
+
+    def execute(self, context):
+        mat = context.active_object.active_material
+        if not mat or not hasattr(mat, "paint_system"):
+            return {'CANCELLED'}
+
+        active_group_idx = int(mat.paint_system.active_group)
+        active_group = mat.paint_system.groups[active_group_idx]
+        source_idx = active_group.active_layer_index
+        target_idx = int(self.target_layer_enum)
+
+        # Get the layers
+        source_layer = active_group.layers[source_idx]
+        target_layer = active_group.layers[target_idx]
+
+        # Determine new position based on layer types and selected position
+        if target_layer.type == 'FOLDER':
+            if self.position == 'INSIDE' and source_layer.type == 'IMAGE':
+                # Move inside folder logic here
+                # This would require restructuring the data to support nested layers
+                pass
+            else:
+                # Handle over/under cases
+                new_idx = target_idx if self.position == 'UNDER' else target_idx
+                active_group.layers.move(source_idx, new_idx)
+        else:
+            # Regular layer movement
+            new_idx = target_idx if self.position == 'UNDER' else target_idx
+            active_group.layers.move(source_idx, new_idx)
+
+        # Update active layer index
+        active_group.active_layer_index = new_idx
 
         # Force UI update
         if context.area:
@@ -255,7 +471,18 @@ class PAINTSYSTEM_OT_addLayer(Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "layer_name")
+        mat = context.active_object.active_material
+        active_group_idx = int(mat.paint_system.active_group)
+        active_group = mat.paint_system.groups[active_group_idx]
+        active_layer = active_group.layers[active_group.active_layer_index]
+
+        layout.label(text=f"Move '{active_layer.name}'")
+
+        # Position selection based on layer type
+        layout.prop(self, "position", text="Position")
+
+        # Target layer selection
+        layout.prop(self, "target_layer_enum", text="Target Layer")
 
 
 class PAINTSYSTEM_OT_deleteLayer(Operator):
@@ -263,9 +490,9 @@ class PAINTSYSTEM_OT_deleteLayer(Operator):
     bl_idname = "paint_system.delete_layer"
     bl_label = "delete Layer"
     bl_description = "Delete selected layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
-    @ classmethod
+    @classmethod
     def poll(cls, context):
         mat = context.active_object.active_material
         active_group_idx = int(mat.paint_system.active_group)
@@ -320,84 +547,14 @@ def get_groups(self, context):
     return [(str(i), group.name, f"Group {i}") for i, group in enumerate(mat.paint_system.groups)]
 
 
-class PAINTSYSTEM_UL_layers(UIList):
+class PAINTSYSTEM_UL_items(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        split = layout.split(factor=0.7)
-        split.prop(item, "name", text="", emboss=False)
-        split.prop(item, "blend_mode", text="")
-
-
-class PaintSystemLayer(PropertyGroup):
-    name: StringProperty(
-        name="Name",
-        description="Layer name",
-        default="Layer"
-    )
-    image: PointerProperty(
-        name="Image",
-        type=bpy.types.Image
-    )
-    enabled: BoolProperty(
-        name="Enabled",
-        description="Toggle layer visibility",
-        default=True
-    )
-    opacity: FloatProperty(
-        name="Opacity",
-        description="Layer opacity",
-        min=0.0,
-        max=1.0,
-        default=1.0
-    )
-    clip_below: BoolProperty(
-        name="Clip Below",
-        description="Clip layers below this one",
-        default=False
-    )
-    blend_mode: EnumProperty(
-        name="Blend",
-        description="Blend mode for this layer",
-        items=[
-            ('MIX', "Mix", "Regular mixing"),
-            ('ADD', "Add", "Additive blending"),
-            ('MULTIPLY', "Multiply", "Multiplicative blending"),
-            ('SUBTRACT', "Subtract", "Subtractive blending"),
-            ('OVERLAY', "Overlay", "Overlay blending"),
-        ],
-        default='MIX'
-    )
-
-
-class PaintSystemFolder(PropertyGroup):
-    name: StringProperty(
-        name="Name",
-        description="Folder name",
-        default="Folder"
-    )
-    enabled: BoolProperty(
-        name="Enabled",
-        description="Toggle layer visibility",
-        default=True
-    )
-    opacity: FloatProperty(
-        name="Opacity",
-        description="Layer opacity",
-        min=0.0,
-        max=1.0,
-        default=1.0
-    )
-    layers: CollectionProperty(type=PaintSystemLayer)
-
-
-class PaintSystemLayers(PropertyGroup):
-    name: StringProperty(
-        name="Name",
-        description="Group name",
-        default="Group"
-    )
-    # items: Folders and layers
-    layers: CollectionProperty(type=PaintSystemLayer)
-    active_layer_index: IntProperty(name="Active Layer Index")
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.prop(item, "enabled", text="", emboss=False,
+                 icon='HIDE_OFF' if item.enabled else 'HIDE_ON', icon_only=True)
+        row.prop(item, "name", text="", icon='FILE_IMAGE' if item.type ==
+                 'IMAGE' else 'FILE_FOLDER', emboss=False)
 
 
 class PaintSystemGroups(PropertyGroup):
@@ -420,6 +577,13 @@ class MAT_PT_paintSystemGroups(Panel):
     bl_region_type = "UI"
     bl_label = "Paint System"
     bl_category = 'Paint System'
+
+    @classmethod
+    def poll(cls, context):
+        if not context.active_object:
+            return False
+        mat = context.active_object.active_material
+        return mat and hasattr(mat, "paint_system")
 
     def draw(self, context):
         layout = self.layout
@@ -448,6 +612,19 @@ class MAT_PT_paintSystemGroups(Panel):
             row.prop(mat.paint_system, "active_group", text="")
 
 
+def layers_ui(self, layout: UILayout, layers, lvl=0):
+    if lvl == 0:
+        col = layout.column(align=True)
+    for i, layer in enumerate(layers):
+        row = col.row(align=True)
+        row.scale_y = 1.5
+        row.prop(layer, "enabled", text="", emboss=False,
+                 icon='HIDE_OFF' if layer.enabled else 'HIDE_ON', icon_only=True)
+        # Image or folder icon
+        row.prop(layer, "name", text="", icon='FILE_IMAGE' if layer.type ==
+                 'IMAGE' else 'FILE_FOLDER', emboss=False)
+
+
 class MAT_PT_paintSystemLayers(Panel):
     bl_idname = 'MAT_PT_paintSystemLayers'
     bl_space_type = "VIEW_3D"
@@ -458,6 +635,8 @@ class MAT_PT_paintSystemLayers(Panel):
 
     @classmethod
     def poll(cls, context):
+        if not context.active_object:
+            return False
         mat = context.active_object.active_material
         return mat and hasattr(mat, "paint_system") and len(mat.paint_system.groups) > 0 and mat.paint_system.active_group
 
@@ -470,12 +649,10 @@ class MAT_PT_paintSystemLayers(Panel):
 
         # Layer list
         row = layout.row()
-        rows = 4
-        row.template_list("PAINTSYSTEM_UL_layers", "", active_group,
+        rows = 5
+        row.template_list("PAINTSYSTEM_UL_items", "", active_group,
                           "layers", active_group, "active_layer_index",
                           rows=rows)
-
-        # Layer management buttons
         col = row.column(align=True)
         col.operator("paint_system.add_layer",
                      icon='ADD', text="")
@@ -486,10 +663,26 @@ class MAT_PT_paintSystemLayers(Panel):
                      icon='TRIA_UP', text="").action = 'UP'
         col.operator("paint_system.layer_action",
                      icon='TRIA_DOWN', text="").action = 'DOWN'
+        col.separator()
+        col.operator("paint_system.move_layer",
+                     icon='NLA_PUSHDOWN', text="")
+
+        if active_group.active_layer_index >= 0 and active_group.active_layer_index < len(active_group.layers):
+            active_layer = active_group.layers[active_group.active_layer_index]
+            layout.label(text="Layer Settings:")
+            layout.prop(active_layer, "opacity", slider=True)
+            col = layout.column(align=True)
+            row = col.row()
+            row.scale_y = 1.5
+            row.prop(active_layer, "clip_below",
+                     icon='SELECT_INTERSECT')
+            row.prop(active_layer, "blend_mode", text="")
 
 
 classes = (
+    PaintSystemImage,
     PaintSystemLayer,
+    PaintSystemFolder,
     PaintSystemLayers,
     PaintSystemGroups,
     PAINTSYSTEM_OT_addPaintSystem,
@@ -499,9 +692,12 @@ classes = (
     PAINTSYSTEM_OT_layerActions,
     PAINTSYSTEM_OT_addLayer,
     PAINTSYSTEM_OT_deleteLayer,
-    PAINTSYSTEM_UL_layers,
+    PAINTSYSTEM_OT_moveLayer,
+    PAINTSYSTEM_UL_items,
     MAT_PT_paintSystemGroups,
     MAT_PT_paintSystemLayers,
+
+
 )
 
 
