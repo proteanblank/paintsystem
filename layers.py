@@ -14,8 +14,10 @@ from bpy.types import (Operator,
                        UIList,
                        UILayout,)
 
+from .nestedListManager import (NestedListItem, NestedListManager)
 
-class PaintSystemLayer(PropertyGroup):
+
+class PaintSystemLayer(NestedListItem):
     name: StringProperty(
         name="Name",
         description="Layer name",
@@ -72,7 +74,7 @@ class PaintSystemLayer(PropertyGroup):
 #     layers: CollectionProperty(type=PaintSystemLayer)
 
 
-class PaintSystemLayers(PropertyGroup):
+class PaintSystemLayers(NestedListManager):
     name: StringProperty(
         name="Name",
         description="Group name",
@@ -639,8 +641,6 @@ class MAT_PT_paintSystemLayers(Panel):
             return None
         active_group_idx = int(mat.paint_system.active_group)
         return mat.paint_system.groups[active_group_idx]
-
-    layers: PointerProperty(type=PaintSystemLayers)
 
     @classmethod
     def poll(cls, context):

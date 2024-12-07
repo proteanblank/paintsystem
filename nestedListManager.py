@@ -1,33 +1,31 @@
 import bpy
 from bpy.props import StringProperty, IntProperty, CollectionProperty, PointerProperty
+from typing import cast
 
 
-class BaseNestedListItem(bpy.types.PropertyGroup):
-    """Base class for nested list items that handles the hierarchy."""
+class NestedListItem(bpy.types.PropertyGroup):
+    """Represents a single item in the nested list."""
     id: IntProperty()  # Unique identifier
+    name: StringProperty()  # Item name
     parent_id: IntProperty(default=-1)  # ID of the parent (-1 means no parent)
     order: IntProperty()  # Order within the same parent
 
-    def draw_item(self, layout):
-        """Override this method to customize how the item is displayed."""
-        raise NotImplementedError("Subclasses must implement draw_item")
 
-    def copy_from(self, other):
-        """Override this method to copy custom properties from another item."""
-        self.id = other.id
-        self.parent_id = other.parent_id
-        self.order = other.order
-
-
-class BaseNestedListManager(bpy.types.PropertyGroup):
-    """Base class for managing nested lists. Override 'item_type' in subclasses."""
+class NestedListManager(bpy.types.PropertyGroup):
+    """Manages the nested list."""
+    # items: CollectionProperty(type=NestedListItem)
     active_index: IntProperty()
     next_id: IntProperty(default=0)
 
-    @property
-    def items(self):
-        """Override this property to return your CollectionProperty of items."""
-        raise NotImplementedError("Subclasses must implement items property")
+    def add_item(self, name, parent_id=-1):
+        """Adds a new item."""
+        new_item = self.items.add()
+        new_item.id = self.next_id
+        new_item.name = name
+        new_item.parent_id = parent_id
+        new_item.order = self.get_next_order(parent_id)
+        self.next_id += 1
+        return new_item.id
 
     def get_next_order(self, parent_id):
         """Get the next available order for a given parent."""
@@ -53,19 +51,6 @@ class BaseNestedListManager(bpy.types.PropertyGroup):
         if 0 <= flattened_index < len(flattened):
             return flattened[flattened_index][0].id
         return -1
-
-    def create_item(self):
-        """Override this method to customize item creation."""
-        raise NotImplementedError("Subclasses must implement create_item")
-
-    def add_item(self, parent_id=-1, **kwargs):
-        """Adds a new item."""
-        new_item = self.create_item(**kwargs)
-        new_item.id = self.next_id
-        new_item.parent_id = parent_id
-        new_item.order = self.get_next_order(parent_id)
-        self.next_id += 1
-        return new_item.id
 
     def move_item(self, item_id, new_parent_id):
         """Moves an item to a new parent."""
@@ -121,83 +106,53 @@ class BaseNestedListManager(bpy.types.PropertyGroup):
         return collect_items(-1, 0)
 
 
-class BaseNestedList(bpy.types.UIList):
-    """Base UIList class for displaying nested items."""
+class NLM_UL_List(bpy.types.UIList):
+    """Custom UIList to display NestedListItem objects."""
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
-        manager = self.get_manager(context)
-        flattened = manager.flatten_hierarchy()
+        nested_list_manager = context.scene.nested_list_manager
+        flattened = nested_list_manager.flatten_hierarchy()
         if index < len(flattened):
             display_item, level = flattened[index]
-            row = layout.row()
-            row.separator(factor=level)  # Indentation
-            display_item.draw_item(row)  # Call the item's custom draw method
-
-    def get_manager(self, context):
-        """Override this to return the appropriate manager instance."""
-        raise NotImplementedError("Subclasses must implement get_manager")
+            indent = " " * (level * 4)
+            layout.label(
+                text=f"{indent}{display_item.name} (ID: {display_item.id})")
 
 
-class BaseNestedListPanel:
-    """Base class for nested list panels. Inherit from this and bpy.types.Panel."""
+class NLM_PT_Panel(bpy.types.Panel):
+    bl_label = "Nested List Manager"
+    bl_idname = "NLM_PT_panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Nested List"
 
     def draw(self, context):
         layout = self.layout
-        manager = self.get_manager(context)
+        manager = context.scene.nested_list_manager
         flattened = manager.flatten_hierarchy()
 
         row = layout.row()
         row.template_list(
-            self.ul_class.__name__, "",
-            manager, "items",
-            manager, "active_index",
+            "NLM_UL_List", "", manager, "items", manager, "active_index",
             rows=len(flattened)
         )
 
-        self.draw_operators(row.column(align=True))
-
-    def draw_operators(self, layout):
-        """Override this to customize the operator buttons."""
-        layout.operator(self.ops_add, icon="ADD", text="")
-        layout.operator(self.ops_remove, icon="REMOVE", text="")
-        layout.operator(self.ops_move, icon="TRIA_RIGHT", text="")
-        layout.operator(self.ops_move_up, icon="TRIA_UP", text="")
-        layout.operator(self.ops_move_down, icon="TRIA_DOWN", text="")
-
-    @property
-    def ul_class(self):
-        """Override this to return your UIList class."""
-        raise NotImplementedError("Subclasses must implement ul_class")
-
-    @property
-    def ops_add(self): return "nested_list.add_item"
-    @property
-    def ops_remove(self): return "nested_list.remove_item"
-    @property
-    def ops_move(self): return "nested_list.move_item"
-    @property
-    def ops_move_up(self): return "nested_list.move_up"
-    @property
-    def ops_move_down(self): return "nested_list.move_down"
-
-    def get_manager(self, context):
-        """Override this to return the appropriate manager instance."""
-        raise NotImplementedError("Subclasses must implement get_manager")
+        col = row.column(align=True)
+        col.operator("nested_list.add_item", icon="ADD", text="")
+        col.operator("nested_list.remove_item", icon="REMOVE", text="")
+        col.operator("nested_list.move_item", icon="TRIA_RIGHT", text="Move")
+        col.operator("nested_list.move_up", icon="TRIA_UP", text="")
+        col.operator("nested_list.move_down", icon="TRIA_DOWN", text="")
 
 
-class BaseNestedListAddOperator(bpy.types.Operator):
-    """Base class for adding items."""
+class NLM_OT_AddItem(bpy.types.Operator):
     bl_idname = "nested_list.add_item"
     bl_label = "Add Item"
 
-    def get_manager(self, context):
-        """Override this to return the appropriate manager instance."""
-        raise NotImplementedError("Subclasses must implement get_manager")
-
     def execute(self, context):
-        manager = self.get_manager(context)
-        new_id = manager.add_item()
-        # Set active_index to the new item's position
+        manager = context.scene.nested_list_manager
+        new_id = manager.add_item(name=f"Item {manager.next_id}")
+        # Set active_index to the new item's position in the flattened list
         flattened = manager.flatten_hierarchy()
         for i, (item, _) in enumerate(flattened):
             if item.id == new_id:
@@ -206,22 +161,18 @@ class BaseNestedListAddOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class BaseNestedListRemoveOperator(bpy.types.Operator):
-    """Base class for removing items."""
+class NLM_OT_RemoveItem(bpy.types.Operator):
     bl_idname = "nested_list.remove_item"
     bl_label = "Remove Item"
 
-    def get_manager(self, context):
-        """Override this to return the appropriate manager instance."""
-        raise NotImplementedError("Subclasses must implement get_manager")
-
     def execute(self, context):
-        manager = self.get_manager(context)
+        manager = context.scene.nested_list_manager
         item_id = manager.get_id_from_flattened_index(manager.active_index)
         if item_id != -1:
             collection_index = manager.get_collection_index_from_id(item_id)
             if collection_index != -1:
                 manager.items.remove(collection_index)
+                # Update active_index to stay within bounds
                 flattened = manager.flatten_hierarchy()
                 manager.active_index = min(
                     manager.active_index, len(flattened) - 1)
@@ -229,23 +180,18 @@ class BaseNestedListRemoveOperator(bpy.types.Operator):
         return {'CANCELLED'}
 
 
-class BaseNestedListMoveOperator(bpy.types.Operator):
-    """Base class for moving items to new parents."""
+class NLM_OT_MoveItem(bpy.types.Operator):
     bl_idname = "nested_list.move_item"
     bl_label = "Move Item"
     bl_description = "Move the selected item to a new parent"
 
     new_parent_id: IntProperty()
 
-    def get_manager(self, context):
-        """Override this to return the appropriate manager instance."""
-        raise NotImplementedError("Subclasses must implement get_manager")
-
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
-        manager = self.get_manager(context)
+        manager = context.scene.nested_list_manager
         item_id = manager.get_id_from_flattened_index(manager.active_index)
         if item_id != -1:
             if manager.move_item(item_id, self.new_parent_id):
@@ -255,20 +201,16 @@ class BaseNestedListMoveOperator(bpy.types.Operator):
         return {'CANCELLED'}
 
 
-class BaseNestedListMoveUpOperator(bpy.types.Operator):
-    """Base class for moving items up."""
+class NLM_OT_MoveUp(bpy.types.Operator):
     bl_idname = "nested_list.move_up"
     bl_label = "Move Item Up"
 
-    def get_manager(self, context):
-        """Override this to return the appropriate manager instance."""
-        raise NotImplementedError("Subclasses must implement get_manager")
-
     def execute(self, context):
-        manager = self.get_manager(context)
+        manager = context.scene.nested_list_manager
         item_id = manager.get_id_from_flattened_index(manager.active_index)
         if item_id != -1:
             if manager.reorder_item(item_id, 'UP'):
+                # Update active_index to follow the moved item
                 flattened = manager.flatten_hierarchy()
                 for i, (item, _) in enumerate(flattened):
                     if item.id == item_id:
@@ -278,20 +220,16 @@ class BaseNestedListMoveUpOperator(bpy.types.Operator):
         return {'CANCELLED'}
 
 
-class BaseNestedListMoveDownOperator(bpy.types.Operator):
-    """Base class for moving items down."""
+class NLM_OT_MoveDown(bpy.types.Operator):
     bl_idname = "nested_list.move_down"
     bl_label = "Move Item Down"
 
-    def get_manager(self, context):
-        """Override this to return the appropriate manager instance."""
-        raise NotImplementedError("Subclasses must implement get_manager")
-
     def execute(self, context):
-        manager = self.get_manager(context)
+        manager = context.scene.nested_list_manager
         item_id = manager.get_id_from_flattened_index(manager.active_index)
         if item_id != -1:
             if manager.reorder_item(item_id, 'DOWN'):
+                # Update active_index to follow the moved item
                 flattened = manager.flatten_hierarchy()
                 for i, (item, _) in enumerate(flattened):
                     if item.id == item_id:
@@ -299,3 +237,16 @@ class BaseNestedListMoveDownOperator(bpy.types.Operator):
                         break
                 return {'FINISHED'}
         return {'CANCELLED'}
+
+
+classes = [
+    NestedListItem,
+    NestedListManager,
+    NLM_UL_List,
+    NLM_PT_Panel,
+    NLM_OT_AddItem,
+    NLM_OT_RemoveItem,
+    NLM_OT_MoveItem,
+    NLM_OT_MoveUp,
+    NLM_OT_MoveDown,
+]
