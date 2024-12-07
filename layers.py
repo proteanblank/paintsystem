@@ -59,17 +59,17 @@ class PaintSystemLayer(PropertyGroup):
         ],
         default='IMAGE'
     )
-
-
-class PaintSystemImage(PaintSystemLayer):
     image: PointerProperty(
         name="Image",
         type=bpy.types.Image
     )
 
 
-class PaintSystemFolder(PaintSystemLayer):
-    layers: CollectionProperty(type=PaintSystemLayer)
+# class PaintSystemImage(PaintSystemLayer):
+
+
+# class PaintSystemFolder(PaintSystemLayer):
+#     layers: CollectionProperty(type=PaintSystemLayer)
 
 
 class PaintSystemLayers(PropertyGroup):
@@ -633,6 +633,15 @@ class MAT_PT_paintSystemLayers(Panel):
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_paintSystemGroups'
 
+    def get_active_group(self, context):
+        mat = context.active_object.active_material
+        if not mat or not hasattr(mat, "paint_system"):
+            return None
+        active_group_idx = int(mat.paint_system.active_group)
+        return mat.paint_system.groups[active_group_idx]
+
+    layers: PointerProperty(type=PaintSystemLayers)
+
     @classmethod
     def poll(cls, context):
         if not context.active_object:
@@ -680,9 +689,7 @@ class MAT_PT_paintSystemLayers(Panel):
 
 
 classes = (
-    PaintSystemImage,
     PaintSystemLayer,
-    PaintSystemFolder,
     PaintSystemLayers,
     PaintSystemGroups,
     PAINTSYSTEM_OT_addPaintSystem,
