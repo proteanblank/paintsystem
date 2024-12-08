@@ -6,12 +6,8 @@ from bpy.props import (IntProperty,
                        PointerProperty,
                        CollectionProperty,
                        EnumProperty)
-from bpy.types import (Operator,
-                       Panel,
-                       PropertyGroup,
-                       UIList,
-                       UILayout,
-                       Menu)
+from bpy.types import PropertyGroup
+from bpy.utils import register_classes_factory
 from .nestedListManager import BaseNestedListItem, BaseNestedListManager
 
 
@@ -66,6 +62,13 @@ class PaintSystemLayer(BaseNestedListItem):
         name="Image",
         type=bpy.types.Image
     )
+    type: EnumProperty(
+        items=[
+            ('FOLDER', "Folder", "Folder layer"),
+            ('IMAGE', "Image", "Image layer"),
+        ],
+        default='IMAGE'
+    )
 
 
 class PaintSystemLayerManager(BaseNestedListManager):
@@ -75,6 +78,29 @@ class PaintSystemLayerManager(BaseNestedListManager):
     @property
     def item_type(self):
         return PaintSystemLayer
+
+    def get_movement_menu_items(self, item_id, direction):
+        """
+        Get menu items for movement options.
+        Returns list of tuples (identifier, label, description)
+        """
+        options = self.get_movement_options(item_id, direction)
+        menu_items = []
+
+        # Map option identifiers to their operators
+        operator_map = {
+            'UP': 'paint_system.move_up',
+            'DOWN': 'paint_system.move_down'
+        }
+
+        for identifier, description in options:
+            menu_items.append((
+                operator_map[direction],
+                description,
+                {'action': identifier}
+            ))
+
+        return menu_items
 
 
 class PaintSystemGroups(PropertyGroup):
@@ -108,7 +134,3 @@ def unregister():
     del bpy.types.Material.paint_system
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
-
-
-if __name__ == "__main__":
-    register()

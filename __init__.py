@@ -30,11 +30,9 @@ auto_load.init()
 
 
 submodules = [
-    # "properties",
-    # "operators",
-    # "bruh",
-    "layers",
-    # "trail_handler"
+    "operators",
+    "properties",
+    "panels",
 ]
 
 register, unregister = register_submodule_factory(__name__, submodules)
