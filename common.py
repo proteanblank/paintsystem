@@ -75,3 +75,17 @@ def update_group_node_tree(self, context: Context):
     # Rebuild the node tree
     for layer in active_group.layers:
         layer.add_nodes(node_tree)
+
+
+def on_item_delete(item):
+    if item.node_tree:
+        # 2 users: 1 for the node tree, 1 for the datablock
+        if item.node_tree.users <= 2:
+            # print("Removing node tree")
+            bpy.data.node_groups.remove(item.node_tree)
+
+    if item.image:
+        # 2 users: 1 for the image datablock, 1 for the panel
+        if item.image and item.image.users <= 2:
+            # print("Removing image")
+            bpy.data.images.remove(item.image)

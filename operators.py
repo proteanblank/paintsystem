@@ -10,7 +10,7 @@ from bpy.props import (
 from bpy.types import Operator, Image, NodeTree
 
 from bpy.utils import register_classes_factory
-from .common import get_active_group, get_active_layer, redraw_panel, get_highest_number_with_prefix
+from .common import get_active_group, get_active_layer, redraw_panel, get_highest_number_with_prefix, on_item_delete
 from .node_manager import get_node_from_library
 from mathutils import Vector
 
@@ -118,14 +118,12 @@ class PAINTSYSTEM_OT_DeleteGroup(Operator):
         if not active_group:
             return {'CANCELLED'}
 
-        for item, _ in active_group.flatten_hierarchy():
-            if item.type == 'IMAGE' and item.image:
-                bpy.data.images.remove(item.image)
-            if item.node_tree:
-                bpy.data.node_groups.remove(item.node_tree)
-
-        if active_group.node_tree:
+        # 2 users: 1 for the material node tree, 1 for the datablock
+        if active_group.node_tree and active_group.node_tree.users <= 2:
             bpy.data.node_groups.remove(active_group.node_tree)
+
+        for item, _ in active_group.flatten_hierarchy():
+            on_item_delete(item)
 
         active_group_idx = int(mat.paint_system.active_group)
         mat.paint_system.groups.remove(active_group_idx)
@@ -173,9 +171,9 @@ class PAINTSYSTEM_OT_RenameGroup(Operator):
 # -------------------------------------------------------------------
 # Layers Operators
 # -------------------------------------------------------------------
-class PAINTSYSTEM_OT_RemoveItem(Operator):
+class PAINTSYSTEM_OT_DeleteItem(Operator):
     """Remove the active item"""
-    bl_idname = "paint_system.remove_item"
+    bl_idname = "paint_system.delete_item"
     bl_label = "Remove Item"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
@@ -189,23 +187,23 @@ class PAINTSYSTEM_OT_RemoveItem(Operator):
         if not active_group:
             return {'CANCELLED'}
 
-        # Check if item has image data
         active_layer = get_active_layer(self, context)
         if not active_layer:
             return {'CANCELLED'}
 
-        if active_layer.image:
-            bpy.data.images.remove(active_layer.image)
+        # item_id = active_group.get_id_from_flattened_index(
+        #     active_group.active_index)
 
-        # Remove node tree
-        for item, _ in active_group.flatten_hierarchy():
-            if item.id == active_layer.id or item.parent_id == active_layer.id:
-                bpy.data.node_groups.remove(item.node_tree)
+        # for item in active_group.items:
+        #     if item.id == item_id or item.parent_id == item_id:
+        #         delete_item(self, context, item)
+
+        # return {'FINISHED'}
 
         item_id = active_group.get_id_from_flattened_index(
             active_group.active_index)
 
-        if item_id != -1 and active_group.remove_item_and_children(item_id):
+        if item_id != -1 and active_group.remove_item_and_children(item_id, on_item_delete):
             # Update active_index
             flattened = active_group.flatten_hierarchy()
             active_group.active_index = min(
@@ -410,7 +408,7 @@ def create_layer_node_group(name: str, material_name: str, image: Image) -> Node
 
 
 def create_new_layer_with_image(self, context, image):
-    image.use_fake_user = True
+    # image.use_fake_user = True
     active_group = get_active_group(self, context)
     if not active_group:
         return {'CANCELLED'}
@@ -734,7 +732,7 @@ classes = (
     PAINTSYSTEM_OT_AddGroup,
     PAINTSYSTEM_OT_DeleteGroup,
     PAINTSYSTEM_OT_RenameGroup,
-    PAINTSYSTEM_OT_RemoveItem,
+    PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,
     PAINTSYSTEM_OT_TogglePaintMode,

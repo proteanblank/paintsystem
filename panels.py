@@ -93,7 +93,7 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
             else:
                 row.label(icon='FILE_FOLDER')
             row.prop(display_item, "name", text="", emboss=False)
-            row.label(text=f"Order: {display_item.order}")
+            # row.label(text=f"Order: {display_item.order}")
             self.draw_custom_properties(row, display_item)
 
     def draw_custom_properties(self, layout, item):
@@ -159,7 +159,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         # col.operator("paint_system.add_item", text="",
         #              icon='NEWFOLDER').item_type = 'FOLDER'
         col.separator()
-        col.operator("paint_system.remove_item", icon="TRASH", text="")
+        col.operator("paint_system.delete_item", icon="TRASH", text="")
         col.separator()
         col.operator("paint_system.move_up", icon="TRIA_UP", text="")
         col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")

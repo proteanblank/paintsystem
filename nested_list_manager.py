@@ -85,7 +85,7 @@ class BaseNestedListManager(PropertyGroup):
         self.next_id += 1
         return new_item.id
 
-    def remove_item_and_children(self, item_id):
+    def remove_item_and_children(self, item_id, on_delete=None):
         """Remove an item and all its children"""
         to_remove = []
 
@@ -107,6 +107,8 @@ class BaseNestedListManager(PropertyGroup):
 
             # Remove items from highest index to lowest
             for index in sorted(to_remove, reverse=True):
+                if on_delete:
+                    on_delete(self.items[index])
                 self.items.remove(index)
 
             return True
