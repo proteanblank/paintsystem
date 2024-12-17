@@ -18,6 +18,8 @@ def get_groups(self, context):
         return []
     return [(str(i), group.name, f"Group {i}") for i, group in enumerate(mat.paint_system.groups)]
 
+# bpy.types.MeshUVLoopLayer.id_data
+
 
 class PaintSystemLayer(BaseNestedListItem):
 
@@ -26,54 +28,13 @@ class PaintSystemLayer(BaseNestedListItem):
         description="Toggle layer visibility",
         default=True
     )
-    # opacity: FloatProperty(
-    #     name="Opacity",
-    #     description="Layer opacity",
-    #     min=0.0,
-    #     max=1.0,
-    #     default=1.0
-    # )
-    # clip_below: BoolProperty(
-    #     name="Clip Below",
-    #     description="Clip layers below this one",
-    #     default=False
-    # )
-    # blend_mode: EnumProperty(
-    #     name="Blend Mode",
-    #     items=[
-    #         ('NORMAL', "Normal", "Normal blend mode"),
-    #         ('MULTIPLY', "Multiply", "Multiply blend mode"),
-    #         ('SCREEN', "Screen", "Screen blend mode"),
-    #         ('OVERLAY', "Overlay", "Overlay blend mode"),
-    #         ('DARKEN', "Darken", "Darken blend mode"),
-    #         ('LIGHTEN', "Lighten", "Lighten blend mode"),
-    #         ('COLOR_DODGE', "Color Dodge", "Color Dodge blend mode"),
-    #         ('COLOR_BURN', "Color Burn", "Color Burn blend mode"),
-    #         ('HARD_LIGHT', "Hard Light", "Hard Light blend mode"),
-    #         ('SOFT_LIGHT', "Soft Light", "Soft Light blend mode"),
-    #         ('DIFFERENCE', "Difference", "Difference blend mode"),
-    #         ('EXCLUSION', "Exclusion", "Exclusion blend mode"),
-    #         ('HUE', "Hue", "Hue blend mode"),
-    #         ('SATURATION', "Saturation", "Saturation blend mode"),
-    #         ('COLOR', "Color", "Color blend mode"),
-    #         ('LUMINOSITY', "Luminosity", "Luminosity blend mode"),
-    #     ],
-    #     default='NORMAL'
-    # )
-    # interpolation: EnumProperty(
-    #     name="Interpolation",
-    #     items=[
-    #         ('NEAREST', "Nearest", "Nearest interpolation"),
-    #         ('LINEAR', "Linear", "Linear interpolation"),
-    #         ('CUBIC', "Cubic", "Cubic interpolation"),
-    #         ('SMART', "Smart", "Smart interpolation")
-    #     ],
-    #     default='NEAREST',
-    #     description="Interpolation method"
-    # )
     image: PointerProperty(
         name="Image",
         type=bpy.types.Image
+    )
+    uv_map_id: PointerProperty(
+        name="UV Map",
+        type=bpy.types.ID
     )
     type: EnumProperty(
         items=[

@@ -154,10 +154,6 @@ class MAT_PT_PaintSystemLayers(Panel):
         col = row.column(align=True)
         col.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE', text="")
         col.operator("paint_system.add_folder", icon='NEWFOLDER', text="")
-        # col.operator("paint_system.add_item", text="",
-        #              icon='IMAGE_DATA').item_type = 'IMAGE'
-        # col.operator("paint_system.add_item", text="",
-        #              icon='NEWFOLDER').item_type = 'FOLDER'
         col.separator()
         col.operator("paint_system.delete_item", icon="TRASH", text="")
         col.separator()
@@ -179,20 +175,23 @@ class MAT_PT_PaintSystemLayers(Panel):
         #     active_layer.node_tree.name)
 
         layout.label(text=f"{active_layer.name} Settings")
-        row = layout.row()
-        row.scale_y = 1.5
 
         color_mix_node = None
         for node in active_layer.node_tree.nodes:
             if node.type == 'MIX' and node.data_type == 'RGBA':
                 color_mix_node = node
 
+        row = layout.row()
+        row.scale_y = 1.5
         # Let user set opacity and blend mode:
+        row.prop(color_mix_node, "blend_type", text="Blend")
+
+        row = layout.row()
+        row.scale_y = 1.5
         row.prop(layer_node.inputs[1], "default_value",
-                 text="Clip")
+                 text="Clip", icon="CLIPUV_HLT", icon_only=True)
         row.prop(layer_node.inputs[0], "default_value",
                  text="Opacity")
-        row.prop(color_mix_node, "blend_type", text="")
 
         if active_layer.type == 'IMAGE':
 

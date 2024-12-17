@@ -7,7 +7,7 @@ from bpy.props import (
     EnumProperty,
 )
 
-from bpy.types import Operator, Image, NodeTree
+from bpy.types import Operator, Image, NodeTree, Context
 
 from bpy.utils import register_classes_factory
 from .common import get_active_group, get_active_layer, redraw_panel, get_highest_number_with_prefix, on_item_delete
@@ -118,8 +118,14 @@ class PAINTSYSTEM_OT_DeleteGroup(Operator):
         if not active_group:
             return {'CANCELLED'}
 
+        use_node_tree = False
+        for node in mat.node_tree.nodes:
+            if node.type == 'GROUP' and node.node_tree == active_group.node_tree:
+                use_node_tree = True
+                break
+
         # 2 users: 1 for the material node tree, 1 for the datablock
-        if active_group.node_tree and active_group.node_tree.users <= 2:
+        if active_group.node_tree and active_group.node_tree.users <= 1 + use_node_tree:
             bpy.data.node_groups.remove(active_group.node_tree)
 
         for item, _ in active_group.flatten_hierarchy():
@@ -455,6 +461,7 @@ def create_new_layer_with_image(self, context, image):
 class PAINTSYSTEM_OT_TogglePaintMode(Operator):
     bl_idname = "paint_system.toggle_paint_mode"
     bl_label = "Toggle Paint Mode"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     def execute(self, context):
         active_group = get_active_group(self, context)
@@ -473,6 +480,10 @@ class PAINTSYSTEM_OT_TogglePaintMode(Operator):
 class PAINTSYSTEM_OT_NewImage(Operator):
     bl_idname = "paint_system.new_image"
     bl_label = "New Image"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def get_uv_maps_names(self, context: Context):
+        return [(uv_map.name, uv_map.name, "") for uv_map in context.mesh.uv_layers]
 
     name: StringProperty(
         name="Name",
@@ -492,16 +503,13 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         description="Use 32-bit float instead of 16-bit",
         default=False
     )
-    # color: FloatVectorProperty(
-    #     name="Color",
-    #     subtype='COLOR',
-    #     size=4,
-    #     default=(0.0, 0.0, 0.0, 0.0),
-    #     min=0.0,
-    #     max=1.0
-    # )
+    uv_map: EnumProperty(
+        name="UV Map",
+        items=get_uv_maps_names
+    )
 
     def execute(self, context):
+        # context.mesh.uv_layers.new(name=self.name)
         # Create the new image
         active_group = get_active_group(self, context)
         image = bpy.data.images.new(
@@ -523,11 +531,13 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         layout.prop(self, "name")
         layout.prop(self, "image_resolution", expand=True)
         layout.prop(self, "high_bit_float")
+        layout.prop(self, "uv_map")
 
 
 class PAINTSYSTEM_OT_OpenImage(Operator):
     bl_idname = "paint_system.open_image"
     bl_label = "Open Image"
+    bl_options = {'REGISTER', 'UNDO'}
 
     filepath: StringProperty(
         subtype='FILE_PATH',
@@ -554,6 +564,7 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
 class PAINTSYSTEM_OT_AddFolder(Operator):
     bl_idname = "paint_system.add_folder"
     bl_label = "Add Folder"
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         active_group = get_active_group(self, context)
@@ -607,6 +618,7 @@ class PAINTSYSTEM_OT_AddFolder(Operator):
 class IMAGE_OT_SelectImage(Operator):
     bl_idname = "image.select_image"
     bl_label = "Select Image"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     image: PointerProperty(type=Image)
 
@@ -624,6 +636,7 @@ class IMAGE_OT_SelectImage(Operator):
 class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     bl_idname = "paint_system.create_template_setup"
     bl_label = "Create Template Setup"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     template: EnumProperty(
         items=[
@@ -631,6 +644,18 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
             ('COLORALPHA', "Color Alpha", "Color and Alpha"),
         ],
         default='COLOR'
+    )
+
+    use_alpha_blend: BoolProperty(
+        name="Use Alpha Blend",
+        description="Use alpha blend instead of alpha clip",
+        default=True
+    )
+
+    disable_show_backface: BoolProperty(
+        name="Disable Show Backface",
+        description="Disable Show Backface",
+        default=True
     )
 
     def execute(self, context):
@@ -690,6 +715,10 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
                           emission_node.outputs['Emission'])
                 links.new(output_node.inputs['Surface'],
                           shader_mix_node.outputs['Shader'])
+                if self.use_alpha_blend:
+                    mat.blend_method = 'BLEND'
+                if self.disable_show_backface:
+                    mat.show_transparent_back = False
 
         return {'FINISHED'}
 
@@ -699,7 +728,9 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "template")
-
+        if self.template == 'COLORALPHA':
+            layout.prop(self, "use_alpha_blend")
+            layout.prop(self, "disable_show_backface")
 
 # -------------------------------------------------------------------
 # For testing
