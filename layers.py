@@ -12,7 +12,7 @@ from bpy.types import (Operator,
                        UIList,
                        UILayout,
                        Menu)
-from .nestedListManager import BaseNestedListItem, BaseNestedListManager
+from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 
 
 def get_groups(self, context):

@@ -13,6 +13,8 @@
 
 from bpy.utils import register_submodule_factory
 import bpy
+from bpy.app.handlers import persistent
+
 from . import auto_load
 bl_info = {
     "name": "Paint System",
@@ -33,6 +35,9 @@ submodules = [
     "operators",
     "properties",
     "panels",
+    # "node_organizer",
+    # "test",
 ]
+
 
 register, unregister = register_submodule_factory(__name__, submodules)

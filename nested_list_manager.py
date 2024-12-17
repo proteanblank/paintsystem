@@ -1,8 +1,9 @@
 import bpy
 from bpy.props import StringProperty, IntProperty, CollectionProperty, PointerProperty, EnumProperty
+from bpy.types import (PropertyGroup, UIList, Operator, Panel)
 
 
-class BaseNestedListItem(bpy.types.PropertyGroup):
+class BaseNestedListItem(PropertyGroup):
     """Base class for nested list items. Extend this class to add custom properties."""
     id: IntProperty()
     name: StringProperty()
@@ -17,7 +18,7 @@ class BaseNestedListItem(bpy.types.PropertyGroup):
     )
 
 
-class BaseNestedListManager(bpy.types.PropertyGroup):
+class BaseNestedListManager(PropertyGroup):
     """Base class for nested list manager. Override items property in your subclass."""
     active_index: IntProperty()
     next_id: IntProperty(default=0)
@@ -415,7 +416,7 @@ class CustomNestedListManager(BaseNestedListManager):
 # Modified UI list to handle custom properties
 
 
-class BaseNLM_UL_List(bpy.types.UIList):
+class BaseNLM_UL_List(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
         nested_list_manager = self.get_list_manager(context)
         flattened = nested_list_manager.flatten_hierarchy()
@@ -449,7 +450,7 @@ class CustomNLM_UL_List(BaseNLM_UL_List):
 
 
 # Update the NLM_OT_AddItem operator:
-class NLM_OT_AddItem(bpy.types.Operator):
+class NLM_OT_AddItem(Operator):
     bl_idname = "nested_list.add_item"
     bl_label = "Add Item"
 
@@ -489,7 +490,7 @@ class NLM_OT_AddItem(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class NLM_OT_RemoveItem(bpy.types.Operator):
+class NLM_OT_RemoveItem(Operator):
     bl_idname = "nested_list.remove_item"
     bl_label = "Remove Item"
 
@@ -509,7 +510,7 @@ class NLM_OT_RemoveItem(bpy.types.Operator):
         return {'CANCELLED'}
 
 
-class NLM_OT_MoveUp(bpy.types.Operator):
+class NLM_OT_MoveUp(Operator):
     bl_idname = "nested_list.move_up"
     bl_label = "Move Item Up"
 
@@ -566,7 +567,7 @@ class NLM_OT_MoveUp(bpy.types.Operator):
         return {'CANCELLED'}
 
 
-class NLM_OT_MoveDown(bpy.types.Operator):
+class NLM_OT_MoveDown(Operator):
     bl_idname = "nested_list.move_down"
     bl_label = "Move Item Down"
 
@@ -623,7 +624,7 @@ class NLM_OT_MoveDown(bpy.types.Operator):
         return {'CANCELLED'}
 
 
-class NLM_OT_NormalizeOrders(bpy.types.Operator):
+class NLM_OT_NormalizeOrders(Operator):
     bl_idname = "nested_list.normalize_orders"
     bl_label = "Normalize Orders"
 
@@ -633,7 +634,7 @@ class NLM_OT_NormalizeOrders(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class NLM_PT_Panel(bpy.types.Panel):
+class NLM_PT_Panel(Panel):
     bl_label = "Nested List Manager"
     bl_idname = "NLM_PT_panel"
     bl_space_type = 'VIEW_3D'
