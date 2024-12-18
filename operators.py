@@ -412,7 +412,6 @@ def create_layer_node_group(name: str, material_name: str, image: Image, uv_map_
     uv_map_node = None
     # Find UV Map node
     for node in layer_nt.nodes:
-        print(node.type)
         if node.type == 'UVMAP':
             uv_map_node = node
             break
