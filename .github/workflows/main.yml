@@ -31,5 +31,5 @@ jobs:
         uses: blenderkit/blender-addon-release@main
         with:
           artifact_name: paint-system
-          release_name: PaintSystem
-          version: ${{github.event.inputs.version}}
+          release_name: ${{ github.event.inputs.version }}
+          version: ${{ github.event.inputs.version }}
