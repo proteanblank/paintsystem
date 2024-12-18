@@ -19,7 +19,7 @@ jobs:
     steps:        
       - name: Build addon
         uses: blenderkit/blender-addon-build@main
-        id: build-addon # Add an id so we can refer to the output later
+        id: build-addon
         with:
           name: paint-system
           exclude-files: ".git;.github;README.md"
@@ -27,8 +27,8 @@ jobs:
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
         with:
-          name: paint-system # Use the same name as in the build step, or the name of your choosing
-          path: paint-system.zip # The blenderkit/blender-addon-build@main action will always create a zip file with this name
+          name: paint-system
+          path: paint-system/paint-system.zip # Path to the zip
   Release:
     runs-on: ubuntu-latest
     needs: Build
@@ -36,10 +36,10 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: paint-system  # Use the same name that was used for uploading the artifact
+          name: paint-system
       - name: Release addon
         uses: blenderkit/blender-addon-release@main
         with:
-          artifact_name: paint-system # Use the artifact name.
+          artifact_name: paint-system
           release_name: PaintSystem
           version: ${{github.event.inputs.version}}
