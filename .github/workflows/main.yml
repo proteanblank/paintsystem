@@ -28,7 +28,7 @@ jobs:
     needs: Build
     steps:
       - name: Release addon
-        uses: natapol2547/blender-addon-release@main
+        uses: blenderkit/blender-addon-release@main
         with:
           artifact_name: paint-system
           release_name: Paint System
