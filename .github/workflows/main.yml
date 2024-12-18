@@ -20,7 +20,7 @@ jobs:
       - name: Build addon
         uses: blenderkit/blender-addon-build@main
         with:
-          name: sample-addon
+          name: paint-system
           exclude-files: ".git;.github;README.md"
 
   Release:
