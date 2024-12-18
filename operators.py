@@ -10,7 +10,7 @@ from bpy.props import (
 from bpy.types import Operator, Image, NodeTree, Context
 
 from bpy.utils import register_classes_factory
-from .common import get_active_group, get_active_layer, redraw_panel, get_highest_number_with_prefix, on_item_delete
+from .common import get_active_group, get_active_layer, redraw_panel, get_highest_number_with_prefix, on_item_delete, get_uv_maps_names
 from .node_manager import get_node_from_library
 from mathutils import Vector
 
@@ -399,7 +399,7 @@ def create_folder_node_group(name: str, material_name: str) -> NodeTree:
     return folder_nt
 
 
-def create_layer_node_group(name: str, material_name: str, image: Image) -> NodeTree:
+def create_layer_node_group(name: str, material_name: str, image: Image, uv_map_name: str = None) -> NodeTree:
     layer_template = get_node_from_library('_PS_Layer_Template')
     layer_nt = layer_template.copy()
     layer_nt.name = f"PS {name} (MAT: {material_name})"
@@ -409,11 +409,23 @@ def create_layer_node_group(name: str, material_name: str, image: Image) -> Node
         if node.type == 'TEX_IMAGE':
             image_texture_node = node
             break
+    uv_map_node = None
+    # Find UV Map node
+    for node in layer_nt.nodes:
+        print(node.type)
+        if node.type == 'UVMAP':
+            uv_map_node = node
+            break
+    # use uv_map_name or default to first uv map
+    if uv_map_name:
+        uv_map_node.uv_map = uv_map_name
+    else:
+        uv_map_node.uv_map = bpy.context.object.data.uv_layers[0].name
     image_texture_node.image = image
     return layer_nt
 
 
-def create_new_layer_with_image(self, context, image):
+def create_new_layer_with_image(self, context: Context, image: Image, uv_map_name: str):
     # image.use_fake_user = True
     active_group = get_active_group(self, context)
     if not active_group:
@@ -433,7 +445,7 @@ def create_new_layer_with_image(self, context, image):
     active_material = context.active_object.active_material
 
     node_tree = create_layer_node_group(
-        layer_name, active_material.name, image)
+        layer_name, active_material.name, image, uv_map_name)
 
     # Create the new item
     new_id = active_group.add_item(
@@ -442,7 +454,7 @@ def create_new_layer_with_image(self, context, image):
         parent_id=parent_id,
         order=insert_order,
         image=image,
-        node_tree=node_tree
+        node_tree=node_tree,
     )
 
     # Update active index
@@ -482,9 +494,6 @@ class PAINTSYSTEM_OT_NewImage(Operator):
     bl_label = "New Image"
     bl_options = {'REGISTER', 'UNDO'}
 
-    def get_uv_maps_names(self, context: Context):
-        return [(uv_map.name, uv_map.name, "") for uv_map in context.mesh.uv_layers]
-
     name: StringProperty(
         name="Name",
         default="Image",
@@ -503,7 +512,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         description="Use 32-bit float instead of 16-bit",
         default=False
     )
-    uv_map: EnumProperty(
+    uv_map_name: EnumProperty(
         name="UV Map",
         items=get_uv_maps_names
     )
@@ -519,7 +528,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
             alpha=True,
         )
         image.generated_color = (0, 0, 0, 0)
-        create_new_layer_with_image(self, context, image)
+        create_new_layer_with_image(self, context, image, self.uv_map_name)
         active_group.update_node_tree()
         return {'FINISHED'}
 
@@ -531,7 +540,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         layout.prop(self, "name")
         layout.prop(self, "image_resolution", expand=True)
         layout.prop(self, "high_bit_float")
-        layout.prop(self, "uv_map")
+        layout.prop(self, "uv_map_name")
 
 
 class PAINTSYSTEM_OT_OpenImage(Operator):

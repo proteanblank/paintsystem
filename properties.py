@@ -32,10 +32,6 @@ class PaintSystemLayer(BaseNestedListItem):
         name="Image",
         type=bpy.types.Image
     )
-    uv_map_id: PointerProperty(
-        name="UV Map",
-        type=bpy.types.ID
-    )
     type: EnumProperty(
         items=[
             ('FOLDER', "Folder", "Folder layer"),
@@ -112,6 +108,11 @@ class PaintSystemGroup(BaseNestedListManager):
             links.new(inputs[0], group_node.outputs['Color'])
             links.new(inputs[1], group_node.outputs['Alpha'])
             if item.type == 'IMAGE':
+                # uv_map_node = nodes.new('ShaderNodeUVMap')
+                # uv_map_node.uv_map = item.uv_map_name
+                # links.new(group_node.inputs['Vector'],
+                #           uv_map_node.outputs['UV'])
+                # uv_map_node.location = group_node.location + Vector((0, -250))
                 depth_inputs[item.parent_id] = (
                     group_node.inputs['Color'], group_node.inputs['Alpha'], group_node.location)
             elif item.type == 'FOLDER':

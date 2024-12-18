@@ -89,3 +89,11 @@ def on_item_delete(item):
         if item.image and item.image.users <= 2:
             # print("Removing image")
             bpy.data.images.remove(item.image)
+
+
+def get_uv_maps_names(self, context: Context):
+    return [(uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers]
+
+# -------------------------------------------------------------------
+# Layer error checking
+# -------------------------------------------------------------------

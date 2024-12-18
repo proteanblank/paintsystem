@@ -30,7 +30,7 @@ class MAT_PT_PaintSystemGroups(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.active_object
+        return context.active_object and context.active_object.type == 'MESH'
 
     def draw(self, context):
         layout = self.layout
@@ -131,7 +131,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         row.scale_y = 1.5
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
-                         text="Toggle Paint Mode", icon="BRUSHES_ALL")
+                         text="Toggle Paint Mode", icon="BRUSHES_ALL", depress=current_mode == 'PAINT_TEXTURE')
         else:
             row.alert = True
             row.operator("paint_system.create_template_setup",
@@ -194,19 +194,15 @@ class MAT_PT_PaintSystemLayers(Panel):
                  text="Opacity")
 
         if active_layer.type == 'IMAGE':
+            uv_map_node = None
+            for node in active_layer.node_tree.nodes:
+                if node.type == 'UVMAP':
+                    uv_map_node = node
+            row = layout.row()
+            row.scale_y = 1.5
+            row.prop_search(uv_map_node, "uv_map", text="UV Map",
+                            search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
 
-            # # Create row for image selection
-            # row = layout.row(align=True)
-            # # Image property with dropdown
-            # row.template_ID(active_layer, "image",
-            #                 new="image.new", open="image.open")
-            # print(dir(active_layer.image))
-            image = active_layer.image
-            # layout.prop(active_layer, "interpolation", text="Interpolation")
-        # If an image is selected, show additional properties
-        # if active_layer.image:
-        #     layout.template_image(active_layer, "image",
-        #                           active_layer.image.colorspace_settings)
 
 # -------------------------------------------------------------------
 # Images Panels
