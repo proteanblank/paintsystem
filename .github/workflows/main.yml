@@ -19,16 +19,16 @@ jobs:
     steps:        
       - name: Build addon
         uses: blenderkit/blender-addon-build@main
-        id: build-addon  # Add an id so we can refer to the output later
+        id: build-addon # Add an id so we can refer to the output later
         with:
           name: paint-system
           exclude-files: ".git;.github;README.md"
-      
+    
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
         with:
           name: paint-system # Use the same name as in the build step, or the name of your choosing
-          path: ${{ steps.build-addon.outputs.zip-location }} # get the zip location from the previous step
+          path: paint-system.zip # The blenderkit/blender-addon-build@main action will always create a zip file with this name
   Release:
     runs-on: ubuntu-latest
     needs: Build
