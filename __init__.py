@@ -13,6 +13,7 @@
 
 from bpy.utils import register_submodule_factory
 import bpy
+from .paint_system import PaintSystem
 from bpy.app.handlers import persistent
 
 from . import auto_load
@@ -31,6 +32,33 @@ bl_info = {
 auto_load.init()
 
 
+@persistent
+def mode_change_handler(scene):
+    global previous_mode
+
+    # Get the active object and its mode
+    obj = bpy.context.object
+    if obj and obj.mode == 'TEXTURE_PAINT':
+        update_active_image()
+
+
+def update_active_image():
+    ps = PaintSystem(bpy.context)
+    image_paint = bpy.context.tool_settings.image_paint
+    mat = ps.active_material
+    if not mat:
+        return
+    active_layer = ps.active_layer
+    if not active_layer or active_layer.type != 'IMAGE':
+        return
+    if image_paint.mode == 'IMAGE':
+        image_paint.mode = 'MATERIAL'
+    for i, image in enumerate(mat.texture_paint_images):
+        if image == active_layer.image:
+            mat.paint_active_slot = i
+            break
+
+
 submodules = [
     "operators",
     "properties",
@@ -40,4 +68,14 @@ submodules = [
 ]
 
 
-register, unregister = register_submodule_factory(__name__, submodules)
+_register, _unregister = register_submodule_factory(__name__, submodules)
+
+
+def register():
+    _register()
+    bpy.app.handlers.depsgraph_update_post.append(mode_change_handler)
+
+
+def unregister():
+    bpy.app.handlers.depsgraph_update_post.remove(mode_change_handler)
+    _unregister()

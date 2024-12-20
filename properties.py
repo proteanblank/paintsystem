@@ -66,10 +66,6 @@ class PaintSystemLayer(BaseNestedListItem):
 
 
 class PaintSystemGroup(BaseNestedListManager):
-    def get_active_index(self):
-        update_active_image(self, bpy.context)
-        print("GET ACTIVE INDEX")
-        return self.get("active_index", 0)
 
     def update_node_tree(self):
         self.normalize_orders()
@@ -141,7 +137,6 @@ class PaintSystemGroup(BaseNestedListManager):
         name="Active Index",
         description="Active layer index",
         update=update_active_image,
-        # get=get_active_index,
     )
     node_tree: PointerProperty(
         name="Node Tree",
