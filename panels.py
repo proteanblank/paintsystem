@@ -14,7 +14,7 @@ from bpy.types import (Operator,
                        Menu)
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
-from .common import get_active_group, get_active_layer
+from .paint_system import PaintSystem
 
 # -------------------------------------------------------------------
 # Group Panels
@@ -34,8 +34,9 @@ class MAT_PT_PaintSystemGroups(Panel):
 
     def draw(self, context):
         layout = self.layout
-        ob = context.active_object
-        mat = ob.active_material
+        ps = PaintSystem(context)
+        ob = ps.active_object
+        mat = ps.active_material
 
         if not mat:
             layout.label(text="No active material")
@@ -77,7 +78,8 @@ class MAT_MT_PaintSystemGroup(Menu):
 
 class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
-        active_group = get_active_group(self, context)
+        ps = PaintSystem(context)
+        active_group = ps.active_group
         flattened = active_group.flatten_hierarchy()
         if index < len(flattened):
             display_item, level = flattened[index]
@@ -101,7 +103,7 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
             layout.label(text=str(item.order))
 
     def get_list_manager(self, context):
-        return get_active_group(self, context)
+        return PaintSystem(context).group
 
 
 class MAT_PT_PaintSystemLayers(Panel):
@@ -114,7 +116,8 @@ class MAT_PT_PaintSystemLayers(Panel):
 
     def draw(self, context):
         layout = self.layout
-        active_group = get_active_group(self, context)
+        ps = PaintSystem(context)
+        active_group = ps.active_group
         if not active_group:
             layout.label(text="No active group")
             return
@@ -161,25 +164,26 @@ class MAT_PT_PaintSystemLayers(Panel):
         col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 
         # Settings
-        active_layer = get_active_layer(self, context)
+        active_layer = ps.active_layer
 
         if not active_layer:
             return
 
         # Loop over every nodes in the active layer node tree
-        layer_node = None
-        for node in active_group.node_tree.nodes:
-            if node.type == 'GROUP' and node.node_tree and node.node_tree.name == active_layer.node_tree.name:
-                layer_node = node
-        # layer_node = active_group.node_tree.nodes.get(
-        #     active_layer.node_tree.name)
+        # layer_node = None
+        # for node in active_group.node_tree.nodes:
+        #     if node.type == 'GROUP' and node.node_tree and node.node_tree.name == active_layer.node_tree.name:
+        #         layer_node = node
+        layer_node = ps.layer_node_group
 
         layout.label(text=f"{active_layer.name} Settings")
 
-        color_mix_node = None
-        for node in active_layer.node_tree.nodes:
-            if node.type == 'MIX' and node.data_type == 'RGBA':
-                color_mix_node = node
+        # color_mix_node = None
+        # for node in active_layer.node_tree.nodes:
+        #     if node.type == 'MIX' and node.data_type == 'RGBA':
+        #         color_mix_node = node
+
+        color_mix_node = ps.layer_mix_node
 
         row = layout.row()
         row.scale_y = 1.5
@@ -192,14 +196,8 @@ class MAT_PT_PaintSystemLayers(Panel):
                  text="Clip", icon="CLIPUV_HLT", icon_only=True)
         row.prop(layer_node.inputs[0], "default_value",
                  text="Opacity")
-
-        if active_layer.type == 'IMAGE':
-            uv_map_node = None
-            for node in active_layer.node_tree.nodes:
-                if node.type == 'UVMAP':
-                    uv_map_node = node
-            row = layout.row()
-            row.scale_y = 1.5
+        uv_map_node = ps.layer_uvmap_node
+        if uv_map_node:
             row.prop_search(uv_map_node, "uv_map", text="UV Map",
                             search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
 

@@ -51,16 +51,21 @@ class PaintSystemGroup(BaseNestedListManager):
 
     def update_active_image(self, context: Context):
         image_paint = context.tool_settings.image_paint
+        mat = context.active_object.active_material
         flattened = self.flatten_hierarchy()
         if not flattened:
             return None
         active_layer = flattened[self.active_index][0]
-        if not active_layer:
+        if not active_layer or active_layer.type != 'IMAGE':
             return
 
-        image_paint.canvas = active_layer.image
-        if image_paint.mode == 'MATERIAL':
-            image_paint.mode = 'IMAGE'
+        # image_paint.canvas = active_layer.image
+        if image_paint.mode == 'IMAGE':
+            image_paint.mode = 'MATERIAL'
+        for i, image in enumerate(mat.texture_paint_images):
+            if image == active_layer.image:
+                mat.paint_active_slot = i
+                break
 
     def update_node_tree(self):
         self.normalize_orders()
