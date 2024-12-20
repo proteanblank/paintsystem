@@ -198,6 +198,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                  text="Opacity")
         uv_map_node = ps.layer_uvmap_node
         if uv_map_node:
+            row = layout.row()
             row.prop_search(uv_map_node, "uv_map", text="UV Map",
                             search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
 
