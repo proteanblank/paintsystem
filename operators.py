@@ -10,9 +10,16 @@ from bpy.props import (
 from bpy.types import Operator, Image, NodeTree, Context
 
 from bpy.utils import register_classes_factory
-from .common import redraw_panel, get_highest_number_with_prefix, get_uv_maps_names, get_node_from_library
 from .paint_system import PaintSystem
 from mathutils import Vector
+import re
+
+
+def redraw_panel(self, context: Context):
+    # Force the UI to update
+    if context.area:
+        context.area.tag_redraw()
+
 
 # -------------------------------------------------------------------
 # Group Operators
@@ -372,10 +379,27 @@ class PAINTSYSTEM_OT_TogglePaintMode(Operator):
         bpy.ops.object.mode_set(mode='TEXTURE_PAINT', toggle=True)
 
         # Change shading mode
-        if bpy.context.space_data.shading.type in ['SOLID', 'WIREFRAME']:
-            bpy.context.space_data.shading.type = 'MATERIAL'
+        if bpy.context.space_data.shading.type != 'RENDERED':
+            bpy.context.space_data.shading.type = 'RENDERED'
 
         return {'FINISHED'}
+
+
+def get_uv_maps_names(self, context: Context):
+    return [(uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers]
+
+
+def get_highest_number_with_prefix(prefix, string_list):
+    highest_number = 0
+    for string in string_list:
+        if string.startswith(prefix):
+            # Extract numbers from the string using regex
+            match = re.search(r'\d+', string)
+            if match:
+                number = int(match.group())
+                if number > highest_number:
+                    highest_number = number
+    return highest_number
 
 
 class PAINTSYSTEM_OT_NewImage(Operator):
@@ -624,25 +648,25 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
 # -------------------------------------------------------------------
 
 
-class PAINTSYSTEM_OT_Test(Operator):
-    """Test importing node groups from library"""
-    bl_idname = "paint_system.test"
-    bl_label = "Test"
+# class PAINTSYSTEM_OT_Test(Operator):
+#     """Test importing node groups from library"""
+#     bl_idname = "paint_system.test"
+#     bl_label = "Test"
 
-    node_name: StringProperty()
+#     node_name: StringProperty()
 
-    def execute(self, context):
-        node = get_node_from_library(self.node_name)
-        if node:
-            print(f"Found node: {node.name}")
-        return {'FINISHED'}
+#     def execute(self, context):
+#         node = get_node_from_library(self.node_name)
+#         if node:
+#             print(f"Found node: {node.name}")
+#         return {'FINISHED'}
 
-    def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self)
+#     def invoke(self, context, event):
+#         return context.window_manager.invoke_props_dialog(self)
 
-    def draw(self, context):
-        layout = self.layout
-        layout.prop(self, "node_name")
+#     def draw(self, context):
+#         layout = self.layout
+#         layout.prop(self, "node_name")
 
 
 classes = (
@@ -658,7 +682,7 @@ classes = (
     PAINTSYSTEM_OT_OpenImage,
     PAINTSYSTEM_OT_AddFolder,
     PAINTSYSTEM_OT_CreateTemplateSetup,
-    PAINTSYSTEM_OT_Test,
+    # PAINTSYSTEM_OT_Test,
 )
 
 register, unregister = register_classes_factory(classes)

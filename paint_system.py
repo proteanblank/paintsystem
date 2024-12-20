@@ -1,8 +1,15 @@
 import bpy
 from bpy.types import Context, Material, Image, NodeTree, Node, PropertyGroup
 from typing import Optional, Tuple
-from .common import on_item_delete, get_node_from_library
-from mathutils import Vector
+import os
+
+
+LIBRARY_FILE_NAME = "library.blend"
+NODE_GROUP_PREFIX = "_PS"
+
+
+def get_addon_filepath():
+    return os.path.dirname(bpy.path.abspath(__file__)) + os.sep
 
 
 class PaintSystem:
@@ -55,7 +62,7 @@ class PaintSystem:
             bpy.data.node_groups.remove(self.active_group.node_tree)
 
         for item, _ in self.active_group.flatten_hierarchy():
-            on_item_delete(item)
+            self._on_item_delete(item)
 
         active_group_idx = int(self.active_material.paint_system.active_group)
         self.active_material.paint_system.groups.remove(active_group_idx)
@@ -76,7 +83,7 @@ class PaintSystem:
         item_id = self.active_group.get_id_from_flattened_index(
             self.active_group.active_index)
 
-        if item_id != -1 and self.active_group.remove_item_and_children(item_id, on_item_delete):
+        if item_id != -1 and self.active_group.remove_item_and_children(item_id, self._on_item_delete):
             # Update active_index
             flattened = self.active_group.flatten_hierarchy()
             self.active_group.active_index = min(
@@ -268,14 +275,14 @@ class PaintSystem:
         return None
 
     def _create_folder_node_tree(self, folder_name: str, force_reload=False) -> NodeTree:
-        folder_template = get_node_from_library(
+        folder_template = self._get_node_from_library(
             '_PS_Folder_Template', force_reload)
         folder_nt = folder_template.copy()
         folder_nt.name = f"PS {folder_name} (MAT: {self.active_material.name})"
         return folder_nt
 
     def _create_layer_node_tree(self, layer_name: str, image: Image, uv_map_name: str = None, force_reload=False) -> NodeTree:
-        layer_template = get_node_from_library(
+        layer_template = self._get_node_from_library(
             '_PS_Layer_Template', force_reload)
         layer_nt = layer_template.copy()
         layer_nt.name = f"PS {layer_name} (MAT: {self.active_material.name})"
@@ -298,6 +305,88 @@ class PaintSystem:
             uv_map_node.uv_map = bpy.context.object.data.uv_layers[0].name
         image_texture_node.image = image
         return layer_nt
+
+    def _cleanup_duplicate_nodegroups(self, node_tree: NodeTree):
+        """
+        Cleanup duplicate node groups by using Blender's remap_users feature.
+        This automatically handles all node links and nested node groups.
+
+        Args:
+            node_group_name (str): Name of the main node group to clean up
+        """
+        def find_original_nodegroup(name):
+            # Get the base name by removing the .001, .002 etc. if present
+            # This gets the part before the first dot
+            base_name = name.split('.')[0]
+
+            # Find all matching node groups
+            matching_groups = [ng for ng in bpy.data.node_groups
+                               if ng.name == base_name or ng.name.split('.')[0] == base_name]
+
+            if not matching_groups:
+                return None
+
+            # The original is likely the one without a number suffix
+            # or the one with the lowest number if all have suffixes
+            for ng in matching_groups:
+                if ng.name == base_name:  # Exact match without any suffix
+                    return ng
+
+            # If we didn't find an exact match, return the one with lowest suffix number
+            return sorted(matching_groups, key=lambda x: x.name)[0]
+
+        # Process each node group
+        for node in node_tree.nodes:
+            if node.type == 'GROUP' and node.node_tree:
+                ng = node.node_tree
+
+                # Find the original node group
+                original_group = find_original_nodegroup(ng.name)
+
+                # If this is a duplicate (not the original) and we found the original
+                if original_group and ng != original_group:
+                    # Remap all users of this node group to the original
+                    ng.user_remap(original_group)
+                    # Remove the now-unused node group
+                    bpy.data.node_groups.remove(ng)
+
+    def _get_node_from_library(self, tree_name, force_reload=False):
+        # Check if the node group already exists
+        ng = bpy.data.node_groups.get(tree_name)
+        if ng:
+            if force_reload:
+                bpy.data.node_groups.remove(ng)
+            else:
+                return ng
+
+        # Load the library file
+        filepath = get_addon_filepath() + LIBRARY_FILE_NAME
+        with bpy.data.libraries.load(filepath) as (lib_file, current_file):
+            lib_node_group_names = lib_file.node_groups
+            current_node_groups_names = current_file.node_groups
+            for node_group_name in lib_node_group_names:
+                if node_group_name == tree_name:
+                    current_node_groups_names.append(node_group_name)
+
+        # Getting the node group
+        ng = bpy.data.node_groups.get(tree_name)
+        if not ng:
+            return None
+        self._cleanup_duplicate_nodegroups(ng)
+        return ng
+
+    def _on_item_delete(item):
+        if item.node_tree:
+            # 2 users: 1 for the node tree, 1 for the datablock
+            if item.node_tree.users <= 2:
+                # print("Removing node tree")
+                bpy.data.node_groups.remove(item.node_tree)
+
+        if item.image:
+            # 2 users: 1 for the image datablock, 1 for the panel
+            if item.image and item.image.users <= 2:
+                # print("Removing image")
+                bpy.data.images.remove(item.image)
 
     def __find_node_group(self, node_tree: NodeTree, name: str) -> Optional[Node]:
         for node in node_tree.nodes:

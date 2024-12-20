@@ -10,6 +10,7 @@ from bpy.types import (PropertyGroup, Context,
                        NodeTreeInterface, Nodes, NodeTree, NodeLinks)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
+from .paint_system import PaintSystem
 
 
 def get_groups(self, context):
@@ -18,7 +19,26 @@ def get_groups(self, context):
         return []
     return [(str(i), group.name, f"Group {i}") for i, group in enumerate(mat.paint_system.groups)]
 
-# bpy.types.MeshUVLoopLayer.id_data
+
+def update_active_image(self, context: Context):
+    ps = PaintSystem(context)
+    image_paint = context.tool_settings.image_paint
+    mat = ps.active_material
+    # active_group = ps.active_group
+    active_layer = ps.active_layer
+    # flattened = active_group.flatten_hierarchy()
+    # if not flattened:
+    #     return None
+    # active_layer = flattened[self.active_index][0]
+    if not active_layer or active_layer.type != 'IMAGE':
+        return
+    # image_paint.canvas = active_layer.image
+    if image_paint.mode == 'IMAGE':
+        image_paint.mode = 'MATERIAL'
+    for i, image in enumerate(mat.texture_paint_images):
+        if image == active_layer.image:
+            mat.paint_active_slot = i
+            break
 
 
 class PaintSystemLayer(BaseNestedListItem):
@@ -46,26 +66,10 @@ class PaintSystemLayer(BaseNestedListItem):
 
 
 class PaintSystemGroup(BaseNestedListManager):
-    def test(self):
-        print("test")
-
-    def update_active_image(self, context: Context):
-        image_paint = context.tool_settings.image_paint
-        mat = context.active_object.active_material
-        flattened = self.flatten_hierarchy()
-        if not flattened:
-            return None
-        active_layer = flattened[self.active_index][0]
-        if not active_layer or active_layer.type != 'IMAGE':
-            return
-
-        # image_paint.canvas = active_layer.image
-        if image_paint.mode == 'IMAGE':
-            image_paint.mode = 'MATERIAL'
-        for i, image in enumerate(mat.texture_paint_images):
-            if image == active_layer.image:
-                mat.paint_active_slot = i
-                break
+    def get_active_index(self):
+        update_active_image(self, bpy.context)
+        print("GET ACTIVE INDEX")
+        return self.get("active_index", 0)
 
     def update_node_tree(self):
         self.normalize_orders()
@@ -136,7 +140,8 @@ class PaintSystemGroup(BaseNestedListManager):
     active_index: IntProperty(
         name="Active Index",
         description="Active layer index",
-        update=update_active_image
+        update=update_active_image,
+        # get=get_active_index,
     )
     node_tree: PointerProperty(
         name="Node Tree",
@@ -181,7 +186,8 @@ class PaintSystemGroups(PropertyGroup):
     active_group: EnumProperty(
         name="Active Group",
         description="Select active group",
-        items=get_groups
+        items=get_groups,
+        update=update_active_image
     )
 
 
