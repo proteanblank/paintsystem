@@ -281,7 +281,7 @@ class PaintSystem:
         folder_nt.name = f"PS {folder_name} (MAT: {self.active_material.name})"
         return folder_nt
 
-    def _create_layer_node_tree(self, layer_name: str, image: Image, uv_map_name: str = None, force_reload=False) -> NodeTree:
+    def _create_layer_node_tree(self, layer_name: str, image: Image, uv_map_name: str = None, force_reload=True) -> NodeTree:
         layer_template = self._get_node_from_library(
             '_PS_Layer_Template', force_reload)
         layer_nt = layer_template.copy()
@@ -375,7 +375,7 @@ class PaintSystem:
         self._cleanup_duplicate_nodegroups(ng)
         return ng
 
-    def _on_item_delete(item):
+    def _on_item_delete(self, item):
         if item.node_tree:
             # 2 users: 1 for the node tree, 1 for the datablock
             if item.node_tree.users <= 2:
