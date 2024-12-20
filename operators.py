@@ -139,6 +139,8 @@ class PAINTSYSTEM_OT_RenameGroup(Operator):
     bl_idname = "paint_system.rename_group"
     bl_label = "Rename Group"
 
+    new_name: StringProperty(name="New Name")
+
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
@@ -146,16 +148,19 @@ class PAINTSYSTEM_OT_RenameGroup(Operator):
         return active_group
 
     def execute(self, context):
+        ps = PaintSystem(context)
+        active_group = ps.active_group
+        active_group.name = self.new_name
+        redraw_panel(self, context)
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        self.new_name = PaintSystem(context).active_group.name
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
-        ps = PaintSystem(context)
-        active_group = ps.active_group
-        layout.prop(active_group, "name")
+        layout.prop(self, "new_name")
 
 
 # -------------------------------------------------------------------
@@ -451,11 +456,11 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        self.name = self.get_next_image_name(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
-        self.name = self.get_next_image_name(context)
         layout.prop(self, "name")
         layout.prop(self, "image_resolution", expand=True)
         layout.prop(self, "high_bit_float")
@@ -529,11 +534,11 @@ class PAINTSYSTEM_OT_AddFolder(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        self.folder_name = self.get_next_folder_name(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
-        self.folder_name = self.get_next_folder_name(context)
         layout.prop(self, "folder_name")
 
 # -------------------------------------------------------------------
