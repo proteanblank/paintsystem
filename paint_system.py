@@ -1,28 +1,126 @@
 import bpy
 from bpy.types import Context, Material, Image, NodeTree, Node, PropertyGroup
 from typing import Optional, Tuple
+from dataclasses import dataclass
 import os
 
 
 LIBRARY_FILE_NAME = "library.blend"
 NODE_GROUP_PREFIX = "_PS"
+BRUSH_PREFIX = "PS_"
 
 
 def get_addon_filepath():
     return os.path.dirname(bpy.path.abspath(__file__)) + os.sep
 
 
+def cleanup_duplicate_nodegroups(node_tree: NodeTree):
+    """
+    Cleanup duplicate node groups by using Blender's remap_users feature.
+    This automatically handles all node links and nested node groups.
+
+    Args:
+        node_group_name (str): Name of the main node group to clean up
+    """
+    def find_original_nodegroup(name):
+        # Get the base name by removing the .001, .002 etc. if present
+        # This gets the part before the first dot
+        base_name = name.split('.')[0]
+
+        # Find all matching node groups
+        matching_groups = [ng for ng in bpy.data.node_groups
+                           if ng.name == base_name or ng.name.split('.')[0] == base_name]
+
+        if not matching_groups:
+            return None
+
+        # The original is likely the one without a number suffix
+        # or the one with the lowest number if all have suffixes
+        for ng in matching_groups:
+            if ng.name == base_name:  # Exact match without any suffix
+                return ng
+
+        # If we didn't find an exact match, return the one with lowest suffix number
+        return sorted(matching_groups, key=lambda x: x.name)[0]
+
+    # Process each node group
+    for node in node_tree.nodes:
+        if node.type == 'GROUP' and node.node_tree:
+            ng = node.node_tree
+
+            # Find the original node group
+            original_group = find_original_nodegroup(ng.name)
+
+            # If this is a duplicate (not the original) and we found the original
+            if original_group and ng != original_group:
+                # Remap all users of this node group to the original
+                ng.user_remap(original_group)
+                # Remove the now-unused node group
+                bpy.data.node_groups.remove(ng)
+
+
+def get_node_from_library(tree_name, force_reload=False):
+    # Check if the node group already exists
+    ng = bpy.data.node_groups.get(tree_name)
+    if ng:
+        if force_reload:
+            bpy.data.node_groups.remove(ng)
+        else:
+            return ng
+
+    # Load the library file
+    filepath = get_addon_filepath() + LIBRARY_FILE_NAME
+    with bpy.data.libraries.load(filepath) as (lib_file, current_file):
+        lib_node_group_names = lib_file.node_groups
+        current_node_groups_names = current_file.node_groups
+        for node_group_name in lib_node_group_names:
+            if node_group_name == tree_name:
+                current_node_groups_names.append(node_group_name)
+
+    # Getting the node group
+    ng = bpy.data.node_groups.get(tree_name)
+    if not ng:
+        return None
+    cleanup_duplicate_nodegroups(ng)
+    return ng
+
+
+def get_brushes_from_library():
+    # Load the library file
+    filepath = get_addon_filepath() + LIBRARY_FILE_NAME
+    with bpy.data.libraries.load(filepath) as (lib_file, current_file):
+        lib_brushes = lib_file.brushes
+        current_brushes = current_file.brushes
+        for brush in lib_brushes:
+            if brush.startswith(BRUSH_PREFIX) and brush not in bpy.data.brushes:
+                current_brushes.append(brush)
+
+
+@dataclass
+class PaintSystemPreferences:
+    # unified_brush_color: bool
+    # unified_brush_size: bool
+    pass
+
+
 class PaintSystem:
     def __init__(self, context: Context):
+        self.preferences: PaintSystemPreferences = bpy.context.preferences.addons[
+            __package__].preferences
         self.context = context
         self.active_object = context.active_object
+        self.settings = self._get_paint_system_settings()
         self.active_material = self._get_active_material()
-
+        self.groups = self._get_groups()
         self.active_group = self._get_active_group()
         self.active_layer = self._get_active_layer()
         self.layer_node_tree = self._get_layer_node_tree()
         self.layer_node_group = self._get_layer_node_group()
-        self.layer_mix_node, self.layer_uvmap_node = self._get_layer_node_info()
+        self.color_mix_node = self._find_color_mix_node()
+        self.uv_map_node = self._find_uv_map_node()
+        self.opacity_mix_node = self._find_opacity_mix_node()
+        self.clip_mix_node = self._find_clip_mix_node()
+        self.rgb_node = self._find_rgb_node()
 
     def add_group(self, name: str) -> PropertyGroup:
         """Creates a new group in the active material's paint system.
@@ -134,6 +232,47 @@ class PaintSystem:
 
         return self.active_group.get_item_by_id(new_id)
 
+    def create_solid_color_layer(self, name: str, color: Tuple[float, float, float, float]) -> PropertyGroup:
+        """Creates a new solid color layer in the active group.
+
+        Args:
+            color (Tuple[float, float, float, float]): The color to be used in the layer.
+
+        Returns:
+            PropertyGroup: The newly created solid color layer.
+        """
+        # Get insertion position
+        parent_id, insert_order = self.active_group.get_insertion_data()
+        # Adjust existing items' order
+        self.active_group.adjust_sibling_orders(parent_id, insert_order)
+
+        solid_color_template = get_node_from_library(
+            '_PS_Solid_Color_Template', False)
+        solid_color_nt = solid_color_template.copy()
+        solid_color_nt.name = f"PS {name} (MAT: {self.active_material.name})"
+        solid_color_nt.nodes['RGB'].outputs[0].default_value = color
+
+        # Create the new item
+        new_id = self.active_group.add_item(
+            name=name,
+            item_type='SOLID_COLOR',
+            parent_id=parent_id,
+            order=insert_order,
+            node_tree=solid_color_nt,
+        )
+
+        # Update active index
+        if new_id != -1:
+            flattened = self.active_group.flatten_hierarchy()
+            for i, (item, _) in enumerate(flattened):
+                if item.id == new_id:
+                    self.active_group.active_index = i
+                    break
+
+        self.active_group.update_node_tree()
+
+        return self.active_group.get_item_by_id(new_id)
+
     def create_folder(self, name: str) -> PropertyGroup:
         """Creates a new folder in the active group.
 
@@ -149,7 +288,10 @@ class PaintSystem:
         # Adjust existing items' order
         self.active_group.adjust_sibling_orders(parent_id, insert_order)
 
-        node_tree = self._create_folder_node_tree(name)
+        folder_template = get_node_from_library(
+            '_PS_Folder_Template', False)
+        folder_nt = folder_template.copy()
+        folder_nt.name = f"PS {name} (MAT: {self.active_material.name})"
 
         # Create the new item
         new_id = self.active_group.add_item(
@@ -157,7 +299,7 @@ class PaintSystem:
             item_type='FOLDER',
             parent_id=parent_id,
             order=insert_order,
-            node_tree=node_tree
+            node_tree=folder_nt
         )
 
         # Update active index
@@ -170,18 +312,25 @@ class PaintSystem:
 
         self.active_group.update_node_tree()
 
+    def _get_paint_system_settings(self) -> Optional[PropertyGroup]:
+        return bpy.context.scene.paint_system_settings
+
     def _get_active_material(self) -> Optional[Material]:
         if not self.active_object or self.active_object.type != 'MESH':
             return None
 
         return self.active_object.active_material
 
-    def _get_active_group(self) -> Optional[PropertyGroup]:
+    def _get_groups(self) -> Optional[PropertyGroup]:
         if not self.active_material or not hasattr(self.active_material, "paint_system"):
             return None
         paint_system = self.active_material.paint_system
-        if not paint_system.groups:
+        return paint_system.groups
+
+    def _get_active_group(self) -> Optional[PropertyGroup]:
+        if not self.groups:
             return None
+        paint_system = self.active_material.paint_system
 
         active_group_idx = int(paint_system.active_group)
         if active_group_idx >= len(paint_system.groups):
@@ -203,17 +352,6 @@ class PaintSystem:
     def _get_layer_node_tree(self) -> Optional[NodeTree]:
         if not self.active_layer:
             return None
-
-        # if not self.active_layer.node_tree:
-        #     if self.active_layer.type == 'FOLDER':
-        #         layer_node_tree = self._create_folder_node_tree(
-        #             self.active_layer.name)
-        #     elif self.active_layer.type == 'IMAGE':
-        #         layer_node_tree = self._create_layer_node_tree(
-        #             self.active_layer.name, self.active_layer.image, self.active_layer.uv_map)
-
-        #     self.active_layer.node_tree = layer_node_tree
-
         return self.active_layer.node_tree
 
     def _get_layer_node_group(self) -> Optional[Node]:
@@ -222,67 +360,58 @@ class PaintSystem:
         node = self.__find_node_group(
             self.active_group.node_tree, self.active_layer.node_tree.name)
         return node
-        # if node:
-        #     return node
-        # print("Node not found")
-        # try:
-        #     # Try to update the node group
-        #     self.active_group.update_node_tree()
-        #     node = self.__find_node_group(
-        #         self.active_group.node_tree, self.active_layer.name)
-        #     if node:
-        #         return node
-        # except AttributeError:
-        #     # print("AttributeError")
-        #     pass
-        # return None  # (Should be impossible to reach here)
 
-    def _get_layer_node_info(self) -> Tuple[Optional[Node], Optional[Node]]:
-        if not self.layer_node_group:
-            return None, None
-
-        layer_mix_node = self._find_mix_node()
-
-        # if not layer_mix_node:
-        # if self.active_layer.type == 'FOLDER':
-        #     layer_node_tree = self._create_folder_node_tree(
-        #         self.active_layer.name, True)
-        # elif self.active_layer.type == 'IMAGE':
-        #     layer_node_tree = self._create_layer_node_tree(
-        #         self.active_layer.name, self.active_layer.image, self.active_layer.get("uv_map"), True)
-        # self.active_layer.node_tree = layer_node_tree
-        # layer_mix_node = self._find_mix_node()
-
-        layer_uvmap_node = self._find_uv_map_node()
-        # if not layer_uvmap_node and self.active_layer.type == 'IMAGE':
-        #     layer_node_tree = self._create_layer_node_tree(
-        #         self.active_layer.name, self.active_layer.image, self.active_layer.get("uv_map"), True)
-        #     self.active_layer.node_tree = layer_node_tree
-        #     layer_uvmap_node = self._find_uv_map_node()
-
-        return layer_mix_node, layer_uvmap_node
-
-    def _find_mix_node(self) -> Optional[Node]:
+    def _find_color_mix_node(self) -> Optional[Node]:
+        if not self.layer_node_tree:
+            return None
         for node in self.layer_node_tree.nodes:
             if node.type == 'MIX' and node.data_type == 'RGBA':
                 return node
         return None
 
     def _find_uv_map_node(self) -> Optional[Node]:
+        if not self.layer_node_tree:
+            return None
         for node in self.layer_node_tree.nodes:
             if node.type == 'UVMAP':
                 return node
         return None
 
+    def _find_opacity_mix_node(self) -> Optional[Node]:
+        if not self.layer_node_tree:
+            return None
+        for node in self.layer_node_tree.nodes:
+            if node.type == 'MIX' and node.name == 'Opacity':
+                # print("Found opacity mix node")
+                return node
+        return None
+
+    def _find_clip_mix_node(self) -> Optional[Node]:
+        if not self.layer_node_tree:
+            return None
+        for node in self.layer_node_tree.nodes:
+            if node.type == 'MIX' and node.name == 'Clip':
+                # print("Found clip mix node")
+                return node
+        return None
+
+    def _find_rgb_node(self) -> Optional[Node]:
+        if not self.layer_node_tree:
+            return None
+        for node in self.layer_node_tree.nodes:
+            if node.name == 'RGB':
+                return node
+        return None
+
     def _create_folder_node_tree(self, folder_name: str, force_reload=False) -> NodeTree:
-        folder_template = self._get_node_from_library(
+        folder_template = get_node_from_library(
             '_PS_Folder_Template', force_reload)
         folder_nt = folder_template.copy()
         folder_nt.name = f"PS {folder_name} (MAT: {self.active_material.name})"
         return folder_nt
 
     def _create_layer_node_tree(self, layer_name: str, image: Image, uv_map_name: str = None, force_reload=True) -> NodeTree:
-        layer_template = self._get_node_from_library(
+        layer_template = get_node_from_library(
             '_PS_Layer_Template', force_reload)
         layer_nt = layer_template.copy()
         layer_nt.name = f"PS {layer_name} (MAT: {self.active_material.name})"
@@ -305,75 +434,6 @@ class PaintSystem:
             uv_map_node.uv_map = bpy.context.object.data.uv_layers[0].name
         image_texture_node.image = image
         return layer_nt
-
-    def _cleanup_duplicate_nodegroups(self, node_tree: NodeTree):
-        """
-        Cleanup duplicate node groups by using Blender's remap_users feature.
-        This automatically handles all node links and nested node groups.
-
-        Args:
-            node_group_name (str): Name of the main node group to clean up
-        """
-        def find_original_nodegroup(name):
-            # Get the base name by removing the .001, .002 etc. if present
-            # This gets the part before the first dot
-            base_name = name.split('.')[0]
-
-            # Find all matching node groups
-            matching_groups = [ng for ng in bpy.data.node_groups
-                               if ng.name == base_name or ng.name.split('.')[0] == base_name]
-
-            if not matching_groups:
-                return None
-
-            # The original is likely the one without a number suffix
-            # or the one with the lowest number if all have suffixes
-            for ng in matching_groups:
-                if ng.name == base_name:  # Exact match without any suffix
-                    return ng
-
-            # If we didn't find an exact match, return the one with lowest suffix number
-            return sorted(matching_groups, key=lambda x: x.name)[0]
-
-        # Process each node group
-        for node in node_tree.nodes:
-            if node.type == 'GROUP' and node.node_tree:
-                ng = node.node_tree
-
-                # Find the original node group
-                original_group = find_original_nodegroup(ng.name)
-
-                # If this is a duplicate (not the original) and we found the original
-                if original_group and ng != original_group:
-                    # Remap all users of this node group to the original
-                    ng.user_remap(original_group)
-                    # Remove the now-unused node group
-                    bpy.data.node_groups.remove(ng)
-
-    def _get_node_from_library(self, tree_name, force_reload=False):
-        # Check if the node group already exists
-        ng = bpy.data.node_groups.get(tree_name)
-        if ng:
-            if force_reload:
-                bpy.data.node_groups.remove(ng)
-            else:
-                return ng
-
-        # Load the library file
-        filepath = get_addon_filepath() + LIBRARY_FILE_NAME
-        with bpy.data.libraries.load(filepath) as (lib_file, current_file):
-            lib_node_group_names = lib_file.node_groups
-            current_node_groups_names = current_file.node_groups
-            for node_group_name in lib_node_group_names:
-                if node_group_name == tree_name:
-                    current_node_groups_names.append(node_group_name)
-
-        # Getting the node group
-        ng = bpy.data.node_groups.get(tree_name)
-        if not ng:
-            return None
-        self._cleanup_duplicate_nodegroups(ng)
-        return ng
 
     def _on_item_delete(self, item):
         if item.node_tree:

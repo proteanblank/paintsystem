@@ -1,16 +1,19 @@
 import bpy
+
 from bpy.props import (IntProperty,
-                       FloatProperty,
+                       FloatVectorProperty,
                        BoolProperty,
                        StringProperty,
                        PointerProperty,
                        CollectionProperty,
                        EnumProperty)
 from bpy.types import (PropertyGroup, Context,
-                       NodeTreeInterface, Nodes, NodeTree, NodeLinks)
+                       NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
-from .paint_system import PaintSystem
+from .paint_system import PaintSystem, get_node_from_library
+from dataclasses import dataclass
+from typing import Dict
 
 
 def get_groups(self, context):
@@ -20,19 +23,18 @@ def get_groups(self, context):
     return [(str(i), group.name, f"Group {i}") for i, group in enumerate(mat.paint_system.groups)]
 
 
-def update_active_image(self, context: Context):
-    ps = PaintSystem(context)
-    image_paint = context.tool_settings.image_paint
+def update_active_image(self=None, context: Context = None):
+    ps = PaintSystem(bpy.context)
+    image_paint = bpy.context.tool_settings.image_paint
     mat = ps.active_material
-    # active_group = ps.active_group
     active_layer = ps.active_layer
-    # flattened = active_group.flatten_hierarchy()
-    # if not flattened:
-    #     return None
-    # active_layer = flattened[self.active_index][0]
-    if not active_layer or active_layer.type != 'IMAGE':
+    if not active_layer:
         return
-    # image_paint.canvas = active_layer.image
+    if active_layer.type != 'IMAGE':
+        if image_paint.mode == 'MATERIAL':
+            image_paint.mode = 'IMAGE'
+        image_paint.canvas = None
+        return
     if image_paint.mode == 'IMAGE':
         image_paint.mode = 'MATERIAL'
     for i, image in enumerate(mat.texture_paint_images):
@@ -43,10 +45,14 @@ def update_active_image(self, context: Context):
 
 class PaintSystemLayer(BaseNestedListItem):
 
+    def on_update(self, context):
+        PaintSystem(context).active_group.update_node_tree()
+
     enabled: BoolProperty(
         name="Enabled",
         description="Toggle layer visibility",
-        default=True
+        default=True,
+        update=on_update
     )
     image: PointerProperty(
         name="Image",
@@ -56,13 +62,52 @@ class PaintSystemLayer(BaseNestedListItem):
         items=[
             ('FOLDER', "Folder", "Folder layer"),
             ('IMAGE', "Image", "Image layer"),
+            ('SOLID_COLOR', "Solid Color", "Solid Color layer")
         ],
         default='IMAGE'
+    )
+    clip: BoolProperty(
+        name="Clip to Below",
+        description="Clip the layer to the one below",
+        default=False,
+        update=on_update
     )
     node_tree: PointerProperty(
         name="Node Tree",
         type=NodeTree
     )
+
+
+@dataclass
+class NodeEntry:
+    color_input: NodeSocket
+    alpha_input: NodeSocket
+    location: Vector
+    is_clip: bool
+    clip_color_input: NodeSocket
+    clip_alpha_input: NodeSocket
+
+
+# class PaintSystemNodesStore:
+#     def __init__(self):
+#         self.data: Dict[int, NodeEntry] = {}
+
+#     def add_entry(self, entry_id: int, entry: NodeEntry):
+#         """Add a new entry to the datastore."""
+#         self.data[entry_id] = entry
+
+#     def get_entry(self, entry_id: int) -> NodeEntry:
+#         """Retrieve an entry by its ID."""
+#         return self.data.get(entry_id, None)
+
+#     def remove_entry(self, entry_id: int):
+#         """Remove an entry by its ID."""
+#         if entry_id in self.data:
+#             del self.data[entry_id]
+
+#     def list_ids(self):
+#         """List all entry IDs."""
+#         return list(self.data.keys())
 
 
 class PaintSystemGroup(BaseNestedListManager):
@@ -97,39 +142,78 @@ class PaintSystemGroup(BaseNestedListManager):
             new_socket.max_value = 1.0
 
         # Contains the inputs for each depth level and position in the hierarchy
-        depth_inputs = {}
+        # depth_inputs = {}
+        # temp_clip_inputs = []
+        ps_nodes_store: Dict[int, NodeEntry] = {}
 
         # Add group input and output nodes
         ng_input = nodes.new('NodeGroupInput')
         ng_output = nodes.new('NodeGroupOutput')
-        depth_inputs[-1] = (ng_output.inputs['Color'],
-                            ng_output.inputs['Alpha'], ng_output.location)
+        # depth_inputs[-1] = (ng_output.inputs['Color'],
+        #                     ng_output.inputs['Alpha'], ng_output.location)
+        ps_nodes_store[-1] = NodeEntry(
+            ng_output.inputs['Color'], ng_output.inputs['Alpha'], ng_output.location, False, None, None)
 
         for item, _ in flattened:
+            is_clip = item.clip
+            node_entry = ps_nodes_store[item.parent_id]
+            if is_clip and not node_entry.is_clip:
+                alpha_over_nt = get_node_from_library(
+                    '_PS_Alpha_Over')
+                group_node = nodes.new('ShaderNodeGroup')
+                group_node.node_tree = alpha_over_nt
+                group_node.location = node_entry.location + \
+                    Vector((-200, 0))
+                links.new(node_entry.color_input,
+                          group_node.outputs['Color'])
+                links.new(node_entry.alpha_input,
+                          group_node.outputs['Alpha'])
+                node_entry.color_input = group_node.inputs['Under Color']
+                node_entry.alpha_input = group_node.inputs['Under Alpha']
+                node_entry.location = group_node.location
+                node_entry.clip_color_input = group_node.inputs['Over Color']
+                node_entry.clip_alpha_input = group_node.inputs['Over Alpha']
+
+            # Connect layer node group
             group_node = nodes.new('ShaderNodeGroup')
             group_node.node_tree = item.node_tree
-            inputs = depth_inputs[item.parent_id]
-            group_node.location = inputs[2] + Vector((-200, 0))
-            links.new(inputs[0], group_node.outputs['Color'])
-            links.new(inputs[1], group_node.outputs['Alpha'])
-            if item.type == 'IMAGE':
-                # uv_map_node = nodes.new('ShaderNodeUVMap')
-                # uv_map_node.uv_map = item.uv_map_name
-                # links.new(group_node.inputs['Vector'],
-                #           uv_map_node.outputs['UV'])
-                # uv_map_node.location = group_node.location + Vector((0, -250))
-                depth_inputs[item.parent_id] = (
-                    group_node.inputs['Color'], group_node.inputs['Alpha'], group_node.location)
-            elif item.type == 'FOLDER':
-                depth_inputs[item.parent_id] = (
-                    group_node.inputs['Under Color'], group_node.inputs['Under Alpha'], group_node.location)
-                depth_inputs[item.id] = (
-                    group_node.inputs['Over Color'], group_node.inputs['Over Alpha'], group_node.location + Vector((0, 250)))
+            group_node.location = node_entry.location + \
+                Vector((-200, 0))
+            group_node.mute = not item.enabled
 
-        inputs = depth_inputs[-1]
-        links.new(inputs[0], ng_input.outputs['Color'])
-        links.new(inputs[1], ng_input.outputs['Alpha'])
-        ng_input.location = inputs[2] + Vector((-200, 0))
+            if is_clip or node_entry.is_clip:
+                links.new(node_entry.clip_color_input,
+                          group_node.outputs['Color'])
+                node_entry.clip_color_input = group_node.inputs['Color']
+                if not is_clip:
+                    links.new(node_entry.clip_alpha_input,
+                              group_node.outputs['Alpha'])
+                    node_entry.clip_alpha_input = group_node.inputs['Alpha']
+                else:
+                    group_node.inputs['Alpha'].default_value = 1.0
+            else:
+                links.new(node_entry.color_input,
+                          group_node.outputs['Color'])
+                links.new(node_entry.alpha_input,
+                          group_node.outputs['Alpha'])
+                node_entry.color_input = group_node.inputs['Color']
+                node_entry.alpha_input = group_node.inputs['Alpha']
+            node_entry.location = group_node.location
+            node_entry.is_clip = is_clip
+
+            if item.type == 'FOLDER':
+                ps_nodes_store[item.id] = NodeEntry(
+                    group_node.inputs['Over Color'],
+                    group_node.inputs['Over Alpha'],
+                    group_node.location + Vector((0, -250)),
+                    False,
+                    None,
+                    None)
+
+        node_entry = ps_nodes_store[-1]
+        links.new(node_entry.color_input, ng_input.outputs['Color'])
+        links.new(node_entry.alpha_input, ng_input.outputs['Alpha'])
+        ng_input.location = node_entry.location + Vector((-200, 0))
 
     # Define the collection property directly in the class
     items: CollectionProperty(type=PaintSystemLayer)
@@ -186,20 +270,32 @@ class PaintSystemGroups(PropertyGroup):
     )
 
 
+class PaintSystemSettings(PropertyGroup):
+    brush_color: FloatVectorProperty(
+        name="Brush Color",
+        subtype='COLOR',
+        default=(1.0, 1.0, 1.0)
+    )
+
+
 classes = (
     PaintSystemLayer,
     PaintSystemGroup,
-    PaintSystemGroups
+    PaintSystemGroups,
+    PaintSystemSettings
 )
 
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
+    bpy.types.Scene.paint_system_settings = PointerProperty(
+        type=PaintSystemSettings)
     bpy.types.Material.paint_system = PointerProperty(type=PaintSystemGroups)
 
 
 def unregister():
     del bpy.types.Material.paint_system
+    del bpy.types.Scene.paint_system_settings
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

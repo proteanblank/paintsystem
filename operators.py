@@ -3,14 +3,14 @@ import bpy
 from bpy.props import (
     BoolProperty,
     StringProperty,
-    PointerProperty,
+    FloatVectorProperty,
     EnumProperty,
 )
 
-from bpy.types import Operator, Image, NodeTree, Context
+from bpy.types import Operator, Context
 
 from bpy.utils import register_classes_factory
-from .paint_system import PaintSystem
+from .paint_system import PaintSystem, get_brushes_from_library
 from mathutils import Vector
 import re
 
@@ -20,10 +20,31 @@ def redraw_panel(self, context: Context):
     if context.area:
         context.area.tag_redraw()
 
-
+# bpy.types.Image.pack
 # -------------------------------------------------------------------
 # Group Operators
 # -------------------------------------------------------------------
+
+
+class PAINTSYSTEM_OT_SaveImages(Operator):
+    """Save all images in the active group"""
+    bl_idname = "paint_system.save_images"
+    bl_label = "Save Images"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Save all images in the active group"
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        return ps.active_group and ps.active_group.flatten_hierarchy()
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        flattened = ps.active_group.flatten_hierarchy()
+        for item, _ in flattened:
+            if item.image:
+                item.image.pack()
+        return {'FINISHED'}
 
 
 class PAINTSYSTEM_OT_DuplicateGroupWarning(Operator):
@@ -31,6 +52,7 @@ class PAINTSYSTEM_OT_DuplicateGroupWarning(Operator):
     bl_idname = "paint_system.duplicate_group_warning"
     bl_label = "Warning"
     bl_options = {'INTERNAL'}
+    bl_description = "Warning for duplicate group name"
 
     group_name: StringProperty()
 
@@ -59,17 +81,33 @@ class PAINTSYSTEM_OT_DuplicateGroupWarning(Operator):
             text="Click OK to create anyway, or cancel to choose a different name")
 
 
-class PAINTSYSTEM_OT_AddGroup(Operator):
+class PAINTSYSTEM_OT_NewGroup(Operator):
     """Add a new group"""
-    bl_idname = "paint_system.add_group"
+    bl_idname = "paint_system.new_group"
     bl_label = "Add Group"
     bl_description = "Add a new group"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Add a new group"
 
     group_name: StringProperty(
         name="Group Name",
         description="Name for the new group",
         default="New Group"
+    )
+
+    create_material_setup: BoolProperty(
+        name="Create Material Setup",
+        description="Create a template material setup for painting",
+        default=False
+    )
+
+    material_template: EnumProperty(
+        name="Material Template",
+        items=[
+            ('COLOR', "Color", "Color only"),
+            ('COLORALPHA', "Color Alpha", "Color and Alpha"),
+        ],
+        default='COLOR'
     )
 
     def execute(self, context):
@@ -87,17 +125,33 @@ class PAINTSYSTEM_OT_AddGroup(Operator):
 
         ps.add_group(self.group_name)
 
+        if self.create_material_setup:
+            print("Creating material setup")
+            bpy.ops.paint_system.create_template_setup(
+                'INVOKE_DEFAULT', template=self.material_template, disable_popup=True)
+
         # Force the UI to update
         redraw_panel(self, context)
 
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        ps = PaintSystem(context)
+        groups = ps.groups
+        if not groups:
+            self.create_material_setup = True
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "group_name")
+        row = layout.row(align=True)
+        row.scale_y = 1.5
+        row.prop(self, "create_material_setup",
+                 text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
+        row.prop(self, "material_template", text="")
+        layout.label(text="Setup material for painting",
+                     icon='QUESTION')
 
 
 class PAINTSYSTEM_OT_DeleteGroup(Operator):
@@ -106,6 +160,7 @@ class PAINTSYSTEM_OT_DeleteGroup(Operator):
     bl_label = "Delete Group"
     bl_description = "Delete the active group"
     bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Delete the active group"
 
     @classmethod
     def poll(cls, context):
@@ -138,6 +193,8 @@ class PAINTSYSTEM_OT_DeleteGroup(Operator):
 class PAINTSYSTEM_OT_RenameGroup(Operator):
     bl_idname = "paint_system.rename_group"
     bl_label = "Rename Group"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Rename the active group"
 
     new_name: StringProperty(name="New Name")
 
@@ -171,6 +228,7 @@ class PAINTSYSTEM_OT_DeleteItem(Operator):
     bl_idname = "paint_system.delete_item"
     bl_label = "Remove Item"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Remove the active item"
 
     @classmethod
     def poll(cls, context):
@@ -201,6 +259,7 @@ class PAINTSYSTEM_OT_MoveUp(Operator):
     bl_idname = "paint_system.move_up"
     bl_label = "Move Item Up"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Move the active item up"
 
     action: EnumProperty(
         items=[
@@ -287,6 +346,7 @@ class PAINTSYSTEM_OT_MoveDown(Operator):
     bl_idname = "paint_system.move_down"
     bl_label = "Move Item Down"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Move the active item down"
 
     action: EnumProperty(
         items=[
@@ -374,6 +434,7 @@ class PAINTSYSTEM_OT_TogglePaintMode(Operator):
     bl_idname = "paint_system.toggle_paint_mode"
     bl_label = "Toggle Paint Mode"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Toggle between texture paint and object mode"
 
     def execute(self, context):
         ps = PaintSystem(context)
@@ -383,9 +444,113 @@ class PAINTSYSTEM_OT_TogglePaintMode(Operator):
 
         bpy.ops.object.mode_set(mode='TEXTURE_PAINT', toggle=True)
 
-        # Change shading mode
-        if bpy.context.space_data.shading.type != 'RENDERED':
-            bpy.context.space_data.shading.type = 'RENDERED'
+        if bpy.context.object.mode == 'TEXTURE_PAINT':
+            # Change shading mode
+            if bpy.context.space_data.shading.type != 'RENDERED':
+                bpy.context.space_data.shading.type = 'RENDERED'
+
+            # if ps.preferences.unified_brush_color:
+            #     bpy.context.scene.tool_settings.unified_paint_settings.use_unified_color = True
+            # if ps.preferences.unified_brush_size:
+            #     bpy.context.scene.tool_settings.unified_paint_settings.use_unified_size = True
+
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_AddPresetBrushes(Operator):
+    bl_idname = "paint_system.add_preset_brushes"
+    bl_label = "Import Paint System Brushes"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add preset brushes to the active group"
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_group = ps.active_group
+        if not active_group:
+            return {'CANCELLED'}
+
+        get_brushes_from_library()
+
+        return {'FINISHED'}
+
+
+def set_active_panel_category(category, area_type):
+    areas = (
+        area for win in bpy.context.window_manager.windows for area in win.screen.areas if area.type == area_type)
+    for a in areas:
+        for r in a.regions:
+            if r.type == 'UI':
+                if r.width == 1:
+                    with bpy.context.temp_override(area=a):
+                        bpy.ops.wm.context_toggle(
+                            data_path='space_data.show_region_ui')
+                try:
+                    print(r.active_panel_category)
+                    if r.active_panel_category != category:
+                        r.active_panel_category = category
+                        a.tag_redraw()
+                except NameError as e:
+                    raise e
+
+
+class PAINTSYSTEM_OT_SetActivePanel(Operator):
+    bl_idname = "paint_system.set_active_panel"
+    bl_label = "Set Active Panel"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Set active panel"
+    bl_options = {'INTERNAL'}
+
+    category: StringProperty()
+
+    area_type: StringProperty(
+        default='VIEW_3D',
+    )
+
+    def execute(self, context: Context):
+        print(self.category, self.area_type)
+        set_active_panel_category(self.category, self.area_type)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_PaintModeSettings(Operator):
+    bl_label = "Paint Mode Settings"
+    bl_idname = "paint_system.paint_mode_menu"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Paint mode settings"
+
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row()
+        col = row.column()
+        unified_settings = bpy.context.scene.tool_settings.unified_paint_settings
+        col.prop(unified_settings, "use_unified_color", text="Unified Color")
+        col.prop(unified_settings, "use_unified_size", text="Unified Size")
+
+    def execute(self, context):
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.invoke_popup(self, width=200)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_ToggleClip(Operator):
+    bl_idname = "paint_system.toggle_clip"
+    bl_label = "Toggle Clipping"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Toggle layer clipping"
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        clip_mix_node = ps.clip_mix_node
+        return clip_mix_node
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        clip_mix_node = ps.clip_mix_node
+
+        clip_mix_node.inputs[0].default_value = not clip_mix_node.inputs[0].default_value
 
         return {'FINISHED'}
 
@@ -411,6 +576,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
     bl_idname = "paint_system.new_image"
     bl_label = "New Image"
     bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Create a new image"
 
     def get_next_image_name(self, context: Context) -> str:
         ps = PaintSystem(context)
@@ -451,6 +617,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
             height=int(self.image_resolution),
             alpha=True,
         )
+        image.pack()
         image.generated_color = (0, 0, 0, 0)
         ps.create_image_layer(self.name, image, self.uv_map_name)
         return {'FINISHED'}
@@ -471,6 +638,7 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
     bl_idname = "paint_system.open_image"
     bl_label = "Open Image"
     bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Open an image"
 
     filepath: StringProperty(
         subtype='FILE_PATH',
@@ -489,7 +657,8 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         image = bpy.data.images.load(self.filepath, check_existing=True)
-        ps.create_image_layer(self.name, image, self.uv_map_name)
+        image.pack()
+        ps.create_image_layer(image.name, image, self.uv_map_name)
         return {'FINISHED'}
 
     def invoke(self, context, event):
@@ -501,10 +670,88 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
         layout.prop(self, "uv_map_name")
 
 
-class PAINTSYSTEM_OT_AddFolder(Operator):
-    bl_idname = "paint_system.add_folder"
+class PAINTSYSTEM_OT_OpenExistingImage(Operator):
+    bl_idname = "paint_system.open_existing_image"
+    bl_label = "Open Existing Image"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Open an image from the existing images"
+
+    image_name: StringProperty()
+
+    uv_map_name: EnumProperty(
+        name="UV Map",
+        items=get_uv_maps_names
+    )
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_group = ps.active_group
+        if not active_group:
+            return {'CANCELLED'}
+        image = bpy.data.images.get(self.image_name)
+        if not image:
+            return {'CANCELLED'}
+        ps.create_image_layer(self.image_name, image, self.uv_map_name)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        self.image_name = bpy.data.images[0].name
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop_search(self, "image_name", bpy.data,
+                           "images", text="Image")
+        layout.prop(self, "uv_map_name")
+
+
+class PAINTSYSTEM_OT_NewSolidColor(Operator):
+    bl_idname = "paint_system.new_solid_color"
+    bl_label = "New Solid Color"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Create a new solid color"
+
+    def get_next_image_name(self, context: Context) -> str:
+        ps = PaintSystem(context)
+        flattened = ps.active_group.flatten_hierarchy()
+        number = get_highest_number_with_prefix(
+            'Color', [item[0].name for item in flattened]) + 1
+        return f"Color {number}"
+
+    name: StringProperty(
+        name="Name",
+        default="Color",
+    )
+
+    color: FloatVectorProperty(
+        name="Color",
+        subtype='COLOR',
+        size=4,
+        min=0.0,
+        max=1.0,
+        default=(1.0, 1.0, 1.0, 1.0)
+    )
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        ps.create_solid_color_layer(self.name, self.color)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        self.name = self.get_next_image_name(context)
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "name")
+        layout.prop(self, "color")
+
+
+class PAINTSYSTEM_OT_NewFolder(Operator):
+    bl_idname = "paint_system.new_folder"
     bl_label = "Add Folder"
     bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add a new folder"
 
     def get_next_folder_name(self, context: Context) -> str:
         ps = PaintSystem(context)
@@ -541,6 +788,7 @@ class PAINTSYSTEM_OT_AddFolder(Operator):
         layout = self.layout
         layout.prop(self, "folder_name")
 
+
 # -------------------------------------------------------------------
 # Template Material Creation
 # -------------------------------------------------------------------
@@ -550,13 +798,21 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     bl_idname = "paint_system.create_template_setup"
     bl_label = "Create Template Setup"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Create a template material setup for painting"
 
     template: EnumProperty(
+        name="Template",
         items=[
             ('COLOR', "Color", "Color only"),
             ('COLORALPHA', "Color Alpha", "Color and Alpha"),
         ],
         default='COLOR'
+    )
+
+    disable_popup: BoolProperty(
+        name="Disable Popup",
+        description="Disable popup",
+        default=False
     )
 
     use_alpha_blend: BoolProperty(
@@ -639,6 +895,8 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        if self.disable_popup:
+            return self.execute(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
@@ -675,17 +933,24 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
 
 
 classes = (
+    PAINTSYSTEM_OT_SaveImages,
     PAINTSYSTEM_OT_DuplicateGroupWarning,
-    PAINTSYSTEM_OT_AddGroup,
+    PAINTSYSTEM_OT_NewGroup,
     PAINTSYSTEM_OT_DeleteGroup,
     PAINTSYSTEM_OT_RenameGroup,
     PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,
     PAINTSYSTEM_OT_TogglePaintMode,
+    PAINTSYSTEM_OT_AddPresetBrushes,
+    PAINTSYSTEM_OT_SetActivePanel,
+    PAINTSYSTEM_OT_PaintModeSettings,
+    PAINTSYSTEM_OT_ToggleClip,
     PAINTSYSTEM_OT_NewImage,
     PAINTSYSTEM_OT_OpenImage,
-    PAINTSYSTEM_OT_AddFolder,
+    PAINTSYSTEM_OT_OpenExistingImage,
+    PAINTSYSTEM_OT_NewSolidColor,
+    PAINTSYSTEM_OT_NewFolder,
     PAINTSYSTEM_OT_CreateTemplateSetup,
     # PAINTSYSTEM_OT_Test,
 )

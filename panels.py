@@ -6,15 +6,39 @@ from bpy.props import (IntProperty,
                        PointerProperty,
                        CollectionProperty,
                        EnumProperty)
-from bpy.types import (Operator,
-                       Panel,
-                       PropertyGroup,
-                       UIList,
-                       UILayout,
-                       Menu)
+from bpy.types import (Panel,
+                       Menu,
+                       AddonPreferences,
+                       Context)
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem
+
+# -------------------------------------------------------------------
+# Addon Preferences
+# -------------------------------------------------------------------
+
+
+class PaintSystemPreferences(AddonPreferences):
+    bl_idname = __package__
+
+    unified_brush_color: BoolProperty(
+        name="Unified Brush Color",
+        description="Use the same color for all brushes",
+        default=True
+    )
+
+    unified_brush_size: BoolProperty(
+        name="Unified Brush Size",
+        description="Use the same size for all brushes",
+        default=True
+    )
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "unified_brush_color", text="Unified Brush Color")
+        layout.prop(self, "unified_brush_size", text="Unified Brush Size")
+
 
 # -------------------------------------------------------------------
 # Group Panels
@@ -30,7 +54,7 @@ class MAT_PT_PaintSystemGroups(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.active_object and context.active_object.type == 'MESH'
+        return context.active_object and context.active_object.type == 'MESH' and context.active_object.mode != 'TEXTURE_PAINT'
 
     def draw(self, context):
         layout = self.layout
@@ -38,9 +62,10 @@ class MAT_PT_PaintSystemGroups(Panel):
         ob = ps.active_object
         mat = ps.active_material
 
-        if not mat:
-            layout.label(text="No active material")
-            return
+        # if not mat:
+        #     layout.label(text="No active material")
+        #     return
+        layout.label(text="Selected Material:")
         layout.template_ID(ob, "active_material", new="material.new")
 
         if not hasattr(mat, "paint_system"):
@@ -49,15 +74,22 @@ class MAT_PT_PaintSystemGroups(Panel):
         # Add Group button and selector
         row = layout.row()
         row.scale_y = 2.0
-        row.operator("paint_system.add_group",
-                     text="Add New Group", icon='ADD')
+        # row.operator("paint_system.new_group",
+        #              text="Add New Group", icon='ADD')
 
         if len(mat.paint_system.groups) > 0:
-            layout.label(text="Active Group:")
             row = layout.row(align=True)
             row.scale_y = 1.5
+            # row.scale_x = 1.5
             row.prop(mat.paint_system, "active_group", text="")
+            row.operator("paint_system.new_group",
+                         text="", icon='ADD')
             row.menu("MAT_MT_PaintSystemGroup", text="", icon='COLLAPSEMENU')
+        else:
+            row = layout.row(align=True)
+            row.scale_y = 1.5
+            row.operator("paint_system.new_group",
+                         text="Add Group", icon='ADD')
 
 
 class MAT_MT_PaintSystemGroup(Menu):
@@ -70,6 +102,138 @@ class MAT_MT_PaintSystemGroup(Menu):
                         text="Rename Group", icon='GREASEPENCIL')
         layout.operator("paint_system.delete_group",
                         text="Delete Group", icon='TRASH')
+# -------------------------------------------------------------------
+# Brush Settings Panels
+# -------------------------------------------------------------------
+
+
+def set_active_panel(context: Context, panel_name):
+    context.region.active_panel_category = panel_name
+
+
+def prop_unified(
+    layout,
+    context,
+    brush,
+    prop_name,
+    unified_name=None,
+    pressure_name=None,
+    icon='NONE',
+    text=None,
+    slider=False,
+    header=False,
+):
+    """ Generalized way of adding brush options to the UI,
+        along with their pen pressure setting and global toggle, if they exist. """
+    row = layout.row(align=True)
+    ups = context.tool_settings.unified_paint_settings
+    prop_owner = brush
+    if unified_name and getattr(ups, unified_name):
+        prop_owner = ups
+
+    row.prop(prop_owner, prop_name, icon=icon, text=text, slider=slider)
+
+    if pressure_name:
+        row.prop(brush, pressure_name, text="")
+
+    if unified_name and not header:
+        # NOTE: We don't draw UnifiedPaintSettings in the header to reduce clutter. D5928#136281
+        row.prop(ups, unified_name, text="", icon='BRUSHES_ALL')
+
+    return row
+
+
+class MAT_PT_Brush(Panel):
+    bl_idname = 'MAT_PT_Brush'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Brush"
+    bl_category = 'Paint System'
+    # bl_parent_id = 'MAT_PT_PaintSystemGroups'
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        return obj.mode == 'TEXTURE_PAINT'
+
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row()
+        row.scale_y = 1.5
+        row.operator("paint_system.set_active_panel",
+                     text="Advanced Settings", icon="PREFERENCES").category = "Tool"
+
+        tool_settings = context.tool_settings.image_paint
+
+        layout.template_ID_preview(tool_settings, "brush",
+                                   new="brush.add", rows=3, cols=8, hide_buttons=False)
+        brush_imported = False
+        for brush in bpy.data.brushes:
+            if brush.name.startswith("PS_"):
+                brush_imported = True
+                break
+        if not brush_imported:
+            layout.operator("paint_system.add_preset_brushes",
+                            text="Add Preset Brushes", icon="ADD")
+
+
+class MAT_PT_BrushColor(Panel):
+    bl_idname = 'MAT_PT_BrushColor'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Color"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_Brush'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        return obj.mode == 'TEXTURE_PAINT'
+
+    def draw_header_preset(self, context):
+        layout = self.layout
+        tool_settings = bpy.context.scene.tool_settings
+        unified_settings = tool_settings.unified_paint_settings
+        brush_settings = tool_settings.image_paint.brush
+        layout.prop(
+            unified_settings if unified_settings.use_unified_color else brush_settings, "color", text="", icon='IMAGE_RGB_ALPHA')
+        # layout.label(text="", icon="INFO")
+
+    def draw(self, context):
+        layout = self.layout
+        tool_settings = bpy.context.scene.tool_settings
+        unified_settings = tool_settings.unified_paint_settings
+        brush_settings = tool_settings.image_paint.brush
+        layout.template_color_picker(
+            unified_settings if unified_settings.use_unified_color else brush_settings, "color", value_slider=True)
+
+
+class MAT_PT_BrushSettings(Panel):
+    bl_idname = 'MAT_PT_BrushSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Settings"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_Brush'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        return obj.mode == 'TEXTURE_PAINT'
+
+    def draw(self, context):
+        layout = self.layout
+        tool_settings = context.tool_settings.image_paint
+        brush = tool_settings.brush
+        prop_unified(layout, context, brush, "strength",
+                     "use_unified_strength", icon="WORLD", text="Strength")
+        prop_unified(layout, context, brush, "size",
+                     "use_unified_strength", icon="WORLD", text="Size", slider=True)
 
 # -------------------------------------------------------------------
 # Layers Panels
@@ -77,24 +241,48 @@ class MAT_MT_PaintSystemGroup(Menu):
 
 
 class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
+    def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
         ps = PaintSystem(context)
         active_group = ps.active_group
         flattened = active_group.flatten_hierarchy()
         if index < len(flattened):
             display_item, level = flattened[index]
             row = layout.row(align=True)
+            # Check if parent of the current item is enabled
+            parent_item = ps.active_group.get_item_by_id(
+                display_item.parent_id)
+            if parent_item and not parent_item.enabled:
+                row.enabled = False
+
             for _ in range(level):
                 row.label(icon='BLANK1')
-            if display_item.type == 'IMAGE':
-                if display_item.image.preview:
-                    row.label(icon_value=display_item.image.preview.icon_id)
-                else:
-                    display_item.image.asset_generate_preview()
-                    row.label(icon='BLANK1')
-            else:
-                row.label(icon='FILE_FOLDER')
+            # if display_item.clip:
+            #     row.separator()
+            match display_item.type:
+                case 'IMAGE':
+                    if display_item.image.preview:
+                        row.label(
+                            icon_value=display_item.image.preview.icon_id)
+                    elif not display_item.image.is_dirty:
+                        row.label(icon='IMAGE_DATA')
+                    else:
+                        display_item.image.asset_generate_preview()
+                        row.label(icon='BLANK1')
+                case 'FOLDER':
+                    row.label(icon='FILE_FOLDER')
+                case 'SOLID_COLOR':
+                    rgb_node = None
+                    for node in display_item.node_tree.nodes:
+                        if node.name == 'RGB':
+                            rgb_node = node
+                    if rgb_node:
+                        row.prop(
+                            rgb_node.outputs[0], "default_value", text="", icon='IMAGE_RGB_ALPHA')
             row.prop(display_item, "name", text="", emboss=False)
+            if display_item.clip:
+                row.label(icon="SELECT_INTERSECT")
+            row.prop(display_item, "enabled", text="",
+                     icon="HIDE_OFF" if display_item.enabled else "HIDE_ON", emboss=False)
             # row.label(text=f"Order: {display_item.order}")
             self.draw_custom_properties(row, display_item)
 
@@ -112,17 +300,19 @@ class MAT_PT_PaintSystemLayers(Panel):
     bl_region_type = "UI"
     bl_label = "Layers"
     bl_category = 'Paint System'
-    bl_parent_id = 'MAT_PT_PaintSystemGroups'
+    # bl_parent_id = 'MAT_PT_PaintSystemGroups'
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_group = ps.active_group
+        return active_group
 
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
         active_group = ps.active_group
-        if not active_group:
-            layout.label(text="No active group")
-            return
-
-        mat = context.active_object.active_material
+        mat = ps.active_material
         contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
                                  active_group.node_tree for node in mat.node_tree.nodes])
 
@@ -130,25 +320,30 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         # Toggle paint mode (switch between object and texture paint mode)
         current_mode = context.mode
-        row = layout.row()
+        row = layout.row(align=True)
         row.scale_y = 1.5
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
                          text="Toggle Paint Mode", icon="BRUSHES_ALL", depress=current_mode == 'PAINT_TEXTURE')
+            # row.operator("paint_system.paint_mode_menu",
+            #              text="", icon="COLLAPSEMENU")
         else:
             row.alert = True
             row.operator("paint_system.create_template_setup",
-                         text="Setup Material")
+                         text="Setup Material", icon="ERROR")
             row.alert = False
 
-        has_dirty_images = any(
-            [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
-        layout.operator("wm.save_mainfile",
-                        text="Save Images*" if has_dirty_images else "Save Images")
+        # has_dirty_images = any(
+        #     [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
+        # layout.operator("paint_system.save_images",
+        #                 text="Save Images*" if has_dirty_images else "Save Images")
+
+        if not flattened:
+            layout.label(text="Add a layer first!",
+                         icon="ERROR")
 
         row = layout.row()
         row.scale_y = 1.5
-
         row.template_list(
             "MAT_PT_UL_PaintSystemLayerList", "", active_group, "items", active_group, "active_index",
             rows=max(5, len(flattened))
@@ -156,7 +351,7 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         col = row.column(align=True)
         col.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE', text="")
-        col.operator("paint_system.add_folder", icon='NEWFOLDER', text="")
+        col.operator("paint_system.new_folder", icon='NEWFOLDER', text="")
         col.separator()
         col.operator("paint_system.delete_item", icon="TRASH", text="")
         col.separator()
@@ -169,34 +364,52 @@ class MAT_PT_PaintSystemLayers(Panel):
         if not active_layer:
             return
 
-        # Loop over every nodes in the active layer node tree
-        # layer_node = None
-        # for node in active_group.node_tree.nodes:
-        #     if node.type == 'GROUP' and node.node_tree and node.node_tree.name == active_layer.node_tree.name:
-        #         layer_node = node
-        layer_node = ps.layer_node_group
-
-        layout.label(text=f"{active_layer.name} Settings")
-
-        # color_mix_node = None
-        # for node in active_layer.node_tree.nodes:
-        #     if node.type == 'MIX' and node.data_type == 'RGBA':
-        #         color_mix_node = node
-
-        color_mix_node = ps.layer_mix_node
-
-        row = layout.row()
-        row.scale_y = 1.5
+        split = layout.split(factor=0.4)
+        split.scale_y = 1.5
         # Let user set opacity and blend mode:
-        row.prop(color_mix_node, "blend_type", text="Blend")
+        split.prop(active_layer, "clip", text="Clip", icon="SELECT_INTERSECT")
+        split.prop(ps.color_mix_node, "blend_type", text="")
 
         row = layout.row()
+        # row.prop(ps.clip_mix_node.inputs[0], "default_value",
+        #          text="Clip", icon="CLIPUV_HLT", toggle=True)
+        # row.operator("paint_system.toggle_clip", text="Clip", icon="CLIPUV_HLT",
+        #              depress=bool(ps.clip_mix_node.inputs[0].default_value))
         row.scale_y = 1.5
-        row.prop(layer_node.inputs[1], "default_value",
-                 text="Clip", icon="CLIPUV_HLT", icon_only=True)
-        row.prop(layer_node.inputs[0], "default_value",
-                 text="Opacity")
-        uv_map_node = ps.layer_uvmap_node
+        row.prop(ps.opacity_mix_node.inputs[0], "default_value",
+                 text="Opacity", slider=True)
+
+        rgb_node = ps.rgb_node
+        if rgb_node:
+            row = layout.row()
+            row.prop(rgb_node.outputs[0], "default_value", text="Color",
+                     icon='IMAGE_RGB_ALPHA')
+
+
+class MAT_PT_PaintSystemLayersAdvanced(Panel):
+    bl_idname = 'MAT_PT_PaintSystemLayersAdvanced'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Advanced"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_PaintSystemLayers'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_group = ps.active_group
+        return active_group and ps.active_layer and ps.active_layer.type == 'IMAGE'
+
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        color_mix_node = ps.color_mix_node
+        if color_mix_node:
+            row = layout.row()
+            row.prop(color_mix_node, "clamp_result", text="Clamp Result")
+
+        uv_map_node = ps.uv_map_node
         if uv_map_node:
             row = layout.row()
             row.prop_search(uv_map_node, "uv_map", text="UV Map",
@@ -214,10 +427,23 @@ class MAT_MT_PaintSystemAddImage(Menu):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator("paint_system.new_image",
-                        text="New Image", icon="IMAGE")
-        layout.operator("paint_system.open_image",
-                        text="Open Image", icon="FILE")
+        row = layout.row()
+        col = row.column()
+        col.label(text="Image:")
+        col.operator("paint_system.new_image",
+                     text="New Image", icon="FILE")
+        col.operator("paint_system.open_image",
+                     text="Open External Image", icon="FILE_FOLDER")
+        col.operator("paint_system.open_existing_image",
+                     text="Use Existing Image", icon="FILE_BACKUP")
+        col.separator()
+        col.label(text="Color:")
+        col.operator("paint_system.new_solid_color", text="Solid Color",
+                     icon="COLORSET_08_VEC")
+        # col = row.column()
+        # col.label(text="Folder:")
+        # col.operator("paint_system.new_folder", text="Folder",
+        #              icon="FILE_FOLDER")
 
 
 # -------------------------------------------------------------------
@@ -237,10 +463,15 @@ class MAT_PT_PaintSystemTest(Panel):
 
 
 classes = (
+    # PaintSystemPreferences,
     MAT_PT_PaintSystemGroups,
     MAT_MT_PaintSystemGroup,
+    MAT_PT_Brush,
+    MAT_PT_BrushColor,
+    MAT_PT_BrushSettings,
     MAT_PT_UL_PaintSystemLayerList,
     MAT_PT_PaintSystemLayers,
+    MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddImage,
     # MAT_PT_PaintSystemTest,
 )
