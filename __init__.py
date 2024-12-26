@@ -15,6 +15,7 @@ from bpy.utils import register_submodule_factory
 import bpy
 from .properties import update_active_image
 from bpy.app.handlers import persistent
+from .paint_system import PaintSystem, get_paint_system_images
 
 from . import auto_load
 bl_info = {
@@ -43,13 +44,22 @@ def mode_change_handler(scene):
 
 @persistent
 def save_handler(scene: bpy.types.Scene):
-    for mat in bpy.data.materials:
-        if hasattr(mat, "paint_system"):
-            ps = mat.paint_system
-            for group in ps.groups:
-                for item in group.items:
-                    if item.image:
-                        item.image.pack()
+    images = get_paint_system_images()
+    for image in images:
+        if not image.is_dirty:
+            continue
+        if image.packed_file or image.filepath == '':
+            image.pack()
+        else:
+            image.save()
+
+
+@persistent
+def refresh_image(scene: bpy.types.Scene):
+    ps = PaintSystem(bpy.context)
+    active_layer = ps.active_layer
+    if active_layer and active_layer.image:
+        active_layer.image.reload()
 
 
 submodules = [
@@ -68,9 +78,11 @@ def register():
     _register()
     bpy.app.handlers.depsgraph_update_post.append(mode_change_handler)
     bpy.app.handlers.save_pre.append(save_handler)
+    bpy.app.handlers.load_post.append(refresh_image)
 
 
 def unregister():
+    bpy.app.handlers.load_post.remove(refresh_image)
     bpy.app.handlers.save_pre.remove(save_handler)
     bpy.app.handlers.depsgraph_update_post.remove(mode_change_handler)
     _unregister()

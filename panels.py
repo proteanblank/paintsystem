@@ -322,6 +322,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         current_mode = context.mode
         row = layout.row(align=True)
         row.scale_y = 1.5
+        row.scale_x = 1.5
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
                          text="Toggle Paint Mode", icon="BRUSHES_ALL", depress=current_mode == 'PAINT_TEXTURE')
@@ -333,10 +334,12 @@ class MAT_PT_PaintSystemLayers(Panel):
                          text="Setup Material", icon="ERROR")
             row.alert = False
 
-        # has_dirty_images = any(
-        #     [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
-        # layout.operator("paint_system.save_images",
-        #                 text="Save Images*" if has_dirty_images else "Save Images")
+        has_dirty_images = any(
+            [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
+        row.operator("paint_system.save_file_and_images",
+                     text="", icon="FILE_TICK", emboss=has_dirty_images)
+        if has_dirty_images:
+            layout.label(text="Don't forget to save your file!", icon="FUND")
 
         if not flattened:
             layout.label(text="Add a layer first!",
@@ -429,17 +432,17 @@ class MAT_MT_PaintSystemAddImage(Menu):
         layout = self.layout
         row = layout.row()
         col = row.column()
-        col.label(text="Image:")
+        col.label(text="Image Layer:")
         col.operator("paint_system.new_image",
                      text="New Image", icon="FILE")
         col.operator("paint_system.open_image",
-                     text="Open External Image", icon="FILE_FOLDER")
+                     text="Open External Image")
         col.operator("paint_system.open_existing_image",
-                     text="Use Existing Image", icon="FILE_BACKUP")
-        col.separator()
+                     text="Use Existing Image")
+        col = row.column()
         col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
-                     icon="COLORSET_08_VEC")
+                     icon="SEQUENCE_COLOR_03")
         # col = row.column()
         # col.label(text="Folder:")
         # col.operator("paint_system.new_folder", text="Folder",

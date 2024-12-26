@@ -96,6 +96,19 @@ def get_brushes_from_library():
                 current_brushes.append(brush)
 
 
+def get_paint_system_images(is_dirty=True):
+    images = []
+    for mat in bpy.data.materials:
+        if hasattr(mat, "paint_system"):
+            ps = mat.paint_system
+            for group in ps.groups:
+                for item in group.items:
+                    image = item.image
+                    if image and image.is_dirty == is_dirty:
+                        images.append(image)
+    return images
+
+
 @dataclass
 class PaintSystemPreferences:
     # unified_brush_color: bool
@@ -202,6 +215,7 @@ class PaintSystem:
         Returns:
             PropertyGroup: The newly created image layer.
         """
+        image.pack()
 
         # Get insertion position
         parent_id, insert_order = self.active_group.get_insertion_data()

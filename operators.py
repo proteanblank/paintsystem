@@ -26,12 +26,12 @@ def redraw_panel(self, context: Context):
 # -------------------------------------------------------------------
 
 
-class PAINTSYSTEM_OT_SaveImages(Operator):
+class PAINTSYSTEM_OT_SaveFileAndImages(Operator):
     """Save all images in the active group"""
-    bl_idname = "paint_system.save_images"
-    bl_label = "Save Images"
+    bl_idname = "paint_system.save_file_and_images"
+    bl_label = "Save File and Images"
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Save all images in the active group"
+    bl_description = "Save all images and the blend file"
 
     @classmethod
     def poll(cls, context):
@@ -44,6 +44,7 @@ class PAINTSYSTEM_OT_SaveImages(Operator):
         for item, _ in flattened:
             if item.image:
                 item.image.pack()
+        bpy.ops.wm.save_mainfile()
         return {'FINISHED'}
 
 
@@ -598,11 +599,11 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         ],
         default='1024'
     )
-    high_bit_float: BoolProperty(
-        name="High Bit Float",
-        description="Use 32-bit float instead of 16-bit",
-        default=False
-    )
+    # high_bit_float: BoolProperty(
+    #     name="High Bit Float",
+    #     description="Use 32-bit float instead of 16-bit",
+    #     default=False
+    # )
     uv_map_name: EnumProperty(
         name="UV Map",
         items=get_uv_maps_names
@@ -617,7 +618,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
             height=int(self.image_resolution),
             alpha=True,
         )
-        image.pack()
+        # image.pack()
         image.generated_color = (0, 0, 0, 0)
         ps.create_image_layer(self.name, image, self.uv_map_name)
         return {'FINISHED'}
@@ -630,7 +631,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         layout = self.layout
         layout.prop(self, "name")
         layout.prop(self, "image_resolution", expand=True)
-        layout.prop(self, "high_bit_float")
+        # layout.prop(self, "high_bit_float")
         layout.prop(self, "uv_map_name")
 
 
@@ -657,7 +658,7 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         image = bpy.data.images.load(self.filepath, check_existing=True)
-        image.pack()
+        # image.pack()
         ps.create_image_layer(image.name, image, self.uv_map_name)
         return {'FINISHED'}
 
@@ -919,9 +920,6 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
 #     node_name: StringProperty()
 
 #     def execute(self, context):
-#         node = get_node_from_library(self.node_name)
-#         if node:
-#             print(f"Found node: {node.name}")
 #         return {'FINISHED'}
 
 #     def invoke(self, context, event):
@@ -933,7 +931,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
 
 
 classes = (
-    PAINTSYSTEM_OT_SaveImages,
+    PAINTSYSTEM_OT_SaveFileAndImages,
     PAINTSYSTEM_OT_DuplicateGroupWarning,
     PAINTSYSTEM_OT_NewGroup,
     PAINTSYSTEM_OT_DeleteGroup,
