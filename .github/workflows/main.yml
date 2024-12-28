@@ -23,14 +23,17 @@ jobs:
             - name: Extract version from __init__.py
               id: extract_version
               run: |
-                  # Extract the version tuple from __init__.py
-                  VERSION=$(grep -oP '(?<=version = )\(.*?\)' path/to/__init__.py | tr -d '(), ' | tr '\n' '.')
+                  VERSION=$(grep -oP '(?<=["'\'']version["'\'']:\s*\()\d+,\s*\d+,\s*\d+(?=\))' path/to/__init__.py)
                   if [[ -z "$VERSION" ]]; then
                     echo "Error: Version could not be extracted from __init__.py"
                     exit 1
                   fi
-                  echo "VERSION=$VERSION"
-                  echo "version=$VERSION" >> $GITHUB_ENV
+
+                  # Convert "1, 1, 2" into "1.1.2"
+                  VERSION_DOTS=$(echo "$VERSION" | sed 's/, *\([0-9]\+\)/.\1/g')
+
+                  echo "VERSION=$VERSION_DOTS"
+                  echo "version=$VERSION_DOTS" >> $GITHUB_ENV
 
             - name: Validate version
               id: validate_version
