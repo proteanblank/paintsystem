@@ -925,7 +925,7 @@ def update_notice_box_ui(self, context):
     colR.scale_y = 1.5
     if not updater.manual_only:
         colR.operator(AddonUpdaterUpdateNow.bl_idname,
-                      text="Update", icon="LOOP_FORWARDS")
+                      text="Update", icon="IMPORT")
         col.operator("wm.url_open", text="Open website").url = updater.website
         # ops = col.operator("wm.url_open",text="Direct download")
         # ops.url=updater.update_link
@@ -1476,7 +1476,7 @@ def register(bl_info):
     # check for update in user preferences found a new version, show a popup
     # (at most once per blender session, and it provides an option to ignore
     # for future sessions); default behavior is set to True.
-    updater.show_popups = True
+    updater.show_popups = False
     # note: if set to false, there will still be an "update ready" box drawn
     # using the `update_notice_box_ui` panel function.
 
