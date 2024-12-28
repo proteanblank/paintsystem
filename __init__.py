@@ -57,7 +57,7 @@ def save_handler(scene: bpy.types.Scene):
 @persistent
 def refresh_image(scene: bpy.types.Scene):
     ps = PaintSystem(bpy.context)
-    active_layer = ps.active_layer
+    active_layer = ps.get_active_layer()
     if active_layer and active_layer.image:
         active_layer.image.reload()
 

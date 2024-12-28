@@ -96,16 +96,24 @@ def get_brushes_from_library():
                 current_brushes.append(brush)
 
 
-def get_paint_system_images(is_dirty=True):
-    images = []
+def get_paint_system_groups():
+    groups = []
     for mat in bpy.data.materials:
         if hasattr(mat, "paint_system"):
             ps = mat.paint_system
-            for group in ps.groups:
-                for item in group.items:
-                    image = item.image
-                    if image and image.is_dirty == is_dirty:
-                        images.append(image)
+            for group in ps.get_groups():
+                groups.append(group)
+    return groups
+
+
+def get_paint_system_images(is_dirty=True):
+    images = []
+    groups = get_paint_system_groups()
+    for group in groups:
+        for item in group.items:
+            image = item.image
+            if image and (image.is_dirty or not is_dirty):
+                images.append(image)
     return images
 
 
@@ -122,18 +130,18 @@ class PaintSystem:
             __package__].preferences
         self.context = context
         self.active_object = context.active_object
-        self.settings = self._get_paint_system_settings()
-        self.active_material = self._get_active_material()
-        self.groups = self._get_groups()
-        self.active_group = self._get_active_group()
-        self.active_layer = self._get_active_layer()
-        self.layer_node_tree = self._get_layer_node_tree()
-        self.layer_node_group = self._get_layer_node_group()
-        self.color_mix_node = self._find_color_mix_node()
-        self.uv_map_node = self._find_uv_map_node()
-        self.opacity_mix_node = self._find_opacity_mix_node()
-        self.clip_mix_node = self._find_clip_mix_node()
-        self.rgb_node = self._find_rgb_node()
+        # self.settings = self.get_settings()
+        # mat = self.get_active_material()
+        # self.groups = self.get_groups()
+        # active_group = self.get_active_group()
+        # active_layer = self.get_active_layer()
+        # layer_node_tree = self.get_layer_node_tree()
+        # self.layer_node_group = self.get_layer_node_group()
+        # self.color_mix_node = self.find_color_mix_node()
+        # self.uv_map_node = self.find_uv_map_node()
+        # self.opacity_mix_node = self.find_opacity_mix_node()
+        # self.clip_mix_node = self.find_clip_mix_node()
+        # self.rgb_node = self.find_rgb_node()
 
     def add_group(self, name: str) -> PropertyGroup:
         """Creates a new group in the active material's paint system.
@@ -144,15 +152,16 @@ class PaintSystem:
         Returns:
             PropertyGroup: The newly created group.
         """
-        new_group = self.active_material.paint_system.groups.add()
+        mat = self.get_active_material()
+        new_group = mat.paint_system.groups.add()
         new_group.name = name
         node_tree = bpy.data.node_groups.new(
-            name=f"PS_GRP {name} (MAT: {self.active_material.name})", type='ShaderNodeTree')
+            name=f"PS_GRP {name} (MAT: {mat.name})", type='ShaderNodeTree')
         new_group.node_tree = node_tree
         new_group.update_node_tree()
         # Set the active group to the newly created one
-        self.active_material.paint_system.active_group = str(
-            len(self.active_material.paint_system.groups) - 1)
+        mat.paint_system.active_group = str(
+            len(mat.paint_system.groups) - 1)
 
         return new_group
 
@@ -163,24 +172,26 @@ class PaintSystem:
             bool: True if the active group and its items were successfully deleted, False otherwise.
         """
         use_node_tree = False
-        for node in self.active_material.node_tree.nodes:
-            if node.type == 'GROUP' and node.node_tree == self.active_group.node_tree:
+        mat = self.get_active_material()
+        active_group = self.get_active_group()
+        for node in mat.node_tree.nodes:
+            if node.type == 'GROUP' and node.node_tree == active_group.node_tree:
                 use_node_tree = True
                 break
 
         # 2 users: 1 for the material node tree, 1 for the datablock
-        if self.active_group.node_tree and self.active_group.node_tree.users <= 1 + use_node_tree:
-            bpy.data.node_groups.remove(self.active_group.node_tree)
+        if active_group.node_tree and active_group.node_tree.users <= 1 + use_node_tree:
+            bpy.data.node_groups.remove(active_group.node_tree)
 
-        for item, _ in self.active_group.flatten_hierarchy():
+        for item, _ in active_group.flatten_hierarchy():
             self._on_item_delete(item)
 
-        active_group_idx = int(self.active_material.paint_system.active_group)
-        self.active_material.paint_system.groups.remove(active_group_idx)
+        active_group_idx = int(mat.paint_system.active_group)
+        mat.paint_system.groups.remove(active_group_idx)
 
-        if self.active_material.paint_system.active_group:
-            self.active_material.paint_system.active_group = str(
-                min(active_group_idx, len(self.active_material.paint_system.groups) - 1))
+        if mat.paint_system.active_group:
+            mat.paint_system.active_group = str(
+                min(active_group_idx, len(mat.paint_system.groups) - 1))
 
         return True
 
@@ -190,17 +201,17 @@ class PaintSystem:
         Returns:
             bool: True if the active item and its children were successfully deleted, False otherwise.
         """
+        active_group = self.get_active_group()
+        item_id = active_group.get_id_from_flattened_index(
+            active_group.active_index)
 
-        item_id = self.active_group.get_id_from_flattened_index(
-            self.active_group.active_index)
-
-        if item_id != -1 and self.active_group.remove_item_and_children(item_id, self._on_item_delete):
+        if item_id != -1 and active_group.remove_item_and_children(item_id, self._on_item_delete):
             # Update active_index
-            flattened = self.active_group.flatten_hierarchy()
-            self.active_group.active_index = min(
-                self.active_group.active_index, len(flattened) - 1)
+            flattened = active_group.flatten_hierarchy()
+            active_group.active_index = min(
+                active_group.active_index, len(flattened) - 1)
 
-            self.active_group.update_node_tree()
+            active_group.update_node_tree()
 
             return True
         return False
@@ -215,17 +226,19 @@ class PaintSystem:
         Returns:
             PropertyGroup: The newly created image layer.
         """
-        image.pack()
+        # image.pack()
+
+        active_group = self.get_active_group()
 
         # Get insertion position
-        parent_id, insert_order = self.active_group.get_insertion_data()
+        parent_id, insert_order = active_group.get_insertion_data()
         # Adjust existing items' order
-        self.active_group.adjust_sibling_orders(parent_id, insert_order)
+        active_group.adjust_sibling_orders(parent_id, insert_order)
 
         node_tree = self._create_layer_node_tree(name, image, uv_map_name)
 
         # Create the new item
-        new_id = self.active_group.add_item(
+        new_id = active_group.add_item(
             name=name,
             item_type='IMAGE',
             parent_id=parent_id,
@@ -236,15 +249,15 @@ class PaintSystem:
 
         # Update active index
         if new_id != -1:
-            flattened = self.active_group.flatten_hierarchy()
+            flattened = active_group.flatten_hierarchy()
             for i, (item, _) in enumerate(flattened):
                 if item.id == new_id:
-                    self.active_group.active_index = i
+                    active_group.active_index = i
                     break
 
-        self.active_group.update_node_tree()
+        active_group.update_node_tree()
 
-        return self.active_group.get_item_by_id(new_id)
+        return active_group.get_item_by_id(new_id)
 
     def create_solid_color_layer(self, name: str, color: Tuple[float, float, float, float]) -> PropertyGroup:
         """Creates a new solid color layer in the active group.
@@ -255,19 +268,21 @@ class PaintSystem:
         Returns:
             PropertyGroup: The newly created solid color layer.
         """
+        mat = self.get_active_material()
+        active_group = self.get_active_group()
         # Get insertion position
-        parent_id, insert_order = self.active_group.get_insertion_data()
+        parent_id, insert_order = active_group.get_insertion_data()
         # Adjust existing items' order
-        self.active_group.adjust_sibling_orders(parent_id, insert_order)
+        active_group.adjust_sibling_orders(parent_id, insert_order)
 
         solid_color_template = get_node_from_library(
             '_PS_Solid_Color_Template', False)
         solid_color_nt = solid_color_template.copy()
-        solid_color_nt.name = f"PS {name} (MAT: {self.active_material.name})"
+        solid_color_nt.name = f"PS {name} (MAT: {mat.name})"
         solid_color_nt.nodes['RGB'].outputs[0].default_value = color
 
         # Create the new item
-        new_id = self.active_group.add_item(
+        new_id = active_group.add_item(
             name=name,
             item_type='SOLID_COLOR',
             parent_id=parent_id,
@@ -277,15 +292,15 @@ class PaintSystem:
 
         # Update active index
         if new_id != -1:
-            flattened = self.active_group.flatten_hierarchy()
+            flattened = active_group.flatten_hierarchy()
             for i, (item, _) in enumerate(flattened):
                 if item.id == new_id:
-                    self.active_group.active_index = i
+                    active_group.active_index = i
                     break
 
-        self.active_group.update_node_tree()
+        active_group.update_node_tree()
 
-        return self.active_group.get_item_by_id(new_id)
+        return active_group.get_item_by_id(new_id)
 
     def create_folder(self, name: str) -> PropertyGroup:
         """Creates a new folder in the active group.
@@ -296,19 +311,21 @@ class PaintSystem:
         Returns:
             PropertyGroup: The newly created folder.
         """
+        mat = self.get_active_material()
+        active_group = self.get_active_group()
         # Get insertion position
-        parent_id, insert_order = self.active_group.get_insertion_data()
+        parent_id, insert_order = active_group.get_insertion_data()
 
         # Adjust existing items' order
-        self.active_group.adjust_sibling_orders(parent_id, insert_order)
+        active_group.adjust_sibling_orders(parent_id, insert_order)
 
         folder_template = get_node_from_library(
             '_PS_Folder_Template', False)
         folder_nt = folder_template.copy()
-        folder_nt.name = f"PS {name} (MAT: {self.active_material.name})"
+        folder_nt.name = f"PS {name} (MAT: {mat.name})"
 
         # Create the new item
-        new_id = self.active_group.add_item(
+        new_id = active_group.add_item(
             name=name,
             item_type='FOLDER',
             parent_id=parent_id,
@@ -318,117 +335,131 @@ class PaintSystem:
 
         # Update active index
         if new_id != -1:
-            flattened = self.active_group.flatten_hierarchy()
+            flattened = active_group.flatten_hierarchy()
             for i, (item, _) in enumerate(flattened):
                 if item.id == new_id:
-                    self.active_group.active_index = i
+                    active_group.active_index = i
                     break
 
-        self.active_group.update_node_tree()
+        active_group.update_node_tree()
 
-    def _get_paint_system_settings(self) -> Optional[PropertyGroup]:
+    def get_settings(self) -> Optional[PropertyGroup]:
         return bpy.context.scene.paint_system_settings
 
-    def _get_active_material(self) -> Optional[Material]:
+    def get_active_material(self) -> Optional[Material]:
         if not self.active_object or self.active_object.type != 'MESH':
             return None
 
         return self.active_object.active_material
 
-    def _get_groups(self) -> Optional[PropertyGroup]:
-        if not self.active_material or not hasattr(self.active_material, "paint_system"):
+    def get_groups(self) -> Optional[PropertyGroup]:
+        mat = self.get_active_material()
+        if not mat or not hasattr(mat, "paint_system"):
             return None
-        paint_system = self.active_material.paint_system
+        paint_system = mat.paint_system
         return paint_system.groups
 
-    def _get_active_group(self) -> Optional[PropertyGroup]:
-        if not self.groups:
+    def get_active_group(self) -> Optional[PropertyGroup]:
+        mat = self.get_active_material()
+        if not self.get_groups():
             return None
-        paint_system = self.active_material.paint_system
+        paint_system = mat.paint_system
 
         active_group_idx = int(paint_system.active_group)
         if active_group_idx >= len(paint_system.groups):
             return None  # handle cases where active index is invalid
         return paint_system.groups[active_group_idx]
 
-    def _get_active_layer(self) -> Optional[PropertyGroup]:
-        if not self.active_group:
+    def get_active_layer(self) -> Optional[PropertyGroup]:
+        active_group = self.get_active_group()
+        if not active_group:
             return None
-        flattened = self.active_group.flatten_hierarchy()
+        flattened = active_group.flatten_hierarchy()
         if not flattened:
             return None
 
-        if self.active_group.active_index >= len(flattened):
+        if active_group.active_index >= len(flattened):
             return None  # handle cases where active index is invalid
 
-        return flattened[self.active_group.active_index][0]
+        return flattened[active_group.active_index][0]
 
-    def _get_layer_node_tree(self) -> Optional[NodeTree]:
-        if not self.active_layer:
+    def get_layer_node_tree(self) -> Optional[NodeTree]:
+        active_layer = self.get_active_layer()
+        if not active_layer:
             return None
-        return self.active_layer.node_tree
+        return active_layer.node_tree
 
-    def _get_layer_node_group(self) -> Optional[Node]:
-        if not self.layer_node_tree:
+    def get_layer_node_group(self) -> Optional[Node]:
+        active_group = self.get_active_group()
+        active_layer = self.get_active_layer()
+        layer_node_tree = self.get_layer_node_tree()
+        if not layer_node_tree:
             return None
-        node = self.__find_node_group(
-            self.active_group.node_tree, self.active_layer.node_tree.name)
+        node = self._find_node_group(
+            active_group.node_tree, active_layer.node_tree.name)
         return node
 
-    def _find_color_mix_node(self) -> Optional[Node]:
-        if not self.layer_node_tree:
+    def find_color_mix_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_layer_node_tree()
+        if not layer_node_tree:
             return None
-        for node in self.layer_node_tree.nodes:
+        for node in layer_node_tree.nodes:
             if node.type == 'MIX' and node.data_type == 'RGBA':
                 return node
         return None
 
-    def _find_uv_map_node(self) -> Optional[Node]:
-        if not self.layer_node_tree:
+    def find_uv_map_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_layer_node_tree()
+        if not layer_node_tree:
             return None
-        for node in self.layer_node_tree.nodes:
+        for node in layer_node_tree.nodes:
             if node.type == 'UVMAP':
                 return node
         return None
 
-    def _find_opacity_mix_node(self) -> Optional[Node]:
-        if not self.layer_node_tree:
+    def find_opacity_mix_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_layer_node_tree()
+        if not layer_node_tree:
             return None
-        for node in self.layer_node_tree.nodes:
+        for node in layer_node_tree.nodes:
             if node.type == 'MIX' and node.name == 'Opacity':
                 # print("Found opacity mix node")
                 return node
         return None
 
-    def _find_clip_mix_node(self) -> Optional[Node]:
-        if not self.layer_node_tree:
+    def find_clip_mix_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_layer_node_tree()
+        if not layer_node_tree:
             return None
-        for node in self.layer_node_tree.nodes:
+        for node in layer_node_tree.nodes:
             if node.type == 'MIX' and node.name == 'Clip':
                 # print("Found clip mix node")
                 return node
         return None
 
-    def _find_rgb_node(self) -> Optional[Node]:
-        if not self.layer_node_tree:
+    def find_rgb_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_layer_node_tree()
+        if not layer_node_tree:
             return None
-        for node in self.layer_node_tree.nodes:
+        for node in layer_node_tree.nodes:
             if node.name == 'RGB':
                 return node
         return None
 
     def _create_folder_node_tree(self, folder_name: str, force_reload=False) -> NodeTree:
+        mat = self.get_active_material()
         folder_template = get_node_from_library(
             '_PS_Folder_Template', force_reload)
         folder_nt = folder_template.copy()
-        folder_nt.name = f"PS {folder_name} (MAT: {self.active_material.name})"
+        folder_nt.name = f"PS {folder_name} (MAT: {mat.name})"
         return folder_nt
 
     def _create_layer_node_tree(self, layer_name: str, image: Image, uv_map_name: str = None, force_reload=True) -> NodeTree:
+        mat = self.get_active_material()
         layer_template = get_node_from_library(
             '_PS_Layer_Template', force_reload)
         layer_nt = layer_template.copy()
-        layer_nt.name = f"PS {layer_name} (MAT: {self.active_material.name})"
+        layer_nt.name = f"PS {layer_name} (MAT: {mat.name})"
         # Find the image texture node
         image_texture_node = None
         for node in layer_nt.nodes:
@@ -462,7 +493,7 @@ class PaintSystem:
                 # print("Removing image")
                 bpy.data.images.remove(item.image)
 
-    def __find_node_group(self, node_tree: NodeTree, name: str) -> Optional[Node]:
+    def _find_node_group(self, node_tree: NodeTree, name: str) -> Optional[Node]:
         for node in node_tree.nodes:
             if node.type == 'GROUP' and node.node_tree and node.node_tree.name == name:
                 return node

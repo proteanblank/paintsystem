@@ -26,8 +26,8 @@ def get_groups(self, context):
 def update_active_image(self=None, context: Context = None):
     ps = PaintSystem(bpy.context)
     image_paint = bpy.context.tool_settings.image_paint
-    mat = ps.active_material
-    active_layer = ps.active_layer
+    mat = ps.get_active_material()
+    active_layer = ps.get_active_layer()
     if not active_layer:
         return
     if active_layer.type != 'IMAGE':
@@ -46,7 +46,7 @@ def update_active_image(self=None, context: Context = None):
 class PaintSystemLayer(BaseNestedListItem):
 
     def on_update(self, context):
-        PaintSystem(context).active_group.update_node_tree()
+        PaintSystem(context).get_active_group().update_node_tree()
 
     enabled: BoolProperty(
         name="Enabled",

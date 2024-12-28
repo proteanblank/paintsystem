@@ -36,14 +36,14 @@ class PAINTSYSTEM_OT_SaveFileAndImages(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        return ps.active_group and ps.active_group.flatten_hierarchy()
+        return ps.get_active_group() and ps.get_active_group().flatten_hierarchy()
 
     def execute(self, context):
-        ps = PaintSystem(context)
-        flattened = ps.active_group.flatten_hierarchy()
-        for item, _ in flattened:
-            if item.image:
-                item.image.pack()
+        # ps = PaintSystem(context)
+        # flattened = ps.get_active_group().flatten_hierarchy()
+        # for item, _ in flattened:
+        #     if item.image:
+        #         item.image.pack()
         bpy.ops.wm.save_mainfile()
         return {'FINISHED'}
 
@@ -103,17 +103,24 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     )
 
     material_template: EnumProperty(
-        name="Material Template",
+        name="Template",
         items=[
+            ('NONE', "None", "Just add node group to material"),
             ('COLOR', "Color", "Color only"),
             ('COLORALPHA', "Color Alpha", "Color and Alpha"),
         ],
-        default='COLOR'
+        default='COLORALPHA'
+    )
+
+    set_view_transform: BoolProperty(
+        name="Set View Transform",
+        description="Set view transform to standard",
+        default=True
     )
 
     def execute(self, context):
         ps = PaintSystem(context)
-        mat = ps.active_material
+        mat = ps.get_active_material()
         if not mat or not hasattr(mat, "paint_system"):
             return {'CANCELLED'}
 
@@ -124,12 +131,15 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
                     'INVOKE_DEFAULT', group_name=self.group_name)
                 return {'CANCELLED'}
 
-        ps.add_group(self.group_name)
+        new_group = ps.add_group(self.group_name)
+        ps.create_solid_color_layer("Paper Color", (1, 1, 1, 1))
 
         if self.create_material_setup:
-            print("Creating material setup")
             bpy.ops.paint_system.create_template_setup(
                 'INVOKE_DEFAULT', template=self.material_template, disable_popup=True)
+
+        if self.set_view_transform:
+            context.scene.view_settings.view_transform = 'Standard'
 
         # Force the UI to update
         redraw_panel(self, context)
@@ -138,9 +148,8 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        groups = ps.groups
-        if not groups:
-            self.create_material_setup = True
+        groups = ps.get_groups()
+        self.create_material_setup = not groups
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
@@ -151,8 +160,11 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         row.prop(self, "create_material_setup",
                  text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
         row.prop(self, "material_template", text="")
-        layout.label(text="Setup material for painting",
-                     icon='QUESTION')
+        # layout.label(text="Setup material for painting",
+        #              icon='QUESTION')
+        if context.scene.view_settings.view_transform != 'Standard':
+            layout.prop(self, "set_view_transform",
+                        text="Set View Transform to Standard")
 
 
 class PAINTSYSTEM_OT_DeleteGroup(Operator):
@@ -166,7 +178,7 @@ class PAINTSYSTEM_OT_DeleteGroup(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        mat = ps.active_material
+        mat = ps.get_active_material()
         return mat and hasattr(mat, "paint_system") and len(mat.paint_system.groups) > 0 and mat.paint_system.active_group
 
     def execute(self, context):
@@ -183,7 +195,7 @@ class PAINTSYSTEM_OT_DeleteGroup(Operator):
 
     def draw(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         layout = self.layout
         layout.label(
             text=f"Delete '{active_group.name}' ?", icon='ERROR')
@@ -202,18 +214,18 @@ class PAINTSYSTEM_OT_RenameGroup(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         return active_group
 
     def execute(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         active_group.name = self.new_name
         redraw_panel(self, context)
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        self.new_name = PaintSystem(context).active_group.name
+        self.new_name = PaintSystem(context).get_active_group().name
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
@@ -234,7 +246,7 @@ class PAINTSYSTEM_OT_DeleteItem(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        return ps.active_layer and ps.active_group
+        return ps.get_active_layer() and ps.get_active_group()
 
     def execute(self, context):
         ps = PaintSystem(context)
@@ -248,7 +260,7 @@ class PAINTSYSTEM_OT_DeleteItem(Operator):
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        active_layer = ps.active_layer
+        active_layer = ps.get_active_layer()
         layout.label(
             text=f"Delete '{active_layer.name}' ?", icon='ERROR')
         layout.label(
@@ -274,7 +286,7 @@ class PAINTSYSTEM_OT_MoveUp(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         item_id = active_group.get_id_from_flattened_index(
             active_group.active_index)
         options = active_group.get_movement_options(item_id, 'UP')
@@ -282,7 +294,7 @@ class PAINTSYSTEM_OT_MoveUp(Operator):
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
 
@@ -305,7 +317,7 @@ class PAINTSYSTEM_OT_MoveUp(Operator):
 
     def draw_menu(self, self_menu, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
         item_id = active_group.get_id_from_flattened_index(
@@ -318,7 +330,7 @@ class PAINTSYSTEM_OT_MoveUp(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
         item_id = active_group.get_id_from_flattened_index(
@@ -361,7 +373,7 @@ class PAINTSYSTEM_OT_MoveDown(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         item_id = active_group.get_id_from_flattened_index(
             active_group.active_index)
         options = active_group.get_movement_options(item_id, 'DOWN')
@@ -369,7 +381,7 @@ class PAINTSYSTEM_OT_MoveDown(Operator):
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
 
@@ -392,7 +404,7 @@ class PAINTSYSTEM_OT_MoveDown(Operator):
 
     def draw_menu(self, self_menu, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
 
@@ -406,7 +418,7 @@ class PAINTSYSTEM_OT_MoveDown(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
 
@@ -439,7 +451,7 @@ class PAINTSYSTEM_OT_TogglePaintMode(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
 
@@ -466,7 +478,7 @@ class PAINTSYSTEM_OT_AddPresetBrushes(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
 
@@ -544,12 +556,12 @@ class PAINTSYSTEM_OT_ToggleClip(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        clip_mix_node = ps.clip_mix_node
+        clip_mix_node = ps.find_clip_mix_node()
         return clip_mix_node
 
     def execute(self, context):
         ps = PaintSystem(context)
-        clip_mix_node = ps.clip_mix_node
+        clip_mix_node = ps.find_clip_mix_node()
 
         clip_mix_node.inputs[0].default_value = not clip_mix_node.inputs[0].default_value
 
@@ -581,7 +593,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
 
     def get_next_image_name(self, context: Context) -> str:
         ps = PaintSystem(context)
-        flattened = ps.active_group.flatten_hierarchy()
+        flattened = ps.get_active_group().flatten_hierarchy()
         number = get_highest_number_with_prefix(
             'Image', [item[0].name for item in flattened]) + 1
         return f"Image {number}"
@@ -611,7 +623,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         image = bpy.data.images.new(
             name=f"PaintSystem_{active_group.next_id}",
             width=int(self.image_resolution),
@@ -686,7 +698,7 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
         image = bpy.data.images.get(self.image_name)
@@ -714,7 +726,7 @@ class PAINTSYSTEM_OT_NewSolidColor(Operator):
 
     def get_next_image_name(self, context: Context) -> str:
         ps = PaintSystem(context)
-        flattened = ps.active_group.flatten_hierarchy()
+        flattened = ps.get_active_group().flatten_hierarchy()
         number = get_highest_number_with_prefix(
             'Color', [item[0].name for item in flattened]) + 1
         return f"Color {number}"
@@ -756,7 +768,7 @@ class PAINTSYSTEM_OT_NewFolder(Operator):
 
     def get_next_folder_name(self, context: Context) -> str:
         ps = PaintSystem(context)
-        flattened = ps.active_group.flatten_hierarchy()
+        flattened = ps.get_active_group().flatten_hierarchy()
         number = get_highest_number_with_prefix(
             'Folder', [item[0].name for item in flattened]) + 1
         return f"Folder {number}"
@@ -769,7 +781,7 @@ class PAINTSYSTEM_OT_NewFolder(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         return active_group
 
     def execute(self, context):
@@ -804,10 +816,11 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     template: EnumProperty(
         name="Template",
         items=[
+            ('NONE', "None", "Just add node group to material"),
             ('COLOR', "Color", "Color only"),
             ('COLORALPHA', "Color Alpha", "Color and Alpha"),
         ],
-        default='COLOR'
+        default='COLORALPHA'
     )
 
     disable_popup: BoolProperty(
@@ -831,12 +844,12 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        return ps.active_group
+        return ps.get_active_group()
 
     def execute(self, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
-        mat = ps.active_material
+        active_group = ps.get_active_group()
+        mat = ps.get_active_material()
         mat.use_nodes = True
         nodes = mat.node_tree.nodes
         links = mat.node_tree.links
@@ -848,6 +861,11 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
                 position = node.location
 
         match self.template:
+            case 'NONE':
+                node_group = nodes.new('ShaderNodeGroup')
+                node_group.node_tree = active_group.node_tree
+                node_group.location = position + Vector((200, 0))
+
             case 'COLOR':
                 node_group = nodes.new('ShaderNodeGroup')
                 node_group.node_tree = active_group.node_tree

@@ -60,7 +60,7 @@ class MAT_PT_PaintSystemGroups(Panel):
         layout = self.layout
         ps = PaintSystem(context)
         ob = ps.active_object
-        mat = ps.active_material
+        mat = ps.get_active_material()
 
         # if not mat:
         #     layout.label(text="No active material")
@@ -243,13 +243,13 @@ class MAT_PT_BrushSettings(Panel):
 class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         flattened = active_group.flatten_hierarchy()
         if index < len(flattened):
             display_item, level = flattened[index]
             row = layout.row(align=True)
             # Check if parent of the current item is enabled
-            parent_item = ps.active_group.get_item_by_id(
+            parent_item = ps.get_active_group().get_item_by_id(
                 display_item.parent_id)
             if parent_item and not parent_item.enabled:
                 row.enabled = False
@@ -305,14 +305,14 @@ class MAT_PT_PaintSystemLayers(Panel):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
+        active_group = ps.get_active_group()
         return active_group
 
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        active_group = ps.active_group
-        mat = ps.active_material
+        active_group = ps.get_active_group()
+        mat = ps.get_active_material()
         contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
                                  active_group.node_tree for node in mat.node_tree.nodes])
 
@@ -362,7 +362,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 
         # Settings
-        active_layer = ps.active_layer
+        active_layer = ps.get_active_layer()
 
         if not active_layer:
             return
@@ -371,18 +371,18 @@ class MAT_PT_PaintSystemLayers(Panel):
         split.scale_y = 1.5
         # Let user set opacity and blend mode:
         split.prop(active_layer, "clip", text="Clip", icon="SELECT_INTERSECT")
-        split.prop(ps.color_mix_node, "blend_type", text="")
+        split.prop(ps.find_color_mix_node(), "blend_type", text="")
 
         row = layout.row()
-        # row.prop(ps.clip_mix_node.inputs[0], "default_value",
+        # row.prop(ps.find_clip_mix_node().inputs[0], "default_value",
         #          text="Clip", icon="CLIPUV_HLT", toggle=True)
         # row.operator("paint_system.toggle_clip", text="Clip", icon="CLIPUV_HLT",
-        #              depress=bool(ps.clip_mix_node.inputs[0].default_value))
+        #              depress=bool(ps.find_clip_mix_node().inputs[0].default_value))
         row.scale_y = 1.5
-        row.prop(ps.opacity_mix_node.inputs[0], "default_value",
+        row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                  text="Opacity", slider=True)
 
-        rgb_node = ps.rgb_node
+        rgb_node = ps.find_rgb_node()
         if rgb_node:
             row = layout.row()
             row.prop(rgb_node.outputs[0], "default_value", text="Color",
@@ -401,18 +401,18 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
-        active_group = ps.active_group
-        return active_group and ps.active_layer and ps.active_layer.type == 'IMAGE'
+        active_group = ps.get_active_group()
+        return active_group and ps.get_active_layer() and ps.get_active_layer().type == 'IMAGE'
 
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        color_mix_node = ps.color_mix_node
+        color_mix_node = ps.find_color_mix_node()
         if color_mix_node:
             row = layout.row()
             row.prop(color_mix_node, "clamp_result", text="Clamp Result")
 
-        uv_map_node = ps.uv_map_node
+        uv_map_node = ps.find_uv_map_node()
         if uv_map_node:
             row = layout.row()
             row.prop_search(uv_map_node, "uv_map", text="UV Map",
