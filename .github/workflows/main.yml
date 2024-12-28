@@ -24,7 +24,7 @@ jobs:
               id: extract_version
               run: |
                   # Extract the version tuple from __init__.py
-                  VERSION=$(grep -oP '(?<=version = )\(.*?\)' path/to/__init__.py | tr -d '(), ' | tr '\n' '.')
+                  VERSION=$(grep -oP '(?<=version = )\(.*?\)' __init__.py | tr -d '(), ' | tr '\n' '.')
                   if [[ -z "$VERSION" ]]; then
                     echo "Error: Version could not be extracted from __init__.py"
                     exit 1
