@@ -336,7 +336,7 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
-        row.operator("paint_system.save_file_and_images",
+        row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK", emboss=has_dirty_images)
         if has_dirty_images:
             layout.label(text="Don't forget to save your file!", icon="FUND")
