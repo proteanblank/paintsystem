@@ -23,7 +23,7 @@ jobs:
             - name: Extract version from __init__.py
               id: extract_version
               run: |
-                  VERSION=$(grep -oP '(?<=["'\'']version["'\'']:\s*\()\d+,\s*\d+,\s*\d+(?=\))' path/to/__init__.py)
+                  VERSION=$(grep -oP '(?<=["'\'']version["'\'']:\s*\()\d+,\s*\d+,\s*\d+(?=\))' __init__.py)
                   if [[ -z "$VERSION" ]]; then
                     echo "Error: Version could not be extracted from __init__.py"
                     exit 1
