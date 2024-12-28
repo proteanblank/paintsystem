@@ -16,6 +16,7 @@ import bpy
 from .properties import update_active_image
 from bpy.app.handlers import persistent
 from .paint_system import PaintSystem, get_paint_system_images
+from . import addon_updater_ops
 
 from . import auto_load
 bl_info = {
@@ -23,7 +24,7 @@ bl_info = {
     "author": "Tawan Sunflower",
     "description": "",
     "blender": (4, 1, 0),
-    "version": (1, 1, 2),
+    "version": (1, 1, 3),
     "location": "View3D > Sidebar > Paint System",
     "warning": "",
     "category": "Node",
@@ -76,6 +77,7 @@ _register, _unregister = register_submodule_factory(__name__, submodules)
 
 def register():
     _register()
+    addon_updater_ops.register(bl_info)
     bpy.app.handlers.depsgraph_update_post.append(mode_change_handler)
     bpy.app.handlers.save_pre.append(save_handler)
     bpy.app.handlers.load_post.append(refresh_image)
@@ -85,4 +87,5 @@ def unregister():
     bpy.app.handlers.load_post.remove(refresh_image)
     bpy.app.handlers.save_pre.remove(save_handler)
     bpy.app.handlers.depsgraph_update_post.remove(mode_change_handler)
+    addon_updater_ops.unregister()
     _unregister()

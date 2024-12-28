@@ -13,31 +13,73 @@ from bpy.types import (Panel,
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem
+from . import addon_updater_ops
 
 # -------------------------------------------------------------------
 # Addon Preferences
 # -------------------------------------------------------------------
 
 
+@addon_updater_ops.make_annotations
 class PaintSystemPreferences(AddonPreferences):
+    """Demo bare-bones preferences"""
     bl_idname = __package__
 
-    unified_brush_color: BoolProperty(
-        name="Unified Brush Color",
-        description="Use the same color for all brushes",
-        default=True
-    )
+    # Addon updater preferences.
 
-    unified_brush_size: BoolProperty(
-        name="Unified Brush Size",
-        description="Use the same size for all brushes",
-        default=True
-    )
+    auto_check_update = BoolProperty(
+        name="Auto-check for Update",
+        description="If enabled, auto-check for updates using an interval",
+        default=True)
+
+    updater_interval_months = IntProperty(
+        name='Months',
+        description="Number of months between checking for updates",
+        default=0,
+        min=0)
+
+    updater_interval_days = IntProperty(
+        name='Days',
+        description="Number of days between checking for updates",
+        default=1,
+        min=0,
+        max=31)
+
+    updater_interval_hours = IntProperty(
+        name='Hours',
+        description="Number of hours between checking for updates",
+        default=0,
+        min=0,
+        max=23)
+
+    updater_interval_minutes = IntProperty(
+        name='Minutes',
+        description="Number of minutes between checking for updates",
+        default=0,
+        min=0,
+        max=59)
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "unified_brush_color", text="Unified Brush Color")
-        layout.prop(self, "unified_brush_size", text="Unified Brush Size")
+
+        # Works best if a column, or even just self.layout.
+        mainrow = layout.row()
+        col = mainrow.column()
+
+        # Updater draw function, could also pass in col as third arg.
+        addon_updater_ops.update_settings_ui(self, context)
+
+        # Alternate draw function, which is more condensed and can be
+        # placed within an existing draw function. Only contains:
+        #   1) check for update/update now buttons
+        #   2) toggle for auto-check (interval will be equal to what is set above)
+        # addon_updater_ops.update_settings_ui_condensed(self, context, col)
+
+        # Adding another column to help show the above condensed ui as one column
+        # col = mainrow.column()
+        # col.scale_y = 2
+        # ops = col.operator("wm.url_open","Open webpage ")
+        # ops.url=addon_updater_ops.updater.website
 
 
 # -------------------------------------------------------------------
@@ -54,10 +96,14 @@ class MAT_PT_PaintSystemGroups(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.active_object and context.active_object.type == 'MESH' and context.active_object.mode != 'TEXTURE_PAINT'
+        addon_updater_ops.check_for_update_background()
+        return (context.active_object and context.active_object.type == 'MESH' and context.active_object.mode != 'TEXTURE_PAINT') or addon_updater_ops.updater.update_ready
 
     def draw(self, context):
         layout = self.layout
+
+        addon_updater_ops.update_notice_box_ui(self, context)
+
         ps = PaintSystem(context)
         ob = ps.active_object
         mat = ps.get_active_material()
@@ -466,7 +512,7 @@ class MAT_PT_PaintSystemTest(Panel):
 
 
 classes = (
-    # PaintSystemPreferences,
+    PaintSystemPreferences,
     MAT_PT_PaintSystemGroups,
     MAT_MT_PaintSystemGroup,
     MAT_PT_Brush,
