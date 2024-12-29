@@ -27,6 +27,10 @@ import traceback
 import bpy
 from bpy.app.handlers import persistent
 
+print(__package__)
+
+# from .. import __package__ as __package__
+
 # Safely import the updater.
 # Prevents popups for users with invalid python installs e.g. missing libraries
 # and will replace with a fake class instead if it fails (so UI draws work).

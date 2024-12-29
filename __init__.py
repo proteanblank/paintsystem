@@ -17,8 +17,8 @@ from .properties import update_active_image
 from bpy.app.handlers import persistent
 from .paint_system import PaintSystem, get_paint_system_images
 from . import addon_updater_ops
-
 from . import auto_load
+
 bl_info = {
     "name": "Paint System",
     "author": "Tawan Sunflower",
@@ -28,8 +28,12 @@ bl_info = {
     "location": "View3D > Sidebar > Paint System",
     "warning": "",
     "category": "Node",
+    'support': 'COMMUNITY',
 }
 
+bl_info_copy = bl_info.copy()
+
+print("Paint System: Registering...", __package__)
 
 auto_load.init()
 
@@ -71,13 +75,12 @@ submodules = [
     # "operation/test",
 ]
 
-
 _register, _unregister = register_submodule_factory(__name__, submodules)
 
 
 def register():
     _register()
-    addon_updater_ops.register(bl_info)
+    addon_updater_ops.register(bl_info_copy)
     bpy.app.handlers.depsgraph_update_post.append(mode_change_handler)
     bpy.app.handlers.save_pre.append(save_handler)
     bpy.app.handlers.load_post.append(refresh_image)

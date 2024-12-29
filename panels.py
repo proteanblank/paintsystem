@@ -14,6 +14,7 @@ from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem
 from . import addon_updater_ops
+# from .. import __package__ as base_package
 
 # -------------------------------------------------------------------
 # Addon Preferences
@@ -212,8 +213,27 @@ class MAT_PT_Brush(Panel):
 
         tool_settings = context.tool_settings.image_paint
 
-        layout.template_ID_preview(tool_settings, "brush",
-                                   new="brush.add", rows=3, cols=8, hide_buttons=False)
+        # Check blender version
+        if bpy.app.version < (4, 3):
+            layout.template_ID_preview(tool_settings, "brush",
+                                       new="brush.add", rows=3, cols=8, hide_buttons=False)
+
+        else:
+            col = layout.column(align=True)
+            shelf_name = "VIEW3D_AST_brush_texture_paint"
+            brush = tool_settings.brush
+            display_name = brush.name if brush else None
+            if display_name and brush.has_unsaved_changes:
+                display_name = display_name + "*"
+            preview_icon_id = brush.preview.icon_id if brush and brush.preview else 0
+            col.template_asset_shelf_popover(
+                shelf_name,
+                icon='BRUSH_DATA' if not preview_icon_id else 'NONE',
+                icon_value=preview_icon_id,
+            )
+            if brush:
+                col.prop(brush, "name", text="")
+
         brush_imported = False
         for brush in bpy.data.brushes:
             if brush.name.startswith("PS_"):
@@ -387,8 +407,8 @@ class MAT_PT_PaintSystemLayers(Panel):
         if has_dirty_images:
             layout.label(text="Don't forget to save your file!", icon="FUND")
 
-        if not flattened:
-            layout.label(text="Add a layer first!",
+        if not any([item.image for (item, _) in flattened]):
+            layout.label(text="Add an image layer first!",
                          icon="ERROR")
 
         row = layout.row()

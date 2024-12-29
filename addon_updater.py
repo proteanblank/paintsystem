@@ -41,6 +41,7 @@ from datetime import datetime, timedelta
 # Blender imports, used in limited cases.
 import bpy
 import addon_utils
+# from .. import __package__ as __package__
 
 # -----------------------------------------------------------------------------
 # The main class
@@ -54,6 +55,7 @@ class SingletonUpdater:
     needed throughout the addon. It implements all the interfaces for running
     updates.
     """
+
     def __init__(self):
 
         self._engine = GithubEngine()
@@ -661,7 +663,8 @@ class SingletonUpdater:
             else:
                 # Don't return branch if in list.
                 n = len(self._include_branch_list)
-                self._tag_latest = self._tags[n]  # guaranteed at least len()=n+1
+                # guaranteed at least len()=n+1
+                self._tag_latest = self._tags[n]
                 self.print_verbose(
                     "Most recent tag found:" + str(self._tags[n]['name']))
 

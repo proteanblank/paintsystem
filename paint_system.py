@@ -95,13 +95,19 @@ def get_brushes_from_library():
             if brush.startswith(BRUSH_PREFIX) and brush not in bpy.data.brushes:
                 current_brushes.append(brush)
 
+    # For blender 4.3
+    if bpy.app.version >= (4, 3, 0):
+        for brush in bpy.data.brushes:
+            if brush.name.startswith(BRUSH_PREFIX):
+                brush.asset_mark()
+
 
 def get_paint_system_groups():
     groups = []
     for mat in bpy.data.materials:
         if hasattr(mat, "paint_system"):
             ps = mat.paint_system
-            for group in ps.get_groups():
+            for group in ps.groups:
                 groups.append(group)
     return groups
 
@@ -126,8 +132,8 @@ class PaintSystemPreferences:
 
 class PaintSystem:
     def __init__(self, context: Context):
-        self.preferences: PaintSystemPreferences = bpy.context.preferences.addons[
-            __package__].preferences
+        # self.preferences: PaintSystemPreferences = bpy.context.preferences.addons[
+        #     'paintsystem'].preferences
         self.context = context
         self.active_object = context.active_object
         # self.settings = self.get_settings()
