@@ -163,3 +163,4 @@ cython_debug/
 
 # Paint System Files
 paintsystem_updater/
+bl_ext.vscode_development.paintsystem_updater/
