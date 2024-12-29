@@ -5,10 +5,10 @@ from bpy.props import (
     StringProperty,
     FloatVectorProperty,
     EnumProperty,
+    IntProperty
 )
-
+import gpu
 from bpy.types import Operator, Context
-
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, get_brushes_from_library
 from mathutils import Vector
@@ -926,6 +926,46 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
             layout.prop(self, "disable_show_backface")
 
 # -------------------------------------------------------------------
+# Image Sampler
+# -------------------------------------------------------------------
+
+
+class PAINTSYSTEM_OT_ColorSampler(Operator):
+    """Sample the color under the mouse cursor"""
+    bl_idname = "paint_system.color_sampler"
+    bl_label = "Color Sampler"
+
+    x: IntProperty()
+    y: IntProperty()
+
+    def execute(self, context):
+        # Get the screen dimensions
+        x, y = self.x, self.y
+
+        buffer = gpu.state.active_framebuffer_get()
+        pixel = buffer.read_color(x, y, 1, 1, 3, 0, 'FLOAT')
+        pixel.dimensions = 1 * 1 * 3
+        pix_value = [float(item) for item in pixel]
+        # print(f"Sampled Color: {pix_value}")
+
+        tool_settings = bpy.context.scene.tool_settings
+        unified_settings = tool_settings.unified_paint_settings
+        brush_settings = tool_settings.image_paint.brush
+        unified_settings.color = pix_value
+        brush_settings.color = pix_value
+
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.area.type == 'VIEW_3D' and context.active_object.mode == 'TEXTURE_PAINT'
+
+    def invoke(self, context, event):
+        self.x = event.mouse_x
+        self.y = event.mouse_y
+        return self.execute(context)
+
+# -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
 
@@ -968,7 +1008,29 @@ classes = (
     PAINTSYSTEM_OT_NewSolidColor,
     PAINTSYSTEM_OT_NewFolder,
     PAINTSYSTEM_OT_CreateTemplateSetup,
+    PAINTSYSTEM_OT_ColorSampler,
     # PAINTSYSTEM_OT_Test,
 )
 
-register, unregister = register_classes_factory(classes)
+_register, _unregister = register_classes_factory(classes)
+
+addon_keymaps = []
+
+
+def register():
+    _register()
+    # Add the hotkey
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.new(name='Screen', space_type='EMPTY')
+        kmi = km.keymap_items.new(
+            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'E', 'PRESS')
+        addon_keymaps.append((km, kmi))
+
+
+def unregister():
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
+    _unregister()
