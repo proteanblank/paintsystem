@@ -1,5 +1,5 @@
 # Paint System Addon
-A simple but flexible painting system for Blender
+A simple but flexible painting system for Non-photorealistic-rendering in Blender
 
 ![Paint System](https://github.com/user-attachments/assets/0db90d3b-b52a-425d-bc37-8ed9d4f41fa4)
 
@@ -13,5 +13,5 @@ In blender click **Edit > Preferences > Add-ons**
 
 Navigate to the downloaded .zip file and install it.
 
-## Documentation
-Coming soon!
+## Introduction
+[Youtube Video](https://youtu.be/WpwZXU6VnuA?si=Ud2-SwYbK1VDJDXP)
