@@ -1,5 +1,5 @@
 # Paint System Addon
-A simple but flexible painting system for Non-photorealistic-rendering in Blender
+A simple but flexible painting system for **non-photorealistic-rendering** in Blender
 
 ![Paint System](https://github.com/user-attachments/assets/0db90d3b-b52a-425d-bc37-8ed9d4f41fa4)
 
