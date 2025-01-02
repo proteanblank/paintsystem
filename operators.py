@@ -965,6 +965,26 @@ class PAINTSYSTEM_OT_ColorSampler(Operator):
         self.y = event.mouse_y
         return self.execute(context)
 
+
+class PAINTSYSTEM_OT_ToggleBrushEraseAlpha(Operator):
+    bl_idname = "paint_system.toggle_brush_erase_alpha"
+    bl_label = "Toggle Brush Erase Alpha"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Toggle between brush and erase alpha"
+
+    def execute(self, context):
+        tool_settings = context.tool_settings
+        paint = tool_settings.image_paint
+
+        if paint is not None:
+            brush = paint.brush
+            if brush is not None:
+                if brush.blend == 'ERASE_ALPHA':
+                    brush.blend = 'MIX'  # Switch back to normal blending
+                else:
+                    brush.blend = 'ERASE_ALPHA'  # Switch to Erase Alpha mode
+        return {'FINISHED'}
+
 # -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
@@ -1009,6 +1029,7 @@ classes = (
     PAINTSYSTEM_OT_NewFolder,
     PAINTSYSTEM_OT_CreateTemplateSetup,
     PAINTSYSTEM_OT_ColorSampler,
+    PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
     # PAINTSYSTEM_OT_Test,
 )
 
@@ -1025,7 +1046,9 @@ def register():
     if kc:
         km = kc.keymaps.new(name='Screen', space_type='EMPTY')
         kmi = km.keymap_items.new(
-            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'E', 'PRESS')
+            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'I', 'PRESS')
+        kmi = km.keymap_items.new(
+            PAINTSYSTEM_OT_ToggleBrushEraseAlpha.bl_idname, type='E', value='PRESS')
         addon_keymaps.append((km, kmi))
 
 
