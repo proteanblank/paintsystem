@@ -31,7 +31,7 @@ class PaintSystemPreferences(AddonPreferences):
     auto_check_update = BoolProperty(
         name="Auto-check for Update",
         description="If enabled, auto-check for updates using an interval",
-        default=True)
+        default=False)
 
     updater_interval_months = IntProperty(
         name='Months',
@@ -474,6 +474,7 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
         layout = self.layout
         ps = PaintSystem(context)
         color_mix_node = ps.find_color_mix_node()
+        active_layer = ps.get_active_layer()
         if color_mix_node:
             row = layout.row()
             row.prop(color_mix_node, "clamp_result", text="Clamp Result")
@@ -484,6 +485,10 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
             row.prop_search(uv_map_node, "uv_map", text="UV Map",
                             search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
 
+        image_texture_node = ps.find_image_texture_node()
+        if image_texture_node:
+            row = layout.row()
+            row.prop(image_texture_node, "interpolation", text="Interpolation")
 
 # -------------------------------------------------------------------
 # Images Panels

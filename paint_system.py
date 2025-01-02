@@ -443,6 +443,15 @@ class PaintSystem:
                 return node
         return None
 
+    def find_image_texture_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_layer_node_tree()
+        if not layer_node_tree:
+            return None
+        for node in layer_node_tree.nodes:
+            if node.type == 'TEX_IMAGE':
+                return node
+        return None
+
     def find_rgb_node(self) -> Optional[Node]:
         layer_node_tree = self.get_layer_node_tree()
         if not layer_node_tree:
