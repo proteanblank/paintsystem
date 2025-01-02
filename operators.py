@@ -10,7 +10,7 @@ from bpy.props import (
 import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
-from .paint_system import PaintSystem, get_brushes_from_library
+from .paint_system import PaintSystem, get_brushes_from_library, ADJUSTMENT_ENUM
 from mathutils import Vector
 import re
 
@@ -547,27 +547,6 @@ class PAINTSYSTEM_OT_PaintModeSettings(Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_ToggleClip(Operator):
-    bl_idname = "paint_system.toggle_clip"
-    bl_label = "Toggle Clipping"
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Toggle layer clipping"
-
-    @classmethod
-    def poll(cls, context):
-        ps = PaintSystem(context)
-        clip_mix_node = ps.find_clip_mix_node()
-        return clip_mix_node
-
-    def execute(self, context):
-        ps = PaintSystem(context)
-        clip_mix_node = ps.find_clip_mix_node()
-
-        clip_mix_node.inputs[0].default_value = not clip_mix_node.inputs[0].default_value
-
-        return {'FINISHED'}
-
-
 def get_uv_maps_names(self, context: Context):
     return [(uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers]
 
@@ -802,6 +781,43 @@ class PAINTSYSTEM_OT_NewFolder(Operator):
         layout.prop(self, "folder_name")
 
 
+class PAINTSYSTEM_OT_NewAdjustmentLayer(Operator):
+    bl_idname = "paint_system.new_adjustment_layer"
+    bl_label = "Add Adjustment Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add a new adjustment layer"
+
+    adjustment_type: EnumProperty(
+        name="Adjustment",
+        items=ADJUSTMENT_ENUM,
+        default='ShaderNodeBrightContrast'
+    )
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        return active_group
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        # Look for get name from in adjustment_enum based on adjustment_type
+        layer_name = next(name for identifier, name,
+                          _ in ADJUSTMENT_ENUM if identifier == self.adjustment_type)
+        ps.create_adjustment_layer(layer_name, self.adjustment_type)
+
+        # Force the UI to update
+        redraw_panel(self, context)
+
+        return {'FINISHED'}
+
+    # def invoke(self, context, event):
+    #     return context.window_manager.invoke_props_dialog(self)
+
+    # def draw(self, context):
+    #     layout = self.layout
+    #     layout.prop(self, "adjustment_name")
+
 # -------------------------------------------------------------------
 # Template Material Creation
 # -------------------------------------------------------------------
@@ -841,7 +857,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         default=True
     )
 
-    @classmethod
+    @ classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
         return ps.get_active_group()
@@ -956,7 +972,7 @@ class PAINTSYSTEM_OT_ColorSampler(Operator):
 
         return {'FINISHED'}
 
-    @classmethod
+    @ classmethod
     def poll(cls, context):
         return context.area.type == 'VIEW_3D' and context.active_object.mode == 'TEXTURE_PAINT'
 
@@ -1021,12 +1037,12 @@ classes = (
     PAINTSYSTEM_OT_AddPresetBrushes,
     PAINTSYSTEM_OT_SetActivePanel,
     PAINTSYSTEM_OT_PaintModeSettings,
-    PAINTSYSTEM_OT_ToggleClip,
     PAINTSYSTEM_OT_NewImage,
     PAINTSYSTEM_OT_OpenImage,
     PAINTSYSTEM_OT_OpenExistingImage,
     PAINTSYSTEM_OT_NewSolidColor,
     PAINTSYSTEM_OT_NewFolder,
+    PAINTSYSTEM_OT_NewAdjustmentLayer,
     PAINTSYSTEM_OT_CreateTemplateSetup,
     PAINTSYSTEM_OT_ColorSampler,
     PAINTSYSTEM_OT_ToggleBrushEraseAlpha,

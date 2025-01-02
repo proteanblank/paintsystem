@@ -2,12 +2,20 @@ import bpy
 from bpy.types import Context, Material, Image, NodeTree, Node, PropertyGroup
 from typing import Optional, Tuple
 from dataclasses import dataclass
+from mathutils import Vector
 import os
 
 
 LIBRARY_FILE_NAME = "library.blend"
 NODE_GROUP_PREFIX = "_PS"
 BRUSH_PREFIX = "PS_"
+ADJUSTMENT_ENUM = [
+    ('ShaderNodeBrightContrast', "Brightness and Contrast", ""),
+    ('ShaderNodeGamma', "Gamma", ""),
+    ('ShaderNodeHueSaturation', "Hue Saturation Value", ""),
+    ('ShaderNodeInvert', "Invert", ""),
+    ('ShaderNodeRGBCurve', "RGB Curves", ""),
+]
 
 
 def get_addon_filepath():
@@ -349,6 +357,73 @@ class PaintSystem:
 
         active_group.update_node_tree()
 
+    def create_adjustment_layer(self, name: str, adjustment_type: str) -> PropertyGroup:
+        """Creates a new adjustment layer in the active group.
+
+        Args:
+            name (str): The name of the new adjustment layer.
+            adjustment_type (str): The type of adjustment to be applied.
+
+        Returns:
+            PropertyGroup: The newly created adjustment layer.
+        """
+        mat = self.get_active_material()
+        active_group = self.get_active_group()
+        # Get insertion position
+        parent_id, insert_order = active_group.get_insertion_data()
+
+        # Adjust existing items' order
+        active_group.adjust_sibling_orders(parent_id, insert_order)
+
+        adjustment_template = get_node_from_library(
+            f'_PS_Adjustment_Template', False)
+        adjustment_nt: NodeTree = adjustment_template.copy()
+        adjustment_nt.name = f"PS {name} (MAT: {mat.name})"
+        nodes = adjustment_nt.nodes
+        links = adjustment_nt.links
+        # Find Vector Math node
+        group_input_node = None
+        for node in nodes:
+            if node.type == 'GROUP_INPUT':
+                group_input_node = node
+                break
+
+        # Find Mix node
+        mix_node = None
+        for node in nodes:
+            if node.type == 'MIX' and node.data_type == 'RGBA':
+                mix_node = node
+                break
+
+        adjustment_node = nodes.new(adjustment_type)
+        adjustment_node.label = 'Adjustment'
+        adjustment_node.location = mix_node.location + Vector([0, -200])
+
+        links.new(adjustment_node.inputs['Color'],
+                  group_input_node.outputs['Color'])
+        links.new(mix_node.inputs['B'], adjustment_node.outputs['Color'])
+
+        # Create the new item
+        new_id = active_group.add_item(
+            name=name,
+            item_type='ADJUSTMENT',
+            parent_id=parent_id,
+            order=insert_order,
+            node_tree=adjustment_nt
+        )
+
+        # Update active index
+        if new_id != -1:
+            flattened = active_group.flatten_hierarchy()
+            for i, (item, _) in enumerate(flattened):
+                if item.id == new_id:
+                    active_group.active_index = i
+                    break
+
+        active_group.update_node_tree()
+
+        return active_group.get_item_by_id(new_id)
+
     def get_settings(self) -> Optional[PropertyGroup]:
         return bpy.context.scene.paint_system_settings
 
@@ -458,6 +533,15 @@ class PaintSystem:
             return None
         for node in layer_node_tree.nodes:
             if node.name == 'RGB':
+                return node
+        return None
+
+    def find_adjustment_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_layer_node_tree()
+        if not layer_node_tree:
+            return None
+        for node in layer_node_tree.nodes:
+            if node.label == 'Adjustment':
                 return node
         return None
 

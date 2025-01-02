@@ -62,7 +62,8 @@ class PaintSystemLayer(BaseNestedListItem):
         items=[
             ('FOLDER', "Folder", "Folder layer"),
             ('IMAGE', "Image", "Image layer"),
-            ('SOLID_COLOR', "Solid Color", "Solid Color layer")
+            ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
+            ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
         ],
         default='IMAGE'
     )

@@ -12,7 +12,7 @@ from bpy.types import (Panel,
                        Context)
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
-from .paint_system import PaintSystem
+from .paint_system import PaintSystem, ADJUSTMENT_ENUM
 from . import addon_updater_ops
 # from .. import __package__ as base_package
 
@@ -344,6 +344,8 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                     if rgb_node:
                         row.prop(
                             rgb_node.outputs[0], "default_value", text="", icon='IMAGE_RGB_ALPHA')
+                case 'ADJUSTMENT':
+                    row.label(icon='SHADERFX')
             row.prop(display_item, "name", text="", emboss=False)
             if display_item.clip:
                 row.label(icon="SELECT_INTERSECT")
@@ -433,26 +435,34 @@ class MAT_PT_PaintSystemLayers(Panel):
         if not active_layer:
             return
 
-        split = layout.split(factor=0.4)
-        split.scale_y = 1.5
         # Let user set opacity and blend mode:
-        split.prop(active_layer, "clip", text="Clip", icon="SELECT_INTERSECT")
-        split.prop(ps.find_color_mix_node(), "blend_type", text="")
-
-        row = layout.row()
-        # row.prop(ps.find_clip_mix_node().inputs[0], "default_value",
-        #          text="Clip", icon="CLIPUV_HLT", toggle=True)
-        # row.operator("paint_system.toggle_clip", text="Clip", icon="CLIPUV_HLT",
-        #              depress=bool(ps.find_clip_mix_node().inputs[0].default_value))
-        row.scale_y = 1.5
-        row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
-                 text="Opacity", slider=True)
+        color_mix_node = ps.find_color_mix_node()
+        if active_layer.type != 'ADJUSTMENT':
+            split = layout.split(factor=0.4)
+            split.scale_y = 1.5
+            split.prop(active_layer, "clip", text="Clip",
+                       icon="SELECT_INTERSECT")
+            split.prop(color_mix_node, "blend_type", text="")
+            row = layout.row()
+            row.scale_y = 1.5
+            row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
+                     text="Opacity", slider=True)
+        else:
+            row = layout.row()
+            row.scale_y = 1.5
+            row.prop(active_layer, "clip", text="Clip",
+                     icon="SELECT_INTERSECT")
 
         rgb_node = ps.find_rgb_node()
         if rgb_node:
             row = layout.row()
             row.prop(rgb_node.outputs[0], "default_value", text="Color",
                      icon='IMAGE_RGB_ALPHA')
+
+        adjustment_node = ps.find_adjustment_node()
+        if adjustment_node:
+            layout.label(text="Adjustment Settings:")
+            layout.template_node_inputs(adjustment_node)
 
 
 class MAT_PT_PaintSystemLayersAdvanced(Panel):
@@ -514,6 +524,11 @@ class MAT_MT_PaintSystemAddImage(Menu):
         col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
                      icon="SEQUENCE_COLOR_03")
+        col = row.column()
+        col.label(text="Adjustment Layer:")
+        for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
+            col.operator("paint_system.new_adjustment_layer",
+                         text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
         # col = row.column()
         # col.label(text="Folder:")
         # col.operator("paint_system.new_folder", text="Folder",
