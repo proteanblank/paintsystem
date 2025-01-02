@@ -14,6 +14,7 @@ from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
 from . import addon_updater_ops
+from .common import is_online
 # from .. import __package__ as base_package
 
 # -------------------------------------------------------------------
@@ -31,7 +32,7 @@ class PaintSystemPreferences(AddonPreferences):
     auto_check_update = BoolProperty(
         name="Auto-check for Update",
         description="If enabled, auto-check for updates using an interval",
-        default=False)
+        default=True if bpy.app.version < (4, 2) else is_online())
 
     updater_interval_months = IntProperty(
         name='Months',
@@ -67,8 +68,12 @@ class PaintSystemPreferences(AddonPreferences):
         mainrow = layout.row()
         col = mainrow.column()
 
-        # Updater draw function, could also pass in col as third arg.
-        addon_updater_ops.update_settings_ui(self, context)
+        if is_online():
+            # Updater draw function, could also pass in col as third arg.
+            addon_updater_ops.update_settings_ui(self, context)
+        else:
+            col.label(
+                text="Please allow online access in user preferences to use the updater")
 
         # Alternate draw function, which is more condensed and can be
         # placed within an existing draw function. Only contains:
