@@ -40,6 +40,10 @@ def update_active_image(self=None, context: Context = None):
     for i, image in enumerate(mat.texture_paint_images):
         if image == active_layer.image:
             mat.paint_active_slot = i
+            # Get uv map name
+            uv_map_node = ps.find_uv_map_node()
+            if uv_map_node:
+                context.object.data.uv_layers[uv_map_node.uv_map].active = True
             break
 
 

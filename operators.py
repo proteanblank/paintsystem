@@ -12,6 +12,7 @@ from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, get_brushes_from_library, ADJUSTMENT_ENUM
 from mathutils import Vector
+from .common import get_object_uv_maps
 import re
 
 
@@ -547,8 +548,8 @@ class PAINTSYSTEM_OT_PaintModeSettings(Operator):
         return {'FINISHED'}
 
 
-def get_uv_maps_names(self, context: Context):
-    return [(uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers]
+# def get_uv_maps_names(self, context: Context):
+#     return [(uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers]
 
 
 def get_highest_number_with_prefix(prefix, string_list):
@@ -597,7 +598,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
     # )
     uv_map_name: EnumProperty(
         name="UV Map",
-        items=get_uv_maps_names
+        items=get_object_uv_maps
     )
 
     def execute(self, context):
@@ -643,7 +644,7 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
 
     uv_map_name: EnumProperty(
         name="UV Map",
-        items=get_uv_maps_names
+        items=get_object_uv_maps
     )
 
     def execute(self, context):
@@ -672,7 +673,7 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
 
     uv_map_name: EnumProperty(
         name="UV Map",
-        items=get_uv_maps_names
+        items=get_object_uv_maps
     )
 
     def execute(self, context):
