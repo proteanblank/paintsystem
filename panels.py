@@ -60,13 +60,13 @@ class PaintSystemPreferences(AddonPreferences):
         default=0,
         min=0,
         max=59)
-    
+
     show_tooltips = BoolProperty(
         name="Show Tooltips",
         description="Show tooltips in the UI",
         default=True
     )
-    
+
     use_compact_design = BoolProperty(
         name="Use Compact Design",
         description="Use a more compact design for the UI",
@@ -86,8 +86,6 @@ class PaintSystemPreferences(AddonPreferences):
             self.auto_check_update = False
             layout.label(
                 text="Please allow online access in user preferences to use the updater")
-            
-        
 
 
 # -------------------------------------------------------------------
@@ -127,7 +125,7 @@ class MAT_PT_PaintSystemGroups(Panel):
             return
         # Add Group button and selector
         row = layout.row()
-        
+
         if not ps.preferences.use_compact_design:
             row.scale_y = 2.0
         # row.operator("paint_system.new_group",
@@ -254,14 +252,14 @@ class MAT_PT_Brush(Panel):
         if not brush_imported:
             layout.operator("paint_system.add_preset_brushes",
                             text="Add Preset Brushes", icon="ADD")
-        
+
         if ps.preferences.show_tooltips:
             row = layout.row()
             if not ps.preferences.use_compact_design:
                 row.scale_y = 1.5
-            row.menu("MAT_PT_BrushTooltips", text='Brush Shortcuts', icon='INFO')
-            
-        
+            row.menu("MAT_PT_BrushTooltips",
+                     text='Brush Shortcuts', icon='INFO')
+
         # row.label(text="Brush Shortcuts")
 
 
@@ -269,16 +267,19 @@ class MAT_PT_BrushTooltips(Menu):
     bl_label = "Brush Tooltips"
     bl_description = "Brush Tooltips"
     bl_idname = "MAT_PT_BrushTooltips"
-    
+
     def draw(self, context):
         layout = self.layout
         # split = layout.split(factor=0.1)
         layout.label(text="Switch to Eraser", icon='EVENT_E')
         layout.label(text="Eyedrop color", icon='EVENT_I')
         layout.separator()
-        layout.operator('wm.url_open', text="Suggest more shortcuts on Github!", icon='URL').url = "https://github.com/natapol2547/paintsystem"
-        layout.operator("paint_system.disable_tool_tips", text="Disable Tooltips", icon='CANCEL')
+        layout.operator('wm.url_open', text="Suggest more shortcuts on Github!",
+                        icon='URL').url = "https://github.com/natapol2547/paintsystem"
+        layout.operator("paint_system.disable_tool_tips",
+                        text="Disable Tooltips", icon='CANCEL')
         # col.label(text="Press I to eyedrop color")
+
 
 class MAT_PT_BrushColor(Panel):
     bl_idname = 'MAT_PT_BrushColor'
@@ -454,7 +455,7 @@ class MAT_PT_PaintSystemLayers(Panel):
             row.scale_y = 1.5
         row.template_list(
             "MAT_PT_UL_PaintSystemLayerList", "", active_group, "items", active_group, "active_index",
-            rows=min(max(5, len(flattened)), 8)
+            rows=max(5, len(flattened))
         )
 
         col = row.column(align=True)
@@ -491,9 +492,9 @@ class MAT_PT_PaintSystemLayers(Panel):
             if not ps.preferences.use_compact_design:
                 split.scale_y = 1.5
             split.prop(active_layer, "clip", text="Clip",
-                     icon="SELECT_INTERSECT")
+                       icon="SELECT_INTERSECT")
             split.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
-                     text="Opacity", slider=True)
+                       text="Opacity", slider=True)
 
         rgb_node = ps.find_rgb_node()
         if rgb_node:
