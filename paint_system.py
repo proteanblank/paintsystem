@@ -133,15 +133,15 @@ def get_paint_system_images(is_dirty=True):
 
 @dataclass
 class PaintSystemPreferences:
-    # unified_brush_color: bool
-    # unified_brush_size: bool
+    show_tooltips: bool
+    use_compact_design: bool
     pass
 
 
 class PaintSystem:
     def __init__(self, context: Context):
-        # self.preferences: PaintSystemPreferences = bpy.context.preferences.addons[
-        #     'paintsystem'].preferences
+        self.preferences: PaintSystemPreferences = bpy.context.preferences.addons[
+            __package__].preferences
         self.context = context
         self.active_object = context.active_object
         # self.settings = self.get_settings()

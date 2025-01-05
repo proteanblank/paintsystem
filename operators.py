@@ -1003,6 +1003,34 @@ class PAINTSYSTEM_OT_ToggleBrushEraseAlpha(Operator):
         return {'FINISHED'}
 
 # -------------------------------------------------------------------
+# For changing preferences
+# -------------------------------------------------------------------
+
+class PAINTSYSTEM_OT_DisableTooltips(Operator):
+    bl_idname = "paint_system.disable_tool_tips"
+    bl_label = "Disable Tool Tips"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Disable Tool Tips"
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        preferences = ps.preferences
+        preferences.show_tooltips = False
+        
+        # Force the UI to update
+        redraw_panel(self, context)
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Disable Tool Tips?")
+        layout.label(text="You can enable them again in the preferences")
+
+# -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
 
@@ -1047,6 +1075,7 @@ classes = (
     PAINTSYSTEM_OT_CreateTemplateSetup,
     PAINTSYSTEM_OT_ColorSampler,
     PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
+    PAINTSYSTEM_OT_DisableTooltips,
     # PAINTSYSTEM_OT_Test,
 )
 

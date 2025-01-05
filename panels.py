@@ -60,32 +60,34 @@ class PaintSystemPreferences(AddonPreferences):
         default=0,
         min=0,
         max=59)
+    
+    show_tooltips = BoolProperty(
+        name="Show Tooltips",
+        description="Show tooltips in the UI",
+        default=True
+    )
+    
+    use_compact_design = BoolProperty(
+        name="Use Compact Design",
+        description="Use a more compact design for the UI",
+        default=False
+    )
 
     def draw(self, context):
         layout = self.layout
 
-        # Works best if a column, or even just self.layout.
-        mainrow = layout.row()
-        col = mainrow.column()
+        layout.prop(self, "show_tooltips", text="Show Tooltips")
+        layout.prop(self, "use_compact_design", text="Use Compact Design")
 
         if is_online():
             # Updater draw function, could also pass in col as third arg.
             addon_updater_ops.update_settings_ui(self, context)
         else:
-            col.label(
+            self.auto_check_update = False
+            layout.label(
                 text="Please allow online access in user preferences to use the updater")
-
-        # Alternate draw function, which is more condensed and can be
-        # placed within an existing draw function. Only contains:
-        #   1) check for update/update now buttons
-        #   2) toggle for auto-check (interval will be equal to what is set above)
-        # addon_updater_ops.update_settings_ui_condensed(self, context, col)
-
-        # Adding another column to help show the above condensed ui as one column
-        # col = mainrow.column()
-        # col.scale_y = 2
-        # ops = col.operator("wm.url_open","Open webpage ")
-        # ops.url=addon_updater_ops.updater.website
+            
+        
 
 
 # -------------------------------------------------------------------
@@ -125,13 +127,16 @@ class MAT_PT_PaintSystemGroups(Panel):
             return
         # Add Group button and selector
         row = layout.row()
-        row.scale_y = 2.0
+        
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 2.0
         # row.operator("paint_system.new_group",
         #              text="Add New Group", icon='ADD')
 
         if len(mat.paint_system.groups) > 0:
             row = layout.row(align=True)
-            row.scale_y = 1.5
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.5
             # row.scale_x = 1.5
             row.prop(mat.paint_system, "active_group", text="")
             row.operator("paint_system.new_group",
@@ -139,7 +144,8 @@ class MAT_PT_PaintSystemGroups(Panel):
             row.menu("MAT_MT_PaintSystemGroup", text="", icon='COLLAPSEMENU')
         else:
             row = layout.row(align=True)
-            row.scale_y = 1.5
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.5
             row.operator("paint_system.new_group",
                          text="Add Group", icon='ADD')
 
@@ -201,7 +207,6 @@ class MAT_PT_Brush(Panel):
     bl_region_type = "UI"
     bl_label = "Brush"
     bl_category = 'Paint System'
-    # bl_parent_id = 'MAT_PT_PaintSystemGroups'
 
     @classmethod
     def poll(cls, context):
@@ -211,8 +216,10 @@ class MAT_PT_Brush(Panel):
 
     def draw(self, context):
         layout = self.layout
+        ps = PaintSystem(context)
         row = layout.row()
-        row.scale_y = 1.5
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.5
         row.operator("paint_system.set_active_panel",
                      text="Advanced Settings", icon="PREFERENCES").category = "Tool"
 
@@ -247,7 +254,31 @@ class MAT_PT_Brush(Panel):
         if not brush_imported:
             layout.operator("paint_system.add_preset_brushes",
                             text="Add Preset Brushes", icon="ADD")
+        
+        if ps.preferences.show_tooltips:
+            row = layout.row()
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.5
+            row.menu("MAT_PT_BrushTooltips", text='Brush Shortcuts', icon='INFO')
+            
+        
+        # row.label(text="Brush Shortcuts")
 
+
+class MAT_PT_BrushTooltips(Menu):
+    bl_label = "Brush Tooltips"
+    bl_description = "Brush Tooltips"
+    bl_idname = "MAT_PT_BrushTooltips"
+    
+    def draw(self, context):
+        layout = self.layout
+        # split = layout.split(factor=0.1)
+        layout.label(text="Switch to Eraser", icon='EVENT_E')
+        layout.label(text="Eyedrop color", icon='EVENT_I')
+        layout.separator()
+        layout.operator('wm.url_open', text="Suggest more shortcuts on Github!", icon='URL').url = "https://github.com/natapol2547/paintsystem"
+        layout.operator("paint_system.disable_tool_tips", text="Disable Tooltips", icon='CANCEL')
+        # col.label(text="Press I to eyedrop color")
 
 class MAT_PT_BrushColor(Panel):
     bl_idname = 'MAT_PT_BrushColor'
@@ -412,17 +443,18 @@ class MAT_PT_PaintSystemLayers(Panel):
         row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK", emboss=has_dirty_images)
         if has_dirty_images:
-            layout.label(text="Don't forget to save your file!", icon="FUND")
+            layout.label(text="Don't forget to save!", icon="FUND")
 
         if not any([item.image for (item, _) in flattened]):
             layout.label(text="Add an image layer first!",
                          icon="ERROR")
 
         row = layout.row()
-        row.scale_y = 1.5
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.5
         row.template_list(
             "MAT_PT_UL_PaintSystemLayerList", "", active_group, "items", active_group, "active_index",
-            rows=max(5, len(flattened))
+            rows=min(max(5, len(flattened)), 8)
         )
 
         col = row.column(align=True)
@@ -444,19 +476,24 @@ class MAT_PT_PaintSystemLayers(Panel):
         color_mix_node = ps.find_color_mix_node()
         if active_layer.type != 'ADJUSTMENT':
             split = layout.split(factor=0.4)
-            split.scale_y = 1.5
+            if not ps.preferences.use_compact_design:
+                split.scale_y = 1.5
             split.prop(active_layer, "clip", text="Clip",
                        icon="SELECT_INTERSECT")
             split.prop(color_mix_node, "blend_type", text="")
             row = layout.row()
-            row.scale_y = 1.5
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.5
             row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                      text="Opacity", slider=True)
         else:
-            row = layout.row()
-            row.scale_y = 1.5
-            row.prop(active_layer, "clip", text="Clip",
+            split = layout.split(factor=0.4)
+            if not ps.preferences.use_compact_design:
+                split.scale_y = 1.5
+            split.prop(active_layer, "clip", text="Clip",
                      icon="SELECT_INTERSECT")
+            split.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
+                     text="Opacity", slider=True)
 
         rgb_node = ps.find_rgb_node()
         if rgb_node:
@@ -520,7 +557,7 @@ class MAT_MT_PaintSystemAddImage(Menu):
         col = row.column()
         col.label(text="Image Layer:")
         col.operator("paint_system.new_image",
-                     text="New Image", icon="FILE")
+                     text="New Image Layer", icon="FILE")
         col.operator("paint_system.open_image",
                      text="Open External Image")
         col.operator("paint_system.open_existing_image",
@@ -567,6 +604,7 @@ classes = (
     MAT_PT_PaintSystemLayers,
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddImage,
+    MAT_PT_BrushTooltips,
     # MAT_PT_PaintSystemTest,
 )
 
