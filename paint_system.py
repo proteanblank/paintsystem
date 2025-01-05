@@ -399,6 +399,16 @@ class PaintSystem:
         adjustment_node.label = 'Adjustment'
         adjustment_node.location = mix_node.location + Vector([0, -200])
 
+        # Checks if the adjustment node has a factor input
+        if 'Fac' in adjustment_node.inputs:
+            # Create a value node
+            value_node = nodes.new('ShaderNodeValue')
+            value_node.label = 'Factor'
+            value_node.outputs[0].default_value = 1.0
+            value_node.location = adjustment_node.location + Vector([-200, 0])
+            links.new(value_node.outputs['Value'],
+                      adjustment_node.inputs['Fac'])
+
         links.new(adjustment_node.inputs['Color'],
                   group_input_node.outputs['Color'])
         links.new(mix_node.inputs['B'], adjustment_node.outputs['Color'])
