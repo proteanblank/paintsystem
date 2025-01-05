@@ -292,7 +292,7 @@ class PaintSystem:
         solid_color_template = get_node_from_library(
             '_PS_Solid_Color_Template', False)
         solid_color_nt = solid_color_template.copy()
-        solid_color_nt.name = f"PS {name} (MAT: {mat.name})"
+        solid_color_nt.name = f"PS_IMG {name} (MAT: {mat.name})"
         solid_color_nt.nodes['RGB'].outputs[0].default_value = color
 
         # Create the new item
@@ -336,7 +336,7 @@ class PaintSystem:
         folder_template = get_node_from_library(
             '_PS_Folder_Template', False)
         folder_nt = folder_template.copy()
-        folder_nt.name = f"PS {name} (MAT: {mat.name})"
+        folder_nt.name = f"PS_FLD {name} (MAT: {mat.name})"
 
         # Create the new item
         new_id = active_group.add_item(
@@ -378,7 +378,7 @@ class PaintSystem:
         adjustment_template = get_node_from_library(
             f'_PS_Adjustment_Template', False)
         adjustment_nt: NodeTree = adjustment_template.copy()
-        adjustment_nt.name = f"PS {name} (MAT: {mat.name})"
+        adjustment_nt.name = f"PS_ADJ {name} (MAT: {mat.name})"
         nodes = adjustment_nt.nodes
         links = adjustment_nt.links
         # Find Vector Math node
