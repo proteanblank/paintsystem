@@ -9,6 +9,13 @@ def is_online():
 STRING_CACHE = {}
 
 
+def redraw_panel(self, context: Context):
+    # Force the UI to update
+    if context.area:
+        context.area.tag_redraw()
+
+
+# Fixes UnicodeDecodeError bug
 def intern_enum_items(items):
     def intern_string(s):
         if not isinstance(s, str):

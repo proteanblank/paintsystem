@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 
-def get_groups(self, context):
+def get_all_group_names(self, context):
     mat = context.active_object.active_material
     if not mat or not hasattr(mat, "paint_system"):
         return []
@@ -24,8 +24,9 @@ def get_groups(self, context):
 
 
 def update_active_image(self=None, context: Context = None):
-    ps = PaintSystem(bpy.context)
-    image_paint = bpy.context.tool_settings.image_paint
+    context = context or bpy.context
+    ps = PaintSystem(context)
+    image_paint = context.tool_settings.image_paint
     mat = ps.get_active_material()
     active_layer = ps.get_active_layer()
     if not active_layer:
@@ -270,7 +271,7 @@ class PaintSystemGroups(PropertyGroup):
     active_group: EnumProperty(
         name="Active Group",
         description="Select active group",
-        items=get_groups,
+        items=get_all_group_names,
         update=update_active_image
     )
 
