@@ -43,7 +43,7 @@ def update_active_image(self=None, context: Context = None):
             # Get uv map name
             uv_map_node = ps.find_uv_map_node()
             if uv_map_node:
-                context.object.data.uv_layers[uv_map_node.uv_map].active = True
+                ps.active_object.data.uv_layers[uv_map_node.uv_map].active = True
             break
 
 
