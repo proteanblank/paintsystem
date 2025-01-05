@@ -59,9 +59,9 @@ license = [
 # For longer explanations use the documentation or detail page.
 #
 # [permissions]
-# network = "Need to sync motion-capture data to server"
+network = "Check for updates from Github"
 # files = "Import/export FBX from/to disk"
-# clipboard = "Copy and paste bone transforms"
+clipboard = "Copy and paste brush colors"
 
 # Optional: build settings.
 # https://docs.blender.org/manual/en/dev/advanced/extensions/command_line_arguments.html#command-line-args-extension-build
