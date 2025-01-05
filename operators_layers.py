@@ -57,7 +57,6 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     """Add a new group"""
     bl_idname = "paint_system.new_group"
     bl_label = "Add Group"
-    bl_description = "Add a new group"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     bl_description = "Add a new group"
 
@@ -143,7 +142,6 @@ class PAINTSYSTEM_OT_DeleteGroup(Operator):
     """Delete the active group"""
     bl_idname = "paint_system.delete_group"
     bl_label = "Delete Group"
-    bl_description = "Delete the active group"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Delete the active group"
 
