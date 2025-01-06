@@ -232,6 +232,14 @@ class PaintSystemGroup(BaseNestedListManager):
         name="Node Tree",
         type=bpy.types.NodeTree
     )
+    bake_image: PointerProperty(
+        name="Bake Image",
+        type=bpy.types.Image
+    )
+    use_bake_image: BoolProperty(
+        name="Use Bake Image",
+        default=False
+    )
 
     @property
     def item_type(self):

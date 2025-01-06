@@ -442,7 +442,11 @@ class MAT_PT_PaintSystemLayers(Panel):
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         row.operator("wm.save_mainfile",
-                     text="", icon="FILE_TICK", emboss=has_dirty_images)
+                     text="", icon="FILE_TICK")
+
+        # Baking and Exporting
+        layout.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE', text="")
+
         if has_dirty_images:
             layout.label(text="Don't forget to save!", icon="FUND")
 
@@ -578,9 +582,24 @@ class MAT_MT_PaintSystemAddImage(Menu):
         #              icon="FILE_FOLDER")
 
 
+class MAT_MT_PaintSystemBakeAndExport(Menu):
+    bl_label = "Bake and Export"
+    bl_idname = "MAT_MT_PaintSystemBakeAndExport"
+
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row()
+        col = row.column()
+        col.label(text="Bake:")
+        col.operator("paint_system.bake_group",
+                     text="New Image Layer", icon="FILE")
+        col = row.column()
+        col.label(text="Export:")
+
 # -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
+
 
 class MAT_PT_PaintSystemTest(Panel):
     bl_idname = 'MAT_PT_PaintSystemTest'
@@ -606,6 +625,7 @@ classes = (
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddImage,
     MAT_PT_BrushTooltips,
+    MAT_MT_PaintSystemBakeAndExport,
     # MAT_PT_PaintSystemTest,
 )
 
