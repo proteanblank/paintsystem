@@ -69,7 +69,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     create_material_setup: BoolProperty(
         name="Create Material Setup",
         description="Create a template material setup for painting",
-        default=False
+        default=True
     )
 
     material_template: EnumProperty(
