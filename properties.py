@@ -58,6 +58,8 @@ def update_brush_settings(self=None, context: Context = None):
     ps = PaintSystem(context)
     active_layer = ps.get_active_layer()
     brush = context.tool_settings.image_paint.brush
+    if not brush:
+        return
     brush.use_alpha = not active_layer.lock_alpha
 
 

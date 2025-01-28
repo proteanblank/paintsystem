@@ -289,6 +289,7 @@ class MAT_PT_BrushTooltips(Menu):
         row = col.row(align=True)
         row.label(icon='EVENT_SHIFT', text="")
         row.label(text="Eyedrop Layer Color", icon='EVENT_X')
+        col.label(text="Scale Brush Size", icon='EVENT_F')
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more shortcuts on Github!",
                         icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
@@ -468,7 +469,8 @@ class MAT_PT_PaintSystemLayers(Panel):
         # Toggle paint mode (switch between object and texture paint mode)
         current_mode = context.mode
         box = layout.box()
-        row = box.row(align=True)
+        col = box.column(align=True)
+        row = col.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
         if contains_mat_setup:
@@ -485,8 +487,8 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         # Baking and Exporting
         row = col.row(align=True)
-        row.scale_y = 1.2
-        row.scale_x = 1.2
+        row.scale_y = 1.5
+        row.scale_x = 1.5
         row.menu("MAT_MT_PaintSystemBakeAndExport",
                  icon='EXPORT', text="Bake and Export")
 
@@ -512,7 +514,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         )
 
         col = row.column(align=True)
-        col.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE', text="")
+        col.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE_DATA', text="")
         col.operator("paint_system.new_folder", icon='NEWFOLDER', text="")
         col.separator()
         col.operator("paint_system.delete_item", icon="TRASH", text="")

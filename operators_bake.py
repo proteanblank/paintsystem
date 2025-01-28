@@ -63,7 +63,7 @@ def is_bakeable(context: Context) -> Tuple[bool, str, List[Node]]:
         context (bpy.types.Context): The context to check
 
     Returns:
-        Tuple[bool, str]: A tuple containing a boolean indicating if the node tree is multi-user and an error message if any
+        Tuple[bool, str, List[bpy.types.Node]]: A tuple containing a boolean indicating if the node tree is multi-user and an error message if any
     """
     ps = PaintSystem(context)
     active_group = ps.get_active_group()
@@ -246,14 +246,13 @@ def bake_node(target_node: Node, bake_type: str, width=1024, height=1024) -> Nod
         }
 
         # Add specific parameters for each bake type
-        if bake_type == 'COMBINED':
-            pass
-            # bake_params['pass_filter'] = {
-            #     'DIFFUSE', 'GLOSSY', 'TRANSMISSION', 'EMIT'}
-        elif bake_type == 'DIFFUSE':
-            bake_params['pass_filter'] = {'COLOR', 'DIRECT', 'INDIRECT'}
-        elif bake_type == 'NORMAL':
-            bake_params['normal_space'] = 'TANGENT'
+        # if bake_type == 'COMBINED':
+        #     bake_params['pass_filter'] = {
+        #         'DIFFUSE', 'GLOSSY', 'TRANSMISSION', 'SUBSURFACE', 'EMISSION'}
+        # elif bake_type == 'DIFFUSE':
+        #     bake_params['pass_filter'] = {'COLOR', 'DIRECT', 'INDIRECT'}
+        # elif bake_type == 'NORMAL':
+        #     bake_params['normal_space'] = 'TANGENT'
 
         # Perform bake
         bpy.ops.object.bake(**bake_params)
@@ -283,21 +282,20 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
 
     bake_started = False
 
-    @classmethod
-    def poll(cls, context):
-        return is_bakeable(context)[0]
-
-    def update_progress(self, context, progress, text=""):
-        ps = PaintSystem(context)
-        active_group = ps.get_active_group()
-        active_group.bake_progress = progress
-        active_group.bake_status = text
-        redraw_panel(self, context)
+    # @classmethod
+    # def poll(cls, context):
+    #     return is_bakeable(context)[0]
 
     def execute(self, context):
         ps = PaintSystem(context)
         mat = ps.get_active_material()
+        acative_group = ps.get_active_group()
         if not mat:
+            return {'CANCELLED'}
+
+        bakable, error, nodes = is_bakeable(context)
+        if not bakable:
+            self.report({'ERROR'}, error)
             return {'CANCELLED'}
 
         connected_node = get_connected_nodes(
@@ -308,6 +306,11 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
                 if node.bl_idname == "ShaderNodeShaderToRGB":
                     node = node.inputs[0].links[0].from_node
                 baking_steps.append((node, "COMBINED"))
+            if node.bl_idname == "ShaderNodeGroup" and node.node_tree == acative_group.node_tree:
+                baking_steps.append((node, "EMISSION"))
+
+        baking_steps.reverse()
+        print(baking_steps)
 
         for idx, (node, bake_type) in enumerate(baking_steps):
             tex_node = bake_node(node, bake_type)
