@@ -274,10 +274,10 @@ class MAT_PT_Brush(Panel):
         # row.label(text="Brush Shortcuts")
 
 
-class MAT_PT_BrushTooltips(Menu):
+class MAT_MT_BrushTooltips(Menu):
     bl_label = "Brush Tooltips"
     bl_description = "Brush Tooltips"
-    bl_idname = "MAT_PT_BrushTooltips"
+    bl_idname = "MAT_MT_BrushTooltips"
 
     def draw(self, context):
         layout = self.layout
@@ -421,10 +421,10 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
         return PaintSystem(context).group
 
 
-class MAT_PT_LayersSettingsTooltips(Menu):
+class MAT_MT_LayersSettingsTooltips(Menu):
     bl_label = "Layer Settings Tooltips"
     bl_description = "Layer Settings Tooltips"
-    bl_idname = "MAT_PT_LayersSettingsTooltips"
+    bl_idname = "MAT_MT_LayersSettingsTooltips"
 
     def draw(self, context):
         layout = self.layout
@@ -674,11 +674,11 @@ classes = (
     MAT_PT_BrushColor,
     # MAT_PT_BrushSettings,
     MAT_PT_UL_PaintSystemLayerList,
-    MAT_PT_LayersSettingsTooltips,
+    MAT_MT_LayersSettingsTooltips,
     MAT_PT_PaintSystemLayers,
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddImage,
-    MAT_PT_BrushTooltips,
+    MAT_MT_BrushTooltips,
     # MAT_PT_PaintSystemTest,
 )
 
