@@ -259,16 +259,18 @@ class MAT_PT_Brush(Panel):
         if not brush_imported:
             layout.operator("paint_system.add_preset_brushes",
                             text="Add Preset Brushes", icon="ADD")
+
         row = layout.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.5
+        row.label(text="Basic Settings:")
         row.operator("paint_system.set_active_panel",
-                     text="Go to Advanced Settings", icon="TOOL_SETTINGS").category = "Tool"
+                     text="More", icon="COLLAPSEMENU").category = "Tool"
         col = layout.column(align=True)
-        prop_unified(col, context, brush, "strength",
-                     "use_unified_strength", icon="WORLD", text="Strength")
+        if not ps.preferences.use_compact_design:
+            col.scale_y = 1.5
         prop_unified(col, context, brush, "size",
                      "use_unified_strength", icon="WORLD", text="Size", slider=True)
+        prop_unified(col, context, brush, "strength",
+                     "use_unified_strength", icon="WORLD", text="Strength")
         # row.label(text="Brush Shortcuts")
 
 
@@ -394,6 +396,10 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
             row.prop(display_item, "name", text="", emboss=False)
             if display_item.clip:
                 row.label(icon="SELECT_INTERSECT")
+            # if display_item.lock_alpha:
+            #     row.label(icon="TEXTURE")
+            if display_item.lock_layer:
+                row.label(icon="VIEW_LOCKED")
             row.prop(display_item, "enabled", text="",
                      icon="HIDE_OFF" if display_item.enabled else "HIDE_ON", emboss=False)
             # row.label(text=f"Order: {display_item.order}")
@@ -510,7 +516,6 @@ class MAT_PT_PaintSystemLayers(Panel):
         match active_layer.type:
             case 'IMAGE':
                 row = box.row(align=True)
-                row.enabled = not active_layer.lock_layer
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
                     row.scale_x = 1.5
@@ -522,6 +527,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                          text="", icon='VIEW_LOCKED')
                 row.prop(color_mix_node, "blend_type", text="")
                 row = box.row()
+                row.enabled = not active_layer.lock_layer
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
@@ -549,21 +555,23 @@ class MAT_PT_PaintSystemLayers(Panel):
                          text="", icon='VIEW_LOCKED')
                 row.prop(color_mix_node, "blend_type", text="")
                 row = box.row()
+                row.enabled = not active_layer.lock_layer
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
 
         rgb_node = ps.find_rgb_node()
+        col = box.column()
+        col.enabled = not active_layer.lock_layer
         if rgb_node:
-            row = layout.row()
-            row.prop(rgb_node.outputs[0], "default_value", text="Color",
+            col.prop(rgb_node.outputs[0], "default_value", text="Color",
                      icon='IMAGE_RGB_ALPHA')
 
         adjustment_node = ps.find_adjustment_node()
         if adjustment_node:
-            box.label(text="Adjustment Settings:", icon='SHADERFX')
-            box.template_node_inputs(adjustment_node)
+            col.label(text="Adjustment Settings:", icon='SHADERFX')
+            col.template_node_inputs(adjustment_node)
 
 
 class MAT_PT_PaintSystemLayersAdvanced(Panel):
@@ -658,7 +666,7 @@ classes = (
     MAT_MT_PaintSystemGroup,
     MAT_PT_Brush,
     MAT_PT_BrushColor,
-    MAT_PT_BrushSettings,
+    # MAT_PT_BrushSettings,
     MAT_PT_UL_PaintSystemLayerList,
     MAT_PT_LayersSettingsTooltips,
     MAT_PT_PaintSystemLayers,
