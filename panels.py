@@ -585,7 +585,7 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
     bl_idname = 'MAT_PT_PaintSystemLayersAdvanced'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_label = "Advanced"
+    bl_label = "Advanced Settings"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_PaintSystemLayers'
     bl_options = {'DEFAULT_CLOSED'}
@@ -602,19 +602,18 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
         color_mix_node = ps.find_color_mix_node()
         active_layer = ps.get_active_layer()
         if color_mix_node:
-            row = layout.row()
-            row.prop(color_mix_node, "clamp_result", text="Clamp Result")
+            layout.prop(color_mix_node, "clamp_result", text="Clamp Result")
 
         uv_map_node = ps.find_uv_map_node()
         if uv_map_node:
-            row = layout.row()
-            row.prop_search(uv_map_node, "uv_map", text="UV Map",
-                            search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
+            layout.prop_search(uv_map_node, "uv_map", text="UV Map",
+                               search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
 
         image_texture_node = ps.find_image_texture_node()
         if image_texture_node:
-            row = layout.row()
-            row.prop(image_texture_node, "interpolation", text="Interpolation")
+            layout.prop(image_texture_node, "interpolation",
+                        text="Interpolation")
+            layout.prop(active_layer.image, "alpha_mode", text="Alpha Mode")
 
 # -------------------------------------------------------------------
 # Images Panels
