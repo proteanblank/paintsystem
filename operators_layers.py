@@ -501,7 +501,8 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
         mat = ps.get_active_material()
-        bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
+        if not get_object_uv_maps(self, context):
+            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
         image = bpy.data.images.new(
             name=f"PS {mat.name} {self.name}",
             width=int(self.image_resolution),
@@ -549,7 +550,8 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         image = bpy.data.images.load(self.filepath, check_existing=True)
-        # image.pack()
+        if not get_object_uv_maps(self, context):
+            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
         ps.create_image_layer(image.name, image, self.uv_map_name)
         return {'FINISHED'}
 
@@ -559,7 +561,10 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "uv_map_name")
+        if not get_object_uv_maps(self, context):
+            layout.label(text="No UV Maps found. Creating new UV Map")
+        else:
+            layout.prop(self, "uv_map_name")
 
 
 class PAINTSYSTEM_OT_OpenExistingImage(Operator):
@@ -583,6 +588,8 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
         image = bpy.data.images.get(self.image_name)
         if not image:
             return {'CANCELLED'}
+        if not get_object_uv_maps(self, context):
+            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
         ps.create_image_layer(self.image_name, image, self.uv_map_name)
         return {'FINISHED'}
 
@@ -594,7 +601,10 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
         layout = self.layout
         layout.prop_search(self, "image_name", bpy.data,
                            "images", text="Image")
-        layout.prop(self, "uv_map_name")
+        if not get_object_uv_maps(self, context):
+            layout.label(text="No UV Maps found. Creating new UV Map")
+        else:
+            layout.prop(self, "uv_map_name")
 
 
 class PAINTSYSTEM_OT_NewSolidColor(Operator):
