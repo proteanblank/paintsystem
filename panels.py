@@ -229,8 +229,16 @@ class MAT_PT_Brush(Panel):
         # row.operator("paint_system.set_active_panel",
         #              text="Advanced Settings", icon="PREFERENCES").category = "Tool"
 
-        tool_settings = context.tool_settings.image_paint
+        brush_imported = False
+        for brush in bpy.data.brushes:
+            if brush.name.startswith("PS_"):
+                brush_imported = True
+                break
+        if not brush_imported:
+            layout.operator("paint_system.add_preset_brushes",
+                            text="Add Preset Brushes", icon="IMPORT")
 
+        tool_settings = context.tool_settings.image_paint
         # Check blender version
         if not is_newer_than(4, 3):
             layout.template_ID_preview(tool_settings, "brush",
@@ -251,20 +259,12 @@ class MAT_PT_Brush(Panel):
         #     if brush:
         #         col.prop(brush, "name", text="")
 
-        brush_imported = False
-        for brush in bpy.data.brushes:
-            if brush.name.startswith("PS_"):
-                brush_imported = True
-                break
-        if not brush_imported:
-            layout.operator("paint_system.add_preset_brushes",
-                            text="Add Preset Brushes", icon="ADD")
-
-        row = layout.row()
-        row.label(text="Basic Settings:")
+        box = layout.box()
+        row = box.row()
+        row.label(text="Settings:", icon="SETTINGS")
         row.operator("paint_system.set_active_panel",
                      text="More", icon="COLLAPSEMENU").category = "Tool"
-        col = layout.column(align=True)
+        col = box.column(align=True)
         if not ps.preferences.use_compact_design:
             col.scale_y = 1.5
         prop_unified(col, context, brush, "size",
@@ -282,11 +282,15 @@ class MAT_PT_BrushTooltips(Menu):
     def draw(self, context):
         layout = self.layout
         # split = layout.split(factor=0.1)
-        layout.label(text="Switch to Eraser", icon='EVENT_E')
-        layout.label(text="Eyedrop color", icon='EVENT_I')
+        col = layout.column()
+        col.label(text="Switch to Eraser", icon='EVENT_E')
+        col.label(text="Eyedrop Screen Color", icon='EVENT_I')
+        row = col.row(align=True)
+        row.label(icon='EVENT_SHIFT', text="")
+        row.label(text="Eyedrop Layer Color", icon='EVENT_X')
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more shortcuts on Github!",
-                        icon='URL').url = "https://github.com/natapol2547/paintsystem"
+                        icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
         layout.operator("paint_system.disable_tool_tips",
                         text="Disable Tooltips", icon='CANCEL')
 
@@ -317,10 +321,14 @@ class MAT_PT_BrushColor(Panel):
 
     def draw(self, context):
         layout = self.layout
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.scale_y = 1.5
+        row.prop(context.preferences.view, "color_picker_type", text="")
         tool_settings = bpy.context.scene.tool_settings
         unified_settings = tool_settings.unified_paint_settings
         brush_settings = tool_settings.image_paint.brush
-        layout.template_color_picker(
+        col.template_color_picker(
             unified_settings if unified_settings.use_unified_color else brush_settings, "color", value_slider=True)
 
 
@@ -427,7 +435,7 @@ class MAT_PT_LayersSettingsTooltips(Menu):
         layout.label(text="Lock Layer Settings", icon='VIEW_LOCKED')
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more settings on Github!",
-                        icon='URL').url = "https://github.com/natapol2547/paintsystem"
+                        icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
         layout.operator("paint_system.disable_tool_tips",
                         text="Disable Tooltips", icon='CANCEL')
 
@@ -458,14 +466,13 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         # Toggle paint mode (switch between object and texture paint mode)
         current_mode = context.mode
-        row = layout.row(align=True)
+        box = layout.box()
+        row = box.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
                          text="Toggle Paint Mode", icon="BRUSHES_ALL", depress=current_mode == 'PAINT_TEXTURE')
-            # row.operator("paint_system.paint_mode_menu",
-            #              text="", icon="COLLAPSEMENU")
         else:
             row.alert = True
             row.operator("paint_system.create_template_setup",
@@ -477,11 +484,11 @@ class MAT_PT_PaintSystemLayers(Panel):
         row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK", emboss=has_dirty_images)
         if has_dirty_images:
-            layout.label(text="Don't forget to save!", icon="FUND")
+            box.label(text="Don't forget to save!", icon="FUND")
 
         if not any([item.image for (item, _) in flattened]):
-            layout.label(text="Add an image layer first!",
-                         icon="ERROR")
+            box.label(text="Add an image layer first!",
+                      icon="ERROR")
 
         row = layout.row()
         if not ps.preferences.use_compact_design:
@@ -632,7 +639,7 @@ class MAT_MT_PaintSystemAddImage(Menu):
         col = row.column()
         col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
-                     icon="SEQUENCE_COLOR_03")
+                     icon="SEQUENCE_COLOR_03" if not is_newer_than(4, 4) else 'STRIP_COLOR_03')
         col = row.column()
         col.label(text="Adjustment Layer:")
         for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
