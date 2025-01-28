@@ -1,6 +1,7 @@
 import bpy
 
 from bpy.props import (IntProperty,
+                       FloatProperty,
                        FloatVectorProperty,
                        BoolProperty,
                        StringProperty,
@@ -239,6 +240,16 @@ class PaintSystemGroup(BaseNestedListManager):
     use_bake_image: BoolProperty(
         name="Use Bake Image",
         default=False
+    )
+    bake_progress: FloatProperty(
+        name="Baking Progress",
+        default=0.0,
+        min=0.0,
+        max=1.0
+    )
+    bake_status: StringProperty(
+        name="Baking Status",
+        default=""
     )
 
     @property

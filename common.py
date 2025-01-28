@@ -15,7 +15,12 @@ def redraw_panel(self, context: Context):
         context.area.tag_redraw()
 
 
+def map_range(num, inMin, inMax, outMin, outMax):
+    return outMin + (float(num - inMin) / float(inMax - inMin) * (outMax - outMin))
+
 # Fixes UnicodeDecodeError bug
+
+
 def intern_enum_items(items):
     def intern_string(s):
         if not isinstance(s, str):

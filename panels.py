@@ -15,6 +15,7 @@ from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
 from . import addon_updater_ops
 from .common import is_online
+from .operators_bake import is_bakeable
 # from .. import __package__ as base_package
 
 # -------------------------------------------------------------------
@@ -425,7 +426,8 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         # Toggle paint mode (switch between object and texture paint mode)
         current_mode = context.mode
-        row = layout.row(align=True)
+        col = layout.column(align=True)
+        row = col.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
         if contains_mat_setup:
@@ -439,14 +441,22 @@ class MAT_PT_PaintSystemLayers(Panel):
                          text="Setup Material", icon="ERROR")
             row.alert = False
 
-        has_dirty_images = any(
-            [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK")
 
         # Baking and Exporting
-        layout.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE', text="")
+        row = col.row(align=True)
+        row.scale_y = 1.2
+        row.scale_x = 1.2
+        row.menu("MAT_MT_PaintSystemBakeAndExport",
+                 icon='EXPORT', text="Bake and Export")
 
+        if active_group.bake_progress > 0:
+            layout.progress(factor=active_group.bake_progress,
+                            text=active_group.bake_status)
+
+        has_dirty_images = any(
+            [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         if has_dirty_images:
             layout.label(text="Don't forget to save!", icon="FUND")
 
@@ -588,13 +598,24 @@ class MAT_MT_PaintSystemBakeAndExport(Menu):
 
     def draw(self, context):
         layout = self.layout
-        row = layout.row()
-        col = row.column()
-        col.label(text="Bake:")
-        col.operator("paint_system.bake_group",
-                     text="New Image Layer", icon="FILE")
-        col = row.column()
-        col.label(text="Export:")
+        ps = PaintSystem(context)
+        mat = ps.get_active_material()
+        bakeable, error_message, nodes = is_bakeable(context)
+        if not bakeable:
+            col = layout.column()
+            col.alert = True
+            col.label(text=error_message, icon='ERROR')
+
+            for node in nodes:
+                # row.operator("node.find_node")
+                col.label(text=node.name)
+            # TODO: Add operator to find nodew
+        else:
+            col = layout.column()
+            col.label(text="Bake:")
+            col.operator("paint_system.bake_group",
+                         text="New Image Layer", icon="FILE")
+            col.label(text="Export:")
 
 # -------------------------------------------------------------------
 # For testing
