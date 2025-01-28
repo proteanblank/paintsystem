@@ -500,9 +500,10 @@ class PAINTSYSTEM_OT_NewImage(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
+        mat = ps.get_active_material()
         bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
         image = bpy.data.images.new(
-            name=f"PaintSystem_{active_group.next_id}",
+            name=f"PS {mat.name} {self.name}",
             width=int(self.image_resolution),
             height=int(self.image_resolution),
             alpha=True,
