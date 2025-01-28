@@ -14,7 +14,7 @@ from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
 from . import addon_updater_ops
-from .common import is_online
+from .common import is_online, is_newer_than
 from .operators_bake import is_bakeable
 # from .. import __package__ as base_package
 
@@ -211,39 +211,24 @@ class MAT_PT_Brush(Panel):
     def poll(cls, context):
         ps = PaintSystem(context)
         obj = ps.active_object
-        return obj.mode == 'TEXTURE_PAINT'
+        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
+
+    def draw_header_preset(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        if ps.preferences.show_tooltips:
+            row = layout.row()
+            row.menu("MAT_PT_BrushTooltips",
+                     text='View Shortcuts!')
 
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        row = layout.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.5
-        row.operator("paint_system.set_active_panel",
-                     text="Advanced Settings", icon="PREFERENCES").category = "Tool"
-
-        tool_settings = context.tool_settings.image_paint
-
-        # Check blender version
-        if bpy.app.version < (4, 3):
-            layout.template_ID_preview(tool_settings, "brush",
-                                       new="brush.add", rows=3, cols=8, hide_buttons=False)
-
-        else:
-            col = layout.column(align=True)
-            shelf_name = "VIEW3D_AST_brush_texture_paint"
-            brush = tool_settings.brush
-            display_name = brush.name if brush else None
-            if display_name and brush.has_unsaved_changes:
-                display_name = display_name + "*"
-            preview_icon_id = brush.preview.icon_id if brush and brush.preview else 0
-            col.template_asset_shelf_popover(
-                shelf_name,
-                icon='BRUSH_DATA' if not preview_icon_id else 'NONE',
-                icon_value=preview_icon_id,
-            )
-            if brush:
-                col.prop(brush, "name", text="")
+        # row = layout.row()
+        # if not ps.preferences.use_compact_design:
+        #     row.scale_y = 1.5
+        # row.operator("paint_system.set_active_panel",
+        #              text="Advanced Settings", icon="PREFERENCES").category = "Tool"
 
         brush_imported = False
         for brush in bpy.data.brushes:
@@ -252,15 +237,41 @@ class MAT_PT_Brush(Panel):
                 break
         if not brush_imported:
             layout.operator("paint_system.add_preset_brushes",
-                            text="Add Preset Brushes", icon="ADD")
+                            text="Add Preset Brushes", icon="IMPORT")
 
-        if ps.preferences.show_tooltips:
-            row = layout.row()
-            if not ps.preferences.use_compact_design:
-                row.scale_y = 1.5
-            row.menu("MAT_PT_BrushTooltips",
-                     text='Brush Shortcuts', icon='INFO')
+        tool_settings = context.tool_settings.image_paint
+        # Check blender version
+        if not is_newer_than(4, 3):
+            layout.template_ID_preview(tool_settings, "brush",
+                                       new="brush.add", rows=3, cols=8, hide_buttons=False)
+        # else:
+        #     col = layout.column(align=True)
+        #     shelf_name = "VIEW3D_AST_brush_texture_paint"
+        #     brush = tool_settings.brush
+        #     display_name = brush.name if brush else None
+        #     if display_name and brush.has_unsaved_changes:
+        #         display_name = display_name + "*"
+        #     preview_icon_id = brush.preview.icon_id if brush and brush.preview else 0
+        #     col.template_asset_shelf_popover(
+        #         shelf_name,
+        #         icon='BRUSH_DATA' if not preview_icon_id else 'NONE',
+        #         icon_value=preview_icon_id,
+        #     )
+        #     if brush:
+        #         col.prop(brush, "name", text="")
 
+        box = layout.box()
+        row = box.row()
+        row.label(text="Settings:", icon="SETTINGS")
+        row.operator("paint_system.set_active_panel",
+                     text="More", icon="COLLAPSEMENU").category = "Tool"
+        col = box.column(align=True)
+        if not ps.preferences.use_compact_design:
+            col.scale_y = 1.5
+        prop_unified(col, context, brush, "size",
+                     "use_unified_strength", icon="WORLD", text="Size", slider=True)
+        prop_unified(col, context, brush, "strength",
+                     "use_unified_strength", icon="WORLD", text="Strength")
         # row.label(text="Brush Shortcuts")
 
 
@@ -272,14 +283,17 @@ class MAT_PT_BrushTooltips(Menu):
     def draw(self, context):
         layout = self.layout
         # split = layout.split(factor=0.1)
-        layout.label(text="Switch to Eraser", icon='EVENT_E')
-        layout.label(text="Eyedrop color", icon='EVENT_I')
+        col = layout.column()
+        col.label(text="Switch to Eraser", icon='EVENT_E')
+        col.label(text="Eyedrop Screen Color", icon='EVENT_I')
+        row = col.row(align=True)
+        row.label(icon='EVENT_SHIFT', text="")
+        row.label(text="Eyedrop Layer Color", icon='EVENT_X')
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more shortcuts on Github!",
-                        icon='URL').url = "https://github.com/natapol2547/paintsystem"
+                        icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
         layout.operator("paint_system.disable_tool_tips",
                         text="Disable Tooltips", icon='CANCEL')
-        # col.label(text="Press I to eyedrop color")
 
 
 class MAT_PT_BrushColor(Panel):
@@ -288,14 +302,14 @@ class MAT_PT_BrushColor(Panel):
     bl_region_type = "UI"
     bl_label = "Color"
     bl_category = 'Paint System'
-    bl_parent_id = 'MAT_PT_Brush'
-    bl_options = {'DEFAULT_CLOSED'}
+    if not is_newer_than(4, 3):
+        bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
         obj = ps.active_object
-        return obj.mode == 'TEXTURE_PAINT'
+        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
     def draw_header_preset(self, context):
         layout = self.layout
@@ -308,10 +322,14 @@ class MAT_PT_BrushColor(Panel):
 
     def draw(self, context):
         layout = self.layout
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.scale_y = 1.5
+        row.prop(context.preferences.view, "color_picker_type", text="")
         tool_settings = bpy.context.scene.tool_settings
         unified_settings = tool_settings.unified_paint_settings
         brush_settings = tool_settings.image_paint.brush
-        layout.template_color_picker(
+        col.template_color_picker(
             unified_settings if unified_settings.use_unified_color else brush_settings, "color", value_slider=True)
 
 
@@ -328,7 +346,7 @@ class MAT_PT_BrushSettings(Panel):
     def poll(cls, context):
         ps = PaintSystem(context)
         obj = ps.active_object
-        return obj.mode == 'TEXTURE_PAINT'
+        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
     def draw(self, context):
         layout = self.layout
@@ -387,6 +405,10 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
             row.prop(display_item, "name", text="", emboss=False)
             if display_item.clip:
                 row.label(icon="SELECT_INTERSECT")
+            # if display_item.lock_alpha:
+            #     row.label(icon="TEXTURE")
+            if display_item.lock_layer:
+                row.label(icon="VIEW_LOCKED")
             row.prop(display_item, "enabled", text="",
                      icon="HIDE_OFF" if display_item.enabled else "HIDE_ON", emboss=False)
             # row.label(text=f"Order: {display_item.order}")
@@ -398,6 +420,25 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
 
     def get_list_manager(self, context):
         return PaintSystem(context).group
+
+
+class MAT_PT_LayersSettingsTooltips(Menu):
+    bl_label = "Layer Settings Tooltips"
+    bl_description = "Layer Settings Tooltips"
+    bl_idname = "MAT_PT_LayersSettingsTooltips"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Layer Settings Tips!")
+        layout.separator()
+        layout.label(text="Clip to Layer Below", icon='SELECT_INTERSECT')
+        layout.label(text="Lock Layer Alpha", icon='TEXTURE')
+        layout.label(text="Lock Layer Settings", icon='VIEW_LOCKED')
+        layout.separator()
+        layout.operator('wm.url_open', text="Suggest more settings on Github!",
+                        icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
+        layout.operator("paint_system.disable_tool_tips",
+                        text="Disable Tooltips", icon='CANCEL')
 
 
 class MAT_PT_PaintSystemLayers(Panel):
@@ -426,15 +467,13 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         # Toggle paint mode (switch between object and texture paint mode)
         current_mode = context.mode
-        col = layout.column(align=True)
-        row = col.row(align=True)
+        box = layout.box()
+        row = box.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
                          text="Toggle Paint Mode", icon="BRUSHES_ALL", depress=current_mode == 'PAINT_TEXTURE')
-            # row.operator("paint_system.paint_mode_menu",
-            #              text="", icon="COLLAPSEMENU")
         else:
             row.alert = True
             row.operator("paint_system.create_template_setup",
@@ -458,11 +497,11 @@ class MAT_PT_PaintSystemLayers(Panel):
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         if has_dirty_images:
-            layout.label(text="Don't forget to save!", icon="FUND")
+            box.label(text="Don't forget to save!", icon="FUND")
 
         if not any([item.image for (item, _) in flattened]):
-            layout.label(text="Add an image layer first!",
-                         icon="ERROR")
+            box.label(text="Add an image layer first!",
+                      icon="ERROR")
 
         row = layout.row()
         if not ps.preferences.use_compact_design:
@@ -481,57 +520,90 @@ class MAT_PT_PaintSystemLayers(Panel):
         col.operator("paint_system.move_up", icon="TRIA_UP", text="")
         col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 
-        # Settings
         active_layer = ps.get_active_layer()
-
         if not active_layer:
             return
 
+        # Settings
+        box = layout.box()
+        row = box.row()
+        row.label(text="Layer Settings:", icon='SETTINGS')
+        if ps.preferences.show_tooltips:
+            row.menu("MAT_PT_LayersSettingsTooltips", text='', icon='QUESTION')
+
         # Let user set opacity and blend mode:
         color_mix_node = ps.find_color_mix_node()
-        if active_layer.type != 'ADJUSTMENT':
-            split = layout.split(factor=0.4)
-            if not ps.preferences.use_compact_design:
-                split.scale_y = 1.5
-            split.prop(active_layer, "clip", text="Clip",
-                       icon="SELECT_INTERSECT")
-            split.prop(color_mix_node, "blend_type", text="")
-            row = layout.row()
-            if not ps.preferences.use_compact_design:
-                row.scale_y = 1.5
-            row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
-                     text="Opacity", slider=True)
-        else:
-            split = layout.split(factor=0.4)
-            if not ps.preferences.use_compact_design:
-                split.scale_y = 1.5
-            split.prop(active_layer, "clip", text="Clip",
-                       icon="SELECT_INTERSECT")
-            split.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
-                       text="Opacity", slider=True)
+        match active_layer.type:
+            case 'IMAGE':
+                row = box.row(align=True)
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                    row.scale_x = 1.5
+                row.prop(active_layer, "clip", text="",
+                         icon="SELECT_INTERSECT")
+                row.prop(active_layer, "lock_alpha",
+                         text="", icon='TEXTURE')
+                row.prop(active_layer, "lock_layer",
+                         text="", icon='VIEW_LOCKED')
+                row.prop(color_mix_node, "blend_type", text="")
+                row = box.row()
+                row.enabled = not active_layer.lock_layer
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
+                         text="Opacity", slider=True)
+
+            case 'ADJUSTMENT':
+                row = box.row(align=True)
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                    row.scale_x = 1.5
+                row.prop(active_layer, "clip", text="",
+                         icon="SELECT_INTERSECT")
+                row.prop(active_layer, "lock_layer",
+                         text="", icon='VIEW_LOCKED')
+                row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
+                         text="Opacity", slider=True)
+            case _:
+                row = box.row(align=True)
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                    row.scale_x = 1.5
+                row.prop(active_layer, "clip", text="",
+                         icon="SELECT_INTERSECT")
+                row.prop(active_layer, "lock_layer",
+                         text="", icon='VIEW_LOCKED')
+                row.prop(color_mix_node, "blend_type", text="")
+                row = box.row()
+                row.enabled = not active_layer.lock_layer
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
+                         text="Opacity", slider=True)
 
         rgb_node = ps.find_rgb_node()
+        col = box.column()
+        col.enabled = not active_layer.lock_layer
         if rgb_node:
-            row = layout.row()
-            row.prop(rgb_node.outputs[0], "default_value", text="Color",
+            col.prop(rgb_node.outputs[0], "default_value", text="Color",
                      icon='IMAGE_RGB_ALPHA')
 
         adjustment_node = ps.find_adjustment_node()
         if adjustment_node:
-            layout.label(text="Adjustment Settings:")
-            layout.template_node_inputs(adjustment_node)
+            col.label(text="Adjustment Settings:", icon='SHADERFX')
+            col.template_node_inputs(adjustment_node)
 
 
 class MAT_PT_PaintSystemLayersAdvanced(Panel):
     bl_idname = 'MAT_PT_PaintSystemLayersAdvanced'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_label = "Advanced"
+    bl_label = "Advanced Settings"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_PaintSystemLayers'
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
+    @ classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
@@ -543,19 +615,18 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
         color_mix_node = ps.find_color_mix_node()
         active_layer = ps.get_active_layer()
         if color_mix_node:
-            row = layout.row()
-            row.prop(color_mix_node, "clamp_result", text="Clamp Result")
+            layout.prop(color_mix_node, "clamp_result", text="Clamp Result")
 
         uv_map_node = ps.find_uv_map_node()
         if uv_map_node:
-            row = layout.row()
-            row.prop_search(uv_map_node, "uv_map", text="UV Map",
-                            search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
+            layout.prop_search(uv_map_node, "uv_map", text="UV Map",
+                               search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
 
         image_texture_node = ps.find_image_texture_node()
         if image_texture_node:
-            row = layout.row()
-            row.prop(image_texture_node, "interpolation", text="Interpolation")
+            layout.prop(image_texture_node, "interpolation",
+                        text="Interpolation")
+            layout.prop(active_layer.image, "alpha_mode", text="Alpha Mode")
 
 # -------------------------------------------------------------------
 # Images Panels
@@ -580,7 +651,7 @@ class MAT_MT_PaintSystemAddImage(Menu):
         col = row.column()
         col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
-                     icon="SEQUENCE_COLOR_03")
+                     icon="SEQUENCE_COLOR_03" if not is_newer_than(4, 4) else 'STRIP_COLOR_03')
         col = row.column()
         col.label(text="Adjustment Layer:")
         for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
@@ -640,8 +711,9 @@ classes = (
     MAT_MT_PaintSystemGroup,
     MAT_PT_Brush,
     MAT_PT_BrushColor,
-    MAT_PT_BrushSettings,
+    # MAT_PT_BrushSettings,
     MAT_PT_UL_PaintSystemLayerList,
+    MAT_PT_LayersSettingsTooltips,
     MAT_PT_PaintSystemLayers,
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddImage,

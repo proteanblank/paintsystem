@@ -10,7 +10,7 @@ import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
-from .common import get_object_uv_maps, redraw_panel
+from .common import redraw_panel, intern_enum_items
 import re
 
 # bpy.types.Image.pack
@@ -426,6 +426,41 @@ def get_highest_number_with_prefix(prefix, string_list):
     return highest_number
 
 
+def get_object_uv_maps(self, context: Context):
+    items = [
+        (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
+    ]
+    return intern_enum_items(items)
+
+
+class PAINTSYSTEM_OT_CreateNewUVMap(Operator):
+    bl_idname = "paint_system.create_new_uv_map"
+    bl_label = "Create New UV Map"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Create a new UV Map"
+
+    uv_map_name: StringProperty(
+        name="Name",
+        default="UVMap"
+    )
+
+    def execute(self, context):
+        current_mode = context.object.mode
+        context.object.data.uv_layers.new(name=self.uv_map_name)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.uv.smart_project(island_margin=0.05)
+        bpy.ops.object.mode_set(mode=current_mode)
+        return {'FINISHED'}
+
+    # def invoke(self, context, event):
+    #     return context.window_manager.invoke_props_dialog(self)
+
+    # def draw(self, context):
+    #     layout = self.layout
+    #     layout.prop(self, "uv_map_name")
+
+
 class PAINTSYSTEM_OT_NewImage(Operator):
     bl_idname = "paint_system.new_image"
     bl_label = "New Image"
@@ -465,13 +500,15 @@ class PAINTSYSTEM_OT_NewImage(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
+        mat = ps.get_active_material()
+        if not get_object_uv_maps(self, context):
+            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
         image = bpy.data.images.new(
-            name=f"PaintSystem_{active_group.next_id}",
+            name=f"PS {mat.name} {self.name}",
             width=int(self.image_resolution),
             height=int(self.image_resolution),
             alpha=True,
         )
-        # image.pack()
         image.generated_color = (0, 0, 0, 0)
         ps.create_image_layer(self.name, image, self.uv_map_name)
         return {'FINISHED'}
@@ -484,8 +521,10 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         layout = self.layout
         layout.prop(self, "name")
         layout.prop(self, "image_resolution", expand=True)
-        # layout.prop(self, "high_bit_float")
-        layout.prop(self, "uv_map_name")
+        if not get_object_uv_maps(self, context):
+            layout.label(text="No UV Maps found. Creating new UV Map")
+        else:
+            layout.prop(self, "uv_map_name")
 
 
 class PAINTSYSTEM_OT_OpenImage(Operator):
@@ -511,7 +550,8 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         image = bpy.data.images.load(self.filepath, check_existing=True)
-        # image.pack()
+        if not get_object_uv_maps(self, context):
+            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
         ps.create_image_layer(image.name, image, self.uv_map_name)
         return {'FINISHED'}
 
@@ -521,7 +561,10 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "uv_map_name")
+        if not get_object_uv_maps(self, context):
+            layout.label(text="No UV Maps found. Creating new UV Map")
+        else:
+            layout.prop(self, "uv_map_name")
 
 
 class PAINTSYSTEM_OT_OpenExistingImage(Operator):
@@ -545,6 +588,8 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
         image = bpy.data.images.get(self.image_name)
         if not image:
             return {'CANCELLED'}
+        if not get_object_uv_maps(self, context):
+            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
         ps.create_image_layer(self.image_name, image, self.uv_map_name)
         return {'FINISHED'}
 
@@ -556,7 +601,10 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
         layout = self.layout
         layout.prop_search(self, "image_name", bpy.data,
                            "images", text="Image")
-        layout.prop(self, "uv_map_name")
+        if not get_object_uv_maps(self, context):
+            layout.label(text="No UV Maps found. Creating new UV Map")
+        else:
+            layout.prop(self, "uv_map_name")
 
 
 class PAINTSYSTEM_OT_NewSolidColor(Operator):
@@ -689,6 +737,7 @@ classes = (
     PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,
+    PAINTSYSTEM_OT_CreateNewUVMap,
     PAINTSYSTEM_OT_NewImage,
     PAINTSYSTEM_OT_OpenImage,
     PAINTSYSTEM_OT_OpenExistingImage,

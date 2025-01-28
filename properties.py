@@ -30,12 +30,14 @@ def update_active_image(self=None, context: Context = None):
     image_paint = context.tool_settings.image_paint
     mat = ps.get_active_material()
     active_layer = ps.get_active_layer()
+    update_brush_settings(self, context)
     if not active_layer:
         return
-    if active_layer.type != 'IMAGE':
+    if active_layer.type != 'IMAGE' or active_layer.lock_layer:
         if image_paint.mode == 'MATERIAL':
             image_paint.mode = 'IMAGE'
         image_paint.canvas = None
+        # Unable to paint
         return
     if image_paint.mode == 'IMAGE':
         image_paint.mode = 'MATERIAL'
@@ -49,16 +51,26 @@ def update_active_image(self=None, context: Context = None):
             break
 
 
+def update_brush_settings(self=None, context: Context = None):
+    context = context or bpy.context
+    if context.mode != 'PAINT_TEXTURE':
+        return
+    ps = PaintSystem(context)
+    active_layer = ps.get_active_layer()
+    brush = context.tool_settings.image_paint.brush
+    brush.use_alpha = not active_layer.lock_alpha
+
+
 class PaintSystemLayer(BaseNestedListItem):
 
-    def on_update(self, context):
+    def update_node_tree(self, context):
         PaintSystem(context).get_active_group().update_node_tree()
 
     enabled: BoolProperty(
         name="Enabled",
         description="Toggle layer visibility",
         default=True,
-        update=on_update
+        update=update_node_tree
     )
     image: PointerProperty(
         name="Image",
@@ -77,7 +89,19 @@ class PaintSystemLayer(BaseNestedListItem):
         name="Clip to Below",
         description="Clip the layer to the one below",
         default=False,
-        update=on_update
+        update=update_node_tree
+    )
+    lock_alpha: BoolProperty(
+        name="Lock Alpha",
+        description="Lock the alpha channel",
+        default=False,
+        update=update_brush_settings
+    )
+    lock_layer: BoolProperty(
+        name="Lock Layer",
+        description="Lock the layer",
+        default=False,
+        update=update_active_image
     )
     node_tree: PointerProperty(
         name="Node Tree",
