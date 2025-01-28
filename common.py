@@ -25,10 +25,3 @@ def intern_enum_items(items):
             STRING_CACHE[s] = s
         return STRING_CACHE[s]
     return [tuple(intern_string(s) for s in item) for item in items]
-
-
-def get_object_uv_maps(self, context: Context):
-    items = [
-        (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
-    ]
-    return intern_enum_items(items)
