@@ -14,7 +14,7 @@ from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
 from . import addon_updater_ops
-from .common import is_online
+from .common import is_online, is_newer_than
 # from .. import __package__ as base_package
 
 # -------------------------------------------------------------------
