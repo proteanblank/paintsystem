@@ -24,7 +24,7 @@ bl_info = {
     "author": "Tawan Sunflower, @blastframe",
     "description": "",
     "blender": (4, 1, 0),
-    "version": (1, 1, 7),
+    "version": (1, 2, 0),
     "location": "View3D > Sidebar > Paint System",
     "warning": "",
     "category": "Node",
@@ -43,7 +43,7 @@ auto_load.init()
 def mode_change_handler(scene):
     # Get the active object and its mode
     obj = bpy.context.object
-    if obj and hasattr(obj,"mode") and obj.mode == 'TEXTURE_PAINT':
+    if obj and hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT':
         update_active_image()
 
 
