@@ -273,7 +273,7 @@ class MAT_PT_Brush(Panel):
         row = box.row()
         row.label(text="Settings:", icon="SETTINGS")
         row.operator("paint_system.set_active_panel",
-                     text="More", icon="COLLAPSEMENU").category = "Tool"
+                     text="More", icon="RIGHTARROW").category = "Tool"
         col = box.column(align=True)
         if not ps.preferences.use_compact_design:
             col.scale_y = 1.5

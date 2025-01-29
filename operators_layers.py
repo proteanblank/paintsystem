@@ -76,10 +76,11 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         name="Template",
         items=[
             ('NONE', "None", "Just add node group to material"),
-            ('COLOR', "Color", "Color only"),
-            ('COLORALPHA', "Color Alpha", "Color and Alpha"),
+            ('STANDARD', "Standard", "Start off with a standard setup"),
+            ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
+            ('NORMAL', "Normal", "Start off with a normal painting setup"),
         ],
-        default='COLORALPHA'
+        default='STANDARD'
     )
 
     set_view_transform: BoolProperty(
@@ -102,7 +103,6 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
                 return {'CANCELLED'}
 
         new_group = ps.add_group(self.group_name)
-        ps.create_solid_color_layer("Paper Color", (1, 1, 1, 1))
 
         if self.create_material_setup:
             bpy.ops.paint_system.create_template_setup(
@@ -496,6 +496,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         name="UV Map",
         items=get_object_uv_maps
     )
+    disable_popup: BoolProperty(default=False)
 
     def execute(self, context):
         ps = PaintSystem(context)
@@ -515,6 +516,8 @@ class PAINTSYSTEM_OT_NewImage(Operator):
 
     def invoke(self, context, event):
         self.name = self.get_next_image_name(context)
+        if self.disable_popup:
+            return self.execute(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
@@ -633,6 +636,7 @@ class PAINTSYSTEM_OT_NewSolidColor(Operator):
         max=1.0,
         default=(1.0, 1.0, 1.0, 1.0)
     )
+    disable_popup: BoolProperty(default=False)
 
     def execute(self, context):
         ps = PaintSystem(context)
@@ -641,6 +645,8 @@ class PAINTSYSTEM_OT_NewSolidColor(Operator):
 
     def invoke(self, context, event):
         self.name = self.get_next_image_name(context)
+        if self.disable_popup:
+            return self.execute(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
@@ -666,6 +672,7 @@ class PAINTSYSTEM_OT_NewFolder(Operator):
         name="Name",
         default="Folder"
     )
+    disable_popup: BoolProperty(default=False)
 
     @classmethod
     def poll(cls, context):
@@ -684,6 +691,8 @@ class PAINTSYSTEM_OT_NewFolder(Operator):
 
     def invoke(self, context, event):
         self.folder_name = self.get_next_folder_name(context)
+        if self.disable_popup:
+            return self.execute(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
