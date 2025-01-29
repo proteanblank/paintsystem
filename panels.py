@@ -105,6 +105,11 @@ class MAT_PT_PaintSystemGroups(Panel):
         addon_updater_ops.check_for_update_background()
         return (context.active_object and context.active_object.type == 'MESH' and context.active_object.mode != 'TEXTURE_PAINT') or addon_updater_ops.updater.update_ready
 
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="KEYTYPE_KEYFRAME_VEC")
+
     def draw(self, context):
         layout = self.layout
 
@@ -212,6 +217,11 @@ class MAT_PT_Brush(Panel):
         obj = ps.active_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="BRUSHES_ALL")
+
     def draw_header_preset(self, context):
         layout = self.layout
         ps = PaintSystem(context)
@@ -309,6 +319,11 @@ class MAT_PT_BrushColor(Panel):
         ps = PaintSystem(context)
         obj = ps.active_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
+
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="COLOR")
 
     def draw_header_preset(self, context):
         layout = self.layout
@@ -454,6 +469,11 @@ class MAT_PT_PaintSystemLayers(Panel):
         active_group = ps.get_active_group()
         return active_group
 
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="IMAGE_RGB")
+
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
@@ -516,7 +536,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = box.row()
         row.label(text="Layer Settings:", icon='SETTINGS')
         if ps.preferences.show_tooltips:
-            row.menu("MAT_PT_LayersSettingsTooltips", text='', icon='QUESTION')
+            row.menu("MAT_MT_LayersSettingsTooltips", text='', icon='QUESTION')
 
         # Let user set opacity and blend mode:
         color_mix_node = ps.find_color_mix_node()
