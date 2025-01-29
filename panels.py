@@ -227,7 +227,7 @@ class MAT_PT_Brush(Panel):
         ps = PaintSystem(context)
         if ps.preferences.show_tooltips:
             row = layout.row()
-            row.menu("MAT_PT_BrushTooltips",
+            row.menu("MAT_MT_BrushTooltips",
                      text='View Shortcuts!')
 
     def draw(self, context):
@@ -311,8 +311,7 @@ class MAT_PT_BrushColor(Panel):
     bl_region_type = "UI"
     bl_label = "Color"
     bl_category = 'Paint System'
-    if not is_newer_than(4, 3):
-        bl_options = {'DEFAULT_CLOSED'}
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
