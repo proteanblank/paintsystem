@@ -43,7 +43,7 @@ auto_load.init()
 def mode_change_handler(scene):
     # Get the active object and its mode
     obj = bpy.context.object
-    if obj and hasattr(obj,"mode") and obj.mode == 'TEXTURE_PAINT':
+    if obj and hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT':
         update_active_image()
 
 
@@ -73,6 +73,7 @@ submodules = [
     "operators_bake",
     "properties",
     "panels",
+    "test_combining_images",
     # "node_organizer",
     # "operation/test",
 ]
