@@ -125,9 +125,9 @@ class MAT_PT_PaintSystemGroups(Panel):
         layout.label(text="Selected Material:")
         layout.template_ID(ob, "active_material", new="material.new")
 
-        if not hasattr(mat, "paint_system"):
-            layout.operator("paint_system.add_paint_system")
-            return
+        # if not hasattr(mat, "paint_system"):
+        #     layout.operator("paint_system.add_paint_system")
+        #     return
         # Add Group button and selector
         row = layout.row()
 
