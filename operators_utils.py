@@ -154,32 +154,48 @@ class PAINTSYSTEM_OT_PaintModeSettings(Operator):
 # Template Material Creation
 # -------------------------------------------------------------------
 class NodeOrganizer:
-    created_nodes: List[bpy.types.Nodes] = []
+    created_nodes_names: List[str]
 
     def __init__(self, material: bpy.types.Material):
-        self.nodes = material.node_tree.nodes
-        self.links = material.node_tree.links
+        self.node_tree = material.node_tree
+        self.nodes = self.node_tree.nodes
+        self.links = self.node_tree.links
         self.rightmost = max(
             self.nodes, key=lambda node: node.location.x).location
+        self.created_nodes_names = []
 
-    def create_node(self, node_type, location=(0, 0)):
+    def value_set(self, obj, path, value):
+        if '.' in path:
+            path_prop, path_attr = path.rsplit('.', 1)
+            prop = obj.path_resolve(path_prop)
+        else:
+            prop = obj
+            path_attr = path
+        setattr(prop, path_attr, value)
+
+    def create_node(self, node_type, attrs):
         node = self.nodes.new(node_type)
-        node.location = Vector(location)
-        self.created_nodes.append(node)
+        for attr in attrs:
+            self.value_set(node, attr, attrs[attr])
+        self.created_nodes_names.append(node.name)
         return node
 
-    def create_link(self, output_node: bpy.types.Node, input_node: bpy.types.Node, output_name, input_name):
+    def create_link(self, output_node_name: str, input_node_name: str, output_name, input_name):
+        output_node = self.nodes[output_node_name]
+        input_node = self.nodes[input_node_name]
         self.links.new(input_node.inputs[input_name],
                        output_node.outputs[output_name])
 
     def move_nodes_offset(self, offset: Vector):
-        for node in self.created_nodes:
+        created_nodes = [self.nodes[name] for name in self.created_nodes_names]
+        for node in created_nodes:
             if node.type != 'FRAME':
                 node.location += offset
 
     def move_nodes_to_end(self):
+        created_nodes = [self.nodes[name] for name in self.created_nodes_names]
         created_nodes_leftmost = min(
-            self.created_nodes, key=lambda node: node.location.x).location
+            created_nodes, key=lambda node: node.location.x).location
         offset = self.rightmost - created_nodes_leftmost + Vector((200, 0))
         self.move_nodes_offset(offset)
 
@@ -238,8 +254,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         node_organizer = NodeOrganizer(mat)
         if self.template == 'NONE':
             node_group = node_organizer.create_node(
-                'ShaderNodeGroup')
-            node_group.node_tree = active_group.node_tree
+                'ShaderNodeGroup', {'node_tree': active_group.node_tree})
             node_organizer.move_nodes_to_end()
             return {'FINISHED'}
 
@@ -250,67 +265,62 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
 
         if self.template in ['STANDARD', 'TRANSPARENT']:
             node_group = node_organizer.create_node(
-                'ShaderNodeGroup', (-600, 0))
-            node_group.node_tree = active_group.node_tree
+                'ShaderNodeGroup', {'location': Vector((-600, 0)), 'node_tree': active_group.node_tree})
             emission_node = node_organizer.create_node(
-                'ShaderNodeEmission', (-400, -100))
+                'ShaderNodeEmission', {'location': Vector((-400, -100))})
             transparent_node = node_organizer.create_node(
-                'ShaderNodeBsdfTransparent', (-400, 100))
+                'ShaderNodeBsdfTransparent', {'location': Vector((-400, 100))})
             shader_mix_node = node_organizer.create_node(
-                'ShaderNodeMixShader', (-200, 0))
+                'ShaderNodeMixShader', {'location': Vector((-200, 0))})
             output_node = node_organizer.create_node(
-                'ShaderNodeOutputMaterial', (0, 0))
-            output_node.is_active_output = True
+                'ShaderNodeOutputMaterial', {'location': Vector((0, 0)), 'is_active_output': True})
             node_organizer.create_link(
-                node_group, emission_node, 'Color', 'Color')
-            node_organizer.create_link(node_group, shader_mix_node, 'Alpha', 0)
+                node_group.name, emission_node.name, 'Color', 'Color')
             node_organizer.create_link(
-                transparent_node, shader_mix_node, 'BSDF', 1)
+                node_group.name, shader_mix_node.name, 'Alpha', 0)
             node_organizer.create_link(
-                emission_node, shader_mix_node, 'Emission', 2)
+                transparent_node.name, shader_mix_node.name, 'BSDF', 1)
             node_organizer.create_link(
-                shader_mix_node, output_node, 'Shader', 'Surface')
+                emission_node.name, shader_mix_node.name, 'Emission', 2)
+            node_organizer.create_link(
+                shader_mix_node.name, output_node.name, 'Shader', 'Surface')
 
         elif self.template == 'NORMAL':
             tex_coord_node = node_organizer.create_node(
-                'ShaderNodeTexCoord', (-1000, 0))
+                'ShaderNodeTexCoord', {'location': Vector((-1000, 0))})
             vector_math_node1 = node_organizer.create_node(
-                'ShaderNodeVectorMath', (-800, 0))
-            vector_math_node1.operation = 'MULTIPLY_ADD'
-            vector_math_node1.inputs[1].default_value = (
-                0.5, 0.5, 0.5)
-            vector_math_node1.inputs[2].default_value = (0.5, 0.5, 0.5)
+                'ShaderNodeVectorMath', {'location': Vector((-800, 0)),
+                                         'operation': 'MULTIPLY_ADD',
+                                         'inputs[1].default_value': (0.5, 0.5, 0.5),
+                                         'inputs[2].default_value': (0.5, 0.5, 0.5)})
             node_group = node_organizer.create_node(
-                'ShaderNodeGroup', (-600, 0))
-            node_group.node_tree = active_group.node_tree
-            node_group.inputs['Alpha'].default_value = 1
+                'ShaderNodeGroup', {'location': Vector((-600, 0)),
+                                    'node_tree': active_group.node_tree,
+                                    'inputs["Alpha"].default_value': 1})
             frame = node_organizer.create_node(
-                'NodeFrame')
-            frame.label = 'Plug this when you are done painting'
+                'NodeFrame', {'label': "Plug this when you are done painting"})
             vector_math_node2 = node_organizer.create_node(
-                'ShaderNodeVectorMath', (-400, -200))
-            vector_math_node2.parent = frame
-            vector_math_node2.operation = 'MULTIPLY_ADD'
-            vector_math_node2.inputs[1].default_value = (
-                2, 2, 2)
-            vector_math_node2.inputs[2].default_value = (-1, -1, -1)
+                'ShaderNodeVectorMath', {'location': Vector((-400, -200)),
+                                         'parent': frame,
+                                         'operation': 'MULTIPLY_ADD',
+                                         'inputs[1].default_value': (2, 2, 2),
+                                         'inputs[2].default_value': (-1, -1, -1)})
             vector_transform_node = node_organizer.create_node(
-                'ShaderNodeVectorTransform', (-200, -200))
-            vector_transform_node.parent = frame
-            vector_transform_node.vector_type = 'NORMAL'
-            vector_transform_node.convert_from = 'OBJECT'
-            vector_transform_node.convert_to = 'WORLD'
+                'ShaderNodeVectorTransform', {'location': Vector((-200, -200)),
+                                              'parent': frame,
+                                              'vector_type': 'NORMAL',
+                                              'convert_from': 'OBJECT',
+                                              'convert_to': 'WORLD'})
             output_node = node_organizer.create_node(
-                'ShaderNodeOutputMaterial', (0, 0))
-            output_node.is_active_output = True
+                'ShaderNodeOutputMaterial', {'location': Vector((0, 0)), 'is_active_output': True})
             node_organizer.create_link(
-                tex_coord_node, vector_math_node1, 'Normal', 'Vector')
+                tex_coord_node.name, vector_math_node1.name, 'Normal', 'Vector')
             node_organizer.create_link(
-                vector_math_node1, node_group, 'Vector', 'Color')
+                vector_math_node1.name, node_group.name, 'Vector', 'Color')
             node_organizer.create_link(
-                node_group, output_node, 'Color', 'Surface')
+                node_group.name, output_node.name, 'Color', 'Surface')
             node_organizer.create_link(
-                vector_math_node2, vector_transform_node, 'Vector', 'Vector')
+                vector_math_node2.name, vector_transform_node.name, 'Vector', 'Vector')
 
         node_organizer.move_nodes_to_end()
 
