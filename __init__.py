@@ -68,10 +68,10 @@ def refresh_image(scene: bpy.types.Scene):
 
 
 submodules = [
+    "properties",
     "operators_layers",
     "operators_utils",
     "operators_bake",
-    "properties",
     "panels",
     "test_combining_images",
     # "node_organizer",

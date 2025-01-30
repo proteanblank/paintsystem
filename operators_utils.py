@@ -13,6 +13,7 @@ from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, get_brushes_from_library
 from mathutils import Vector
 from .common import redraw_panel
+from typing import List
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
@@ -152,6 +153,35 @@ class PAINTSYSTEM_OT_PaintModeSettings(Operator):
 # -------------------------------------------------------------------
 # Template Material Creation
 # -------------------------------------------------------------------
+class NodeOrganizer:
+    created_nodes: List[bpy.types.Nodes] = []
+
+    def __init__(self, material: bpy.types.Material):
+        self.nodes = material.node_tree.nodes
+        self.links = material.node_tree.links
+        self.rightmost = max(
+            self.nodes, key=lambda node: node.location.x).location
+
+    def create_node(self, node_type, location=(0, 0)):
+        node = self.nodes.new(node_type)
+        node.location = Vector(location)
+        self.created_nodes.append(node)
+        return node
+
+    def create_link(self, output_node: bpy.types.Node, input_node: bpy.types.Node, output_name, input_name):
+        self.links.new(input_node.inputs[input_name],
+                       output_node.outputs[output_name])
+
+    def move_nodes_offset(self, offset: Vector):
+        for node in self.created_nodes:
+            if node.type != 'FRAME':
+                node.location += offset
+
+    def move_nodes_to_end(self):
+        created_nodes_leftmost = min(
+            self.created_nodes, key=lambda node: node.location.x).location
+        offset = self.rightmost - created_nodes_leftmost + Vector((200, 0))
+        self.move_nodes_offset(offset)
 
 
 class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
@@ -164,10 +194,11 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         name="Template",
         items=[
             ('NONE', "None", "Just add node group to material"),
-            ('COLOR', "Color", "Color only"),
-            ('COLORALPHA', "Color Alpha", "Color and Alpha"),
+            ('STANDARD', "Standard", "Start off with a standard setup"),
+            ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
+            ('NORMAL', "Normal", "Start off with a normal painting setup"),
         ],
-        default='COLORALPHA'
+        default='STANDARD'
     )
 
     disable_popup: BoolProperty(
@@ -198,65 +229,143 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         active_group = ps.get_active_group()
         mat = ps.get_active_material()
         mat.use_nodes = True
-        nodes = mat.node_tree.nodes
-        links = mat.node_tree.links
 
-        # Get position of the rightmost node
-        position = Vector((0, 0))
-        for node in nodes:
-            if node.location.x > position[0]:
-                position = node.location
+        if self.template in ('STANDARD', 'NONE'):
+            bpy.ops.paint_system.new_solid_color(
+                'INVOKE_DEFAULT', disable_popup=True)
+        bpy.ops.paint_system.new_image('INVOKE_DEFAULT', disable_popup=True)
 
-        match self.template:
-            case 'NONE':
-                node_group = nodes.new('ShaderNodeGroup')
-                node_group.node_tree = active_group.node_tree
-                node_group.location = position + Vector((200, 0))
+        node_organizer = NodeOrganizer(mat)
+        if self.template == 'NONE':
+            node_group = node_organizer.create_node(
+                'ShaderNodeGroup')
+            node_group.node_tree = active_group.node_tree
+            node_organizer.move_nodes_to_end()
+            return {'FINISHED'}
 
-            case 'COLOR':
-                node_group = nodes.new('ShaderNodeGroup')
-                node_group.node_tree = active_group.node_tree
-                node_group.location = position + Vector((200, 0))
-                vector_scale_node = nodes.new('ShaderNodeVectorMath')
-                vector_scale_node.operation = 'SCALE'
-                vector_scale_node.location = position + Vector((400, 0))
-                output_node = nodes.new('ShaderNodeOutputMaterial')
-                output_node.location = position + Vector((600, 0))
-                output_node.is_active_output = True
-                links.new(
-                    vector_scale_node.inputs['Vector'], node_group.outputs['Color'])
-                links.new(
-                    vector_scale_node.inputs['Scale'], node_group.outputs['Alpha'])
-                links.new(output_node.inputs['Surface'],
-                          vector_scale_node.outputs['Vector'])
+        if self.use_alpha_blend:
+            mat.blend_method = 'BLEND'
+        if self.disable_show_backface:
+            mat.show_transparent_back = False
 
-            case 'COLORALPHA':
-                node_group = nodes.new('ShaderNodeGroup')
-                node_group.node_tree = active_group.node_tree
-                node_group.location = position + Vector((200, 0))
-                emission_node = nodes.new('ShaderNodeEmission')
-                emission_node.location = position + Vector((400, -100))
-                transparent_node = nodes.new('ShaderNodeBsdfTransparent')
-                transparent_node.location = position + Vector((400, 100))
-                shader_mix_node = nodes.new('ShaderNodeMixShader')
-                shader_mix_node.location = position + Vector((600, 0))
-                output_node = nodes.new('ShaderNodeOutputMaterial')
-                output_node.location = position + Vector((800, 0))
-                output_node.is_active_output = True
-                links.new(
-                    emission_node.inputs['Color'], node_group.outputs['Color'])
-                links.new(shader_mix_node.inputs[0],
-                          node_group.outputs['Alpha'])
-                links.new(shader_mix_node.inputs[1],
-                          transparent_node.outputs['BSDF'])
-                links.new(shader_mix_node.inputs[2],
-                          emission_node.outputs['Emission'])
-                links.new(output_node.inputs['Surface'],
-                          shader_mix_node.outputs['Shader'])
-                if self.use_alpha_blend:
-                    mat.blend_method = 'BLEND'
-                if self.disable_show_backface:
-                    mat.show_transparent_back = False
+        if self.template in ['STANDARD', 'TRANSPARENT']:
+            node_group = node_organizer.create_node(
+                'ShaderNodeGroup', (-600, 0))
+            node_group.node_tree = active_group.node_tree
+            emission_node = node_organizer.create_node(
+                'ShaderNodeEmission', (-400, -100))
+            transparent_node = node_organizer.create_node(
+                'ShaderNodeBsdfTransparent', (-400, 100))
+            shader_mix_node = node_organizer.create_node(
+                'ShaderNodeMixShader', (-200, 0))
+            output_node = node_organizer.create_node(
+                'ShaderNodeOutputMaterial', (0, 0))
+            output_node.is_active_output = True
+            node_organizer.create_link(
+                node_group, emission_node, 'Color', 'Color')
+            node_organizer.create_link(node_group, shader_mix_node, 'Alpha', 0)
+            node_organizer.create_link(
+                transparent_node, shader_mix_node, 'BSDF', 1)
+            node_organizer.create_link(
+                emission_node, shader_mix_node, 'Emission', 2)
+            node_organizer.create_link(
+                shader_mix_node, output_node, 'Shader', 'Surface')
+
+        elif self.template == 'NORMAL':
+            tex_coord_node = node_organizer.create_node(
+                'ShaderNodeTexCoord', (-1000, 0))
+            vector_math_node1 = node_organizer.create_node(
+                'ShaderNodeVectorMath', (-800, 0))
+            vector_math_node1.operation = 'MULTIPLY_ADD'
+            vector_math_node1.inputs[1].default_value = (
+                0.5, 0.5, 0.5)
+            vector_math_node1.inputs[2].default_value = (0.5, 0.5, 0.5)
+            node_group = node_organizer.create_node(
+                'ShaderNodeGroup', (-600, 0))
+            node_group.node_tree = active_group.node_tree
+            node_group.inputs['Alpha'].default_value = 1
+            frame = node_organizer.create_node(
+                'NodeFrame')
+            frame.label = 'Plug this when you are done painting'
+            vector_math_node2 = node_organizer.create_node(
+                'ShaderNodeVectorMath', (-400, -200))
+            vector_math_node2.parent = frame
+            vector_math_node2.operation = 'MULTIPLY_ADD'
+            vector_math_node2.inputs[1].default_value = (
+                2, 2, 2)
+            vector_math_node2.inputs[2].default_value = (-1, -1, -1)
+            vector_transform_node = node_organizer.create_node(
+                'ShaderNodeVectorTransform', (-200, -200))
+            vector_transform_node.parent = frame
+            vector_transform_node.vector_type = 'NORMAL'
+            vector_transform_node.convert_from = 'OBJECT'
+            vector_transform_node.convert_to = 'WORLD'
+            output_node = node_organizer.create_node(
+                'ShaderNodeOutputMaterial', (0, 0))
+            output_node.is_active_output = True
+            node_organizer.create_link(
+                tex_coord_node, vector_math_node1, 'Normal', 'Vector')
+            node_organizer.create_link(
+                vector_math_node1, node_group, 'Vector', 'Color')
+            node_organizer.create_link(
+                node_group, output_node, 'Color', 'Surface')
+            node_organizer.create_link(
+                vector_math_node2, vector_transform_node, 'Vector', 'Vector')
+
+        node_organizer.move_nodes_to_end()
+
+        # match self.template:
+        #     case 'NONE':
+        #         node_group = nodes.new('ShaderNodeGroup')
+        #         node_group.node_tree = active_group.node_tree
+        #         node_group.location = position + Vector((200, 0))
+
+        # case 'COLOR':
+        #     node_group = nodes.new('ShaderNodeGroup')
+        #     node_group.node_tree = active_group.node_tree
+        #     node_group.location = position + Vector((200, 0))
+        #     vector_scale_node = nodes.new('ShaderNodeVectorMath')
+        #     vector_scale_node.operation = 'SCALE'
+        #     vector_scale_node.location = position + Vector((400, 0))
+        #     output_node = nodes.new('ShaderNodeOutputMaterial')
+        #     output_node.location = position + Vector((600, 0))
+        #     output_node.is_active_output = True
+        #     links.new(
+        #         vector_scale_node.inputs['Vector'], node_group.outputs['Color'])
+        #     links.new(
+        #         vector_scale_node.inputs['Scale'], node_group.outputs['Alpha'])
+        #     links.new(output_node.inputs['Surface'],
+        #               vector_scale_node.outputs['Vector'])
+
+        # case 'STANDARD':
+        #     node_group = nodes.new('ShaderNodeGroup')
+        #     node_group.node_tree = active_group.node_tree
+        #     node_group.location = position + Vector((200, 0))
+        #     emission_node = nodes.new('ShaderNodeEmission')
+        #     emission_node.location = position + Vector((400, -100))
+        #     transparent_node = nodes.new('ShaderNodeBsdfTransparent')
+        #     transparent_node.location = position + Vector((400, 100))
+        #     shader_mix_node = nodes.new('ShaderNodeMixShader')
+        #     shader_mix_node.location = position + Vector((600, 0))
+        #     output_node = nodes.new('ShaderNodeOutputMaterial')
+        #     output_node.location = position + Vector((800, 0))
+        #     output_node.is_active_output = True
+        #     links.new(
+        #         emission_node.inputs['Color'], node_group.outputs['Color'])
+        #     links.new(shader_mix_node.inputs[0],
+        #               node_group.outputs['Alpha'])
+        #     links.new(shader_mix_node.inputs[1],
+        #               transparent_node.outputs['BSDF'])
+        #     links.new(shader_mix_node.inputs[2],
+        #               emission_node.outputs['Emission'])
+        #     links.new(output_node.inputs['Surface'],
+        #               shader_mix_node.outputs['Shader'])
+        #     if self.use_alpha_blend:
+        #         mat.blend_method = 'BLEND'
+        #     if self.disable_show_backface:
+        #         mat.show_transparent_back = False
+
+        # case 'TRANSPARENT':
 
         return {'FINISHED'}
 

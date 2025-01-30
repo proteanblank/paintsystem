@@ -106,6 +106,11 @@ class MAT_PT_PaintSystemGroups(Panel):
         addon_updater_ops.check_for_update_background()
         return (context.active_object and context.active_object.type == 'MESH' and context.active_object.mode != 'TEXTURE_PAINT') or addon_updater_ops.updater.update_ready
 
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="KEYTYPE_KEYFRAME_VEC")
+
     def draw(self, context):
         layout = self.layout
 
@@ -213,12 +218,17 @@ class MAT_PT_Brush(Panel):
         obj = ps.active_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="BRUSHES_ALL")
+
     def draw_header_preset(self, context):
         layout = self.layout
         ps = PaintSystem(context)
         if ps.preferences.show_tooltips:
             row = layout.row()
-            row.menu("MAT_PT_BrushTooltips",
+            row.menu("MAT_MT_BrushTooltips",
                      text='View Shortcuts!')
 
     def draw(self, context):
@@ -264,7 +274,7 @@ class MAT_PT_Brush(Panel):
         row = box.row()
         row.label(text="Settings:", icon="SETTINGS")
         row.operator("paint_system.set_active_panel",
-                     text="More", icon="COLLAPSEMENU").category = "Tool"
+                     text="More", icon="RIGHTARROW").category = "Tool"
         col = box.column(align=True)
         if not ps.preferences.use_compact_design:
             col.scale_y = 1.5
@@ -275,10 +285,10 @@ class MAT_PT_Brush(Panel):
         # row.label(text="Brush Shortcuts")
 
 
-class MAT_PT_BrushTooltips(Menu):
+class MAT_MT_BrushTooltips(Menu):
     bl_label = "Brush Tooltips"
     bl_description = "Brush Tooltips"
-    bl_idname = "MAT_PT_BrushTooltips"
+    bl_idname = "MAT_MT_BrushTooltips"
 
     def draw(self, context):
         layout = self.layout
@@ -303,14 +313,18 @@ class MAT_PT_BrushColor(Panel):
     bl_region_type = "UI"
     bl_label = "Color"
     bl_category = 'Paint System'
-    if not is_newer_than(4, 3):
-        bl_options = {'DEFAULT_CLOSED'}
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
         obj = ps.active_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
+
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="COLOR")
 
     def draw_header_preset(self, context):
         layout = self.layout
@@ -423,10 +437,10 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
         return PaintSystem(context).group
 
 
-class MAT_PT_LayersSettingsTooltips(Menu):
+class MAT_MT_LayersSettingsTooltips(Menu):
     bl_label = "Layer Settings Tooltips"
     bl_description = "Layer Settings Tooltips"
-    bl_idname = "MAT_PT_LayersSettingsTooltips"
+    bl_idname = "MAT_MT_LayersSettingsTooltips"
 
     def draw(self, context):
         layout = self.layout
@@ -455,6 +469,11 @@ class MAT_PT_PaintSystemLayers(Panel):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
         return active_group
+
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="IMAGE_RGB")
 
     def draw(self, context):
         layout = self.layout
@@ -531,7 +550,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = box.row()
         row.label(text="Layer Settings:", icon='SETTINGS')
         if ps.preferences.show_tooltips:
-            row.menu("MAT_PT_LayersSettingsTooltips", text='', icon='QUESTION')
+            row.menu("MAT_MT_LayersSettingsTooltips", text='', icon='QUESTION')
 
         # Let user set opacity and blend mode:
         color_mix_node = ps.find_color_mix_node()
@@ -715,11 +734,11 @@ classes = (
     MAT_PT_BrushColor,
     # MAT_PT_BrushSettings,
     MAT_PT_UL_PaintSystemLayerList,
-    MAT_PT_LayersSettingsTooltips,
+    MAT_MT_LayersSettingsTooltips,
     MAT_PT_PaintSystemLayers,
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddImage,
-    MAT_PT_BrushTooltips,
+    MAT_MT_BrushTooltips,
     MAT_MT_PaintSystemBakeAndExport,
     # MAT_PT_PaintSystemTest,
 )
