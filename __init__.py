@@ -73,7 +73,6 @@ submodules = [
     "operators_utils",
     "operators_bake",
     "panels",
-    "test_combining_images",
     # "node_organizer",
     # "operation/test",
 ]

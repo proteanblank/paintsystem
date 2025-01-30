@@ -5,7 +5,6 @@ from .paint_system import PaintSystem, get_nodetree_from_library
 from typing import List, Tuple
 from mathutils import Vector
 from .common import redraw_panel, map_range
-import copy
 
 IMPOSSIBLE_NODES = (
     "ShaderNodeShaderInfo"
@@ -102,55 +101,51 @@ def is_bakeable(context: Context) -> Tuple[bool, str, List[Node]]:
     return True, "", []
 
 
-def save_cycles_settings():
-    """Saves relevant Cycles render settings to a dictionary."""
-    settings = {}
-    scene = bpy.context.scene
+def setup_render_settings(context: Context, bake_type):
+    """Setup render settings appropriate for the bake type"""
+    cycles = context.scene.cycles.copy()
 
-    if scene.render.engine == 'CYCLES':  # Only save if Cycles is the engine
-        settings['render_engine'] = scene.render.engine
-        settings['device'] = scene.cycles.device
-        settings['samples'] = scene.cycles.samples
-        settings['preview_samples'] = scene.cycles.preview_samples
-        settings['denoiser'] = scene.cycles.denoiser
-        settings['use_denoising'] = scene.cycles.use_denoising
+    # Store original settings
+    original_settings = {
+        'samples': cycles.samples,
+        'use_denoising': cycles.use_denoising,
+        'use_adaptive_sampling': cycles.use_adaptive_sampling
+    }
 
-        # Add more settings you need to save here!
-    return copy.deepcopy(settings)
+    # Configure settings based on bake type
+    if bake_type == 'COMBINED':
+        cycles.samples = 256
+        cycles.use_denoising = True
+        cycles.use_adaptive_sampling = True
+    elif bake_type == 'DIFFUSE':
+        cycles.samples = 128
+        cycles.use_denoising = True
+        cycles.use_adaptive_sampling = True
+    elif bake_type == 'NORMAL':
+        cycles.samples = 16
+        cycles.use_denoising = False
+        cycles.use_adaptive_sampling = False
+    elif bake_type == 'ROUGHNESS':
+        cycles.samples = 4
+        cycles.use_denoising = False
+        cycles.use_adaptive_sampling = False
+    elif bake_type == 'EMIT':
+        cycles.samples = 1
+        cycles.use_denoising = False
+        cycles.use_adaptive_sampling = False
 
-
-def rollback_cycles_settings(saved_settings):
-    """Rolls back Cycles render settings using the saved dictionary, with robustness checks."""
-    scene = bpy.context.scene
-
-    # Only rollback if settings were saved and we are in Cycles
-    if saved_settings and scene.render.engine == 'CYCLES':
-        try:  # Use a try-except block to catch potential errors during rollback
-            # Check if 'engine' attribute still exists
-            if 'render_engine' in saved_settings and hasattr(scene.render, 'engine'):
-                scene.render.engine = saved_settings['render_engine']
-
-            # Check if 'cycles' and 'device' exist
-            if 'device' in saved_settings and hasattr(scene.cycles, 'device'):
-                scene.cycles.device = saved_settings['device']
-            if 'samples' in saved_settings and hasattr(scene.cycles, 'samples'):
-                scene.cycles.samples = saved_settings['samples']
-            if 'preview_samples' in saved_settings and hasattr(scene.cycles, 'preview_samples'):
-                scene.cycles.preview_samples = saved_settings['preview_samples']
-            if 'denoiser' in saved_settings and hasattr(scene.cycles, 'denoiser'):
-                scene.cycles.denoiser = saved_settings['denoiser']
-            if 'use_denoising' in saved_settings and hasattr(scene.cycles, 'use_denoising'):
-                scene.cycles.use_denoising = saved_settings['use_denoising']
-
-            # Add rollbacks for any other settings you saved with similar checks!
-
-        except Exception as e:
-            # Log any errors during rollback
-            print(f"Error during Cycles settings rollback: {e}")
-            # You might want to handle the error more specifically, e.g., show a message to the user.
+    return original_settings
 
 
-def bake_node(context: Context, target_node: Node, width=1024, height=1024) -> Node:
+def restore_render_settings(context: Context, original_settings):
+    """Restore render settings to their original values"""
+    cycles = context.scene.cycles
+    cycles.samples = original_settings['samples']
+    cycles.use_denoising = original_settings['use_denoising']
+    cycles.use_adaptive_sampling = original_settings['use_adaptive_sampling']
+
+
+def bake_node(context: Context, target_node: Node, bake_type: str, width=1024, height=1024) -> Node:
     """
     Bakes a specific node from the active material with optimized settings
 
@@ -170,58 +165,51 @@ def bake_node(context: Context, target_node: Node, width=1024, height=1024) -> N
     nodes = material.node_tree.nodes
     material_output = get_active_material_output(material.node_tree)
     connected_nodes = get_connected_nodes(material_output)
-    last_node_socket = material_output.inputs[0].links[0].from_socket
 
-    # Save the original links from connected_nodes
+    # Connect the target node to the material output
     links = material.node_tree.links
+    # Save the original links from connected_nodes
     original_links = []
     for node in connected_nodes:
-        for input in node.inputs:
-            for link in input.links:
-                original_links.append(link)
+        for link in node.inputs[0].links:
+            original_links.append(link)
 
-    try:
-        # Store original settings
-        original_engine = getattr(context.scene.render, "engine")
-        # Switch to Cycles if needed
-        if context.scene.render.engine != 'CYCLES':
-            context.scene.render.engine = 'CYCLES'
+    # Create a new image with appropriate settings
+    image_name = f"{material.name}_{target_node.name}_{bake_type.lower()}"
 
-        cycles_settings = save_cycles_settings()
-        cycles = context.scene.cycles
-        bake_nt = None
-        if 'Color' in target_node.outputs:
-            bake_nt = get_nodetree_from_library("_PS_Bake")
-            bake_node = nodes.new('ShaderNodeGroup')
-            bake_node.node_tree = bake_nt
-            links.new(bake_node.inputs['Color'], target_node.outputs['Color'])
-            links.new(material_output.inputs[0], bake_node.outputs['Shader'])
-            # Check if target node has Alpha output
-            if 'Alpha' in target_node.outputs:
-                links.new(bake_node.inputs['Alpha'],
-                          target_node.outputs['Alpha'])
-            bake_params = {
-                "type": 'COMBINED',
-                "pass_filter": {'EMIT', 'DIRECT'},
-                "use_clear": True,
-            }
-            cycles.samples = 1
-            cycles.use_denoising = False
-            cycles.use_adaptive_sampling = False
-        elif 'Shader' in target_node.outputs:
-            links.new(material_output.inputs[0], target_node.outputs[0])
-            bake_params = {
-                "type": 'COMBINED',
-                "use_clear": True,
-            }
-            cycles.samples = 256
-            cycles.use_denoising = True
-            cycles.use_adaptive_sampling = True
-        else:
-            return None
+    bake_nt = None
+    if bake_type != 'EMIT':
+        links.new(material_output.inputs[0], target_node.outputs[0])
+    else:
+        bake_nt = get_nodetree_from_library("_PS_Bake")
+        bake_node = nodes.new('ShaderNodeGroup')
+        bake_node.node_tree = bake_nt
+        links.new(bake_node.inputs['Color'], target_node.outputs['Color'])
+        links.new(material_output.inputs[0], bake_node.outputs['Shader'])
+        # Check if target node has Alpha output
+        if 'Alpha' in target_node.outputs:
+            links.new(bake_node.inputs['Alpha'], target_node.outputs['Alpha'])
 
-        # Create a new image with appropriate settings
-        image_name = f"{material.name}_{target_node.name}"
+    # Set appropriate image settings based on bake type
+    if bake_type == 'NORMAL':
+        image = bpy.data.images.new(
+            name=image_name,
+            width=width,
+            height=height,
+            alpha=True,
+            float_buffer=True
+        )
+        image.colorspace_settings.name = 'Non-Color'
+    elif bake_type in ['ROUGHNESS', 'COMBINED']:
+        image = bpy.data.images.new(
+            name=image_name,
+            width=width,
+            height=height,
+            alpha=True,
+            float_buffer=True
+        )
+        image.colorspace_settings.name = 'Non-Color'
+    else:  # DIFFUSE, EMIT
         image = bpy.data.images.new(
             name=image_name,
             width=width,
@@ -230,15 +218,47 @@ def bake_node(context: Context, target_node: Node, width=1024, height=1024) -> N
         )
         image.colorspace_settings.name = 'sRGB'
 
-        # Create and set up the image texture node
-        bake_tex_node = nodes.new('ShaderNodeTexImage')
-        bake_tex_node.name = "temp_bake_node"
-        bake_tex_node.image = image  # Link the image to the texture node
-        bake_tex_node.location = target_node.location + Vector((0, 300))
+    # Create and set up the image texture node
 
+    bake_node = nodes.new('ShaderNodeTexImage')
+    bake_node.name = "temp_bake_node"
+    bake_node.image = image  # Link the image to the texture node
+    bake_node.location = target_node.location + Vector((0, 300))
+
+    # Store original settings
+    original_engine = context.scene.render.engine
+
+    try:
+        # Switch to Cycles if needed
+        if context.scene.render.engine != 'CYCLES':
+            context.scene.render.engine = 'CYCLES'
+
+        # Setup render settings
+        original_render_settings = setup_render_settings(context, bake_type)
+
+        # Select and activate the target node
         for node in nodes:
             node.select = False
-        bake_tex_node.select = True
+        target_node.select = True
+        nodes.active = bake_node
+
+        # # Configure bake parameters based on type
+        # bake_params = {
+        #     'type': bake_type if bake_type != 'COMBINED' else 'COMBINED',
+        #     'margin': 16,
+        #     'use_selected_to_active': False,
+        #     'use_clear': True,
+        #     'target': 'IMAGE_TEXTURES'
+        # }
+
+        # Add specific parameters for each bake type
+        # if bake_type == 'COMBINED':
+        #     bake_params['pass_filter'] = {
+        #         'DIFFUSE', 'GLOSSY', 'TRANSMISSION', 'SUBSURFACE', 'EMISSION'}
+        # elif bake_type == 'DIFFUSE':
+        #     bake_params['pass_filter'] = {'COLOR', 'DIRECT', 'INDIRECT'}
+        # elif bake_type == 'NORMAL':
+        #     bake_params['normal_space'] = 'TANGENT'
 
         # Perform bake
         bpy.ops.object.bake(**bake_params)
@@ -249,14 +269,10 @@ def bake_node(context: Context, target_node: Node, width=1024, height=1024) -> N
             image.reload()
             print(f"Image {image.name} packed.")
 
-        # Delete temporary bake node
-        nodes.remove(bake_node)
-        rollback_cycles_settings(cycles_settings)
-
-        # Restore original links
-        links.new(material_output.inputs[0], last_node_socket)
+        for link in original_links:
+            links.new(link.from_socket, link.to_socket)
         context.scene.render.engine = original_engine
-
+        restore_render_settings(context, original_render_settings)
         return bake_node
 
     except Exception as e:
@@ -303,7 +319,7 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
         print(baking_steps)
 
         for idx, (node, bake_type) in enumerate(baking_steps):
-            tex_node = bake_node(context, node)
+            tex_node = bake_node(context, node, bake_type)
 
         return {'FINISHED'}
 

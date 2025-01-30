@@ -163,12 +163,14 @@ class NodeOrganizer:
             self.nodes, key=lambda node: node.location.x).location
 
     def create_node(self, node_type, location=(0, 0)):
+        print(f"Creating {node_type}")
         node = self.nodes.new(node_type)
         node.location = Vector(location)
         self.created_nodes.append(node)
         return node
 
     def create_link(self, output_node: bpy.types.Node, input_node: bpy.types.Node, output_name, input_name):
+        print(f"Linking {output_node.name} to {input_node.name}")
         self.links.new(input_node.inputs[input_name],
                        output_node.outputs[output_name])
 

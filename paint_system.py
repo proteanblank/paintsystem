@@ -67,14 +67,14 @@ def cleanup_duplicate_nodegroups(node_tree: NodeTree):
                 bpy.data.node_groups.remove(ng)
 
 
-def get_node_from_library(tree_name, force_reload=False):
+def get_nodetree_from_library(tree_name, force_reload=False):
     # Check if the node group already exists
-    ng = bpy.data.node_groups.get(tree_name)
-    if ng:
+    nt = bpy.data.node_groups.get(tree_name)
+    if nt:
         if force_reload:
-            bpy.data.node_groups.remove(ng)
+            bpy.data.node_groups.remove(nt)
         else:
-            return ng
+            return nt
 
     # Load the library file
     filepath = get_addon_filepath() + LIBRARY_FILE_NAME
@@ -86,11 +86,11 @@ def get_node_from_library(tree_name, force_reload=False):
                 current_node_groups_names.append(node_group_name)
 
     # Getting the node group
-    ng = bpy.data.node_groups.get(tree_name)
-    if not ng:
+    nt = bpy.data.node_groups.get(tree_name)
+    if not nt:
         return None
-    cleanup_duplicate_nodegroups(ng)
-    return ng
+    cleanup_duplicate_nodegroups(nt)
+    return nt
 
 
 def get_brushes_from_library():
@@ -289,7 +289,7 @@ class PaintSystem:
         # Adjust existing items' order
         active_group.adjust_sibling_orders(parent_id, insert_order)
 
-        solid_color_template = get_node_from_library(
+        solid_color_template = get_nodetree_from_library(
             '_PS_Solid_Color_Template', False)
         solid_color_nt = solid_color_template.copy()
         solid_color_nt.name = f"PS_IMG {name} (MAT: {mat.name})"
@@ -333,7 +333,7 @@ class PaintSystem:
         # Adjust existing items' order
         active_group.adjust_sibling_orders(parent_id, insert_order)
 
-        folder_template = get_node_from_library(
+        folder_template = get_nodetree_from_library(
             '_PS_Folder_Template', False)
         folder_nt = folder_template.copy()
         folder_nt.name = f"PS_FLD {name} (MAT: {mat.name})"
@@ -375,7 +375,7 @@ class PaintSystem:
         # Adjust existing items' order
         active_group.adjust_sibling_orders(parent_id, insert_order)
 
-        adjustment_template = get_node_from_library(
+        adjustment_template = get_nodetree_from_library(
             f'_PS_Adjustment_Template', False)
         adjustment_nt: NodeTree = adjustment_template.copy()
         adjustment_nt.name = f"PS_ADJ {name} (MAT: {mat.name})"
@@ -557,7 +557,7 @@ class PaintSystem:
 
     def _create_folder_node_tree(self, folder_name: str, force_reload=False) -> NodeTree:
         mat = self.get_active_material()
-        folder_template = get_node_from_library(
+        folder_template = get_nodetree_from_library(
             '_PS_Folder_Template', force_reload)
         folder_nt = folder_template.copy()
         folder_nt.name = f"PS {folder_name} (MAT: {mat.name})"
@@ -565,7 +565,7 @@ class PaintSystem:
 
     def _create_layer_node_tree(self, layer_name: str, image: Image, uv_map_name: str = None, force_reload=True) -> NodeTree:
         mat = self.get_active_material()
-        layer_template = get_node_from_library(
+        layer_template = get_nodetree_from_library(
             '_PS_Layer_Template', force_reload)
         layer_nt = layer_template.copy()
         layer_nt.name = f"PS {layer_name} (MAT: {mat.name})"

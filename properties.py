@@ -12,7 +12,7 @@ from bpy.types import (PropertyGroup, Context,
                        NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
-from .paint_system import PaintSystem, get_node_from_library
+from .paint_system import PaintSystem, get_nodetree_from_library
 from dataclasses import dataclass
 from typing import Dict
 
@@ -191,7 +191,7 @@ class PaintSystemGroup(BaseNestedListManager):
             is_clip = item.clip
             node_entry = ps_nodes_store[item.parent_id]
             if is_clip and not node_entry.is_clip:
-                alpha_over_nt = get_node_from_library(
+                alpha_over_nt = get_nodetree_from_library(
                     '_PS_Alpha_Over')
                 group_node = nodes.new('ShaderNodeGroup')
                 group_node.node_tree = alpha_over_nt
