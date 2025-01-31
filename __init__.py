@@ -24,7 +24,7 @@ bl_info = {
     "author": "Tawan Sunflower, @blastframe",
     "description": "",
     "blender": (4, 1, 0),
-    "version": (1, 1, 8),
+    "version": (1, 1, 9),
     "location": "View3D > Sidebar > Paint System",
     "warning": "",
     "category": "Node",
