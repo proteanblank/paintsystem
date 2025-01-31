@@ -20,7 +20,7 @@ jobs:
             version: ${{ steps.extract_version.outputs.version }}
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Extract version from __init__.py
               id: extract_version
@@ -74,7 +74,7 @@ jobs:
         needs: Build
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Release addon
               uses: blenderkit/blender-addon-release@main
