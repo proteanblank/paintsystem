@@ -14,7 +14,7 @@ from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
 from . import addon_updater_ops
-from .common import is_online, is_newer_than
+from .common import is_online, is_newer_than, icon_parser
 # from .. import __package__ as base_package
 
 # -------------------------------------------------------------------
@@ -657,7 +657,7 @@ class MAT_MT_PaintSystemAddImage(Menu):
         col = row.column()
         col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
-                     icon="SEQUENCE_COLOR_03" if not is_newer_than(4, 4) else 'STRIP_COLOR_03')
+                     icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
         col = row.column()
         col.label(text="Adjustment Layer:")
         for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
