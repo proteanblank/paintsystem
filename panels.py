@@ -172,13 +172,21 @@ def set_active_panel(context: Context, panel_name):
     context.region.active_panel_category = panel_name
 
 
+def get_unified_settings(context: Context, unified_name=None):
+    ups = context.tool_settings.unified_paint_settings
+    tool_settings = context.tool_settings.image_paint
+    brush = tool_settings.brush
+    prop_owner = brush
+    if unified_name and getattr(ups, unified_name):
+        prop_owner = ups
+    return prop_owner
+
+
 def prop_unified(
     layout,
     context,
-    brush,
     prop_name,
     unified_name=None,
-    pressure_name=None,
     icon='NONE',
     text=None,
     slider=False,
@@ -188,14 +196,9 @@ def prop_unified(
         along with their pen pressure setting and global toggle, if they exist. """
     row = layout.row(align=True)
     ups = context.tool_settings.unified_paint_settings
-    prop_owner = brush
-    if unified_name and getattr(ups, unified_name):
-        prop_owner = ups
+    prop_owner = get_unified_settings(context, unified_name)
 
     row.prop(prop_owner, prop_name, icon=icon, text=text, slider=slider)
-
-    if pressure_name:
-        row.prop(brush, pressure_name, text="")
 
     if unified_name and not header:
         # NOTE: We don't draw UnifiedPaintSettings in the header to reduce clutter. D5928#136281
@@ -277,9 +280,9 @@ class MAT_PT_Brush(Panel):
         col = box.column(align=True)
         if not ps.preferences.use_compact_design:
             col.scale_y = 1.5
-        prop_unified(col, context, brush, "size",
-                     "use_unified_strength", icon="WORLD", text="Size", slider=True)
-        prop_unified(col, context, brush, "strength",
+        prop_unified(col, context, "size",
+                     "use_unified_size", icon="WORLD", text="Size", slider=True)
+        prop_unified(col, context, "strength",
                      "use_unified_strength", icon="WORLD", text="Strength")
         # row.label(text="Brush Shortcuts")
 
@@ -326,11 +329,8 @@ class MAT_PT_BrushColor(Panel):
 
     def draw_header_preset(self, context):
         layout = self.layout
-        tool_settings = bpy.context.scene.tool_settings
-        unified_settings = tool_settings.unified_paint_settings
-        brush_settings = tool_settings.image_paint.brush
-        layout.prop(
-            unified_settings if unified_settings.use_unified_color else brush_settings, "color", text="", icon='IMAGE_RGB_ALPHA')
+        layout.prop(get_unified_settings(context, "use_unified_color"), "color",
+                    text="", icon='IMAGE_RGB_ALPHA')
         # layout.label(text="", icon="INFO")
 
     def draw(self, context):
@@ -344,6 +344,29 @@ class MAT_PT_BrushColor(Panel):
         brush_settings = tool_settings.image_paint.brush
         col.template_color_picker(
             unified_settings if unified_settings.use_unified_color else brush_settings, "color", value_slider=True)
+
+
+class MAT_PT_BrushColorPalette(Panel):
+    bl_idname = 'MAT_PT_BrushColorPalette'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Color Palette"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_BrushColor'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT' and is_newer_than(4, 3)
+
+    def draw(self, context):
+        layout = self.layout
+        settings = context.tool_settings.image_paint
+        layout.template_ID(settings, "palette", new="palette.new")
+        if settings.palette:
+            layout.template_palette(settings, "palette", color=True)
 
 
 class MAT_PT_BrushSettings(Panel):
@@ -691,6 +714,7 @@ classes = (
     MAT_MT_PaintSystemGroup,
     MAT_PT_Brush,
     MAT_PT_BrushColor,
+    MAT_PT_BrushColorPalette,
     # MAT_PT_BrushSettings,
     MAT_PT_UL_PaintSystemLayerList,
     MAT_MT_LayersSettingsTooltips,

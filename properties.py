@@ -60,10 +60,26 @@ def update_brush_settings(self=None, context: Context = None):
     brush.use_alpha = not active_layer.lock_alpha
 
 
+def update_paintsystem_image_name(self, context):
+    ps = PaintSystem(context)
+    mat = ps.get_active_material()
+    active_layer = ps.get_active_layer()
+    if not active_layer or not active_layer.image:
+        return
+    active_layer.image.name = f"PS {mat.name} {active_layer.name}"
+
+
 class PaintSystemLayer(BaseNestedListItem):
 
     def update_node_tree(self, context):
         PaintSystem(context).get_active_group().update_node_tree()
+
+    name: StringProperty(
+        name="Name",
+        description="Layer name",
+        default="Layer",
+        update=update_paintsystem_image_name
+    )
 
     enabled: BoolProperty(
         name="Enabled",
@@ -305,6 +321,11 @@ class PaintSystemSettings(PropertyGroup):
         name="Brush Color",
         subtype='COLOR',
         default=(1.0, 1.0, 1.0)
+    )
+    brush_xray: BoolProperty(
+        name="Brush X-Ray",
+        description="Brush X-Ray",
+        default=False
     )
 
 
