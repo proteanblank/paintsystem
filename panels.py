@@ -530,10 +530,6 @@ class MAT_PT_PaintSystemLayers(Panel):
         row.menu("MAT_MT_PaintSystemBakeAndExport",
                  icon='EXPORT', text="Bake and Export")
 
-        if active_group.bake_progress > 0:
-            layout.progress(factor=active_group.bake_progress,
-                            text=active_group.bake_status)
-
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         if has_dirty_images:
