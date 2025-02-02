@@ -209,7 +209,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     template: EnumProperty(
         name="Template",
         items=[
-            ('NONE', "None", "Just add node group to material"),
+            ('NONE', "Use Existing Material", "Just add node group to material"),
             ('STANDARD', "Standard", "Start off with a standard setup"),
             ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
             ('NORMAL', "Normal", "Start off with a normal painting setup"),
