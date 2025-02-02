@@ -119,22 +119,17 @@ class MAT_PT_PaintSystemGroups(Panel):
         ob = ps.active_object
         mat = ps.get_active_material()
 
-        # if not mat:
-        #     layout.label(text="No active material")
-        #     return
         layout.label(text="Selected Material:")
         layout.template_ID(ob, "active_material", new="material.new")
 
-        # if not hasattr(mat, "paint_system"):
-        #     layout.operator("paint_system.add_paint_system")
-        #     return
-        # Add Group button and selector
+        if not mat:
+            layout.label(text="No active material")
+            return
+
         row = layout.row()
 
         if not ps.preferences.use_compact_design:
             row.scale_y = 2.0
-        # row.operator("paint_system.new_group",
-        #              text="Add New Group", icon='ADD')
 
         if hasattr(mat, "paint_system") and len(mat.paint_system.groups) > 0:
             row = layout.row(align=True)
