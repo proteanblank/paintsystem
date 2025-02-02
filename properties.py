@@ -62,11 +62,11 @@ def update_brush_settings(self=None, context: Context = None):
 
 def update_paintsystem_image_name(self, context):
     ps = PaintSystem(context)
+    active_group = ps.get_active_group()
     mat = ps.get_active_material()
-    active_layer = ps.get_active_layer()
-    if not active_layer or not active_layer.image:
-        return
-    active_layer.image.name = f"PS {mat.name} {active_layer.name}"
+    for layer in active_group.items:
+        if layer.image:
+            layer.image.name = f"PS {mat.name} {active_group.name} {layer.name}"
 
 
 class PaintSystemLayer(BaseNestedListItem):
@@ -157,6 +157,13 @@ class NodeEntry:
 
 
 class PaintSystemGroup(BaseNestedListManager):
+
+    name: StringProperty(
+        name="Name",
+        description="Group name",
+        default="Group",
+        update=update_paintsystem_image_name
+    )
 
     def update_node_tree(self):
         self.normalize_orders()

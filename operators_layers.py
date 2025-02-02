@@ -505,7 +505,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         if not get_object_uv_maps(self, context):
             bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
         image = bpy.data.images.new(
-            name=f"PS {mat.name} {self.name}",
+            name=f"PS {mat.name} {active_group.name} {self.name}",
             width=int(self.image_resolution),
             height=int(self.image_resolution),
             alpha=True,
