@@ -14,7 +14,7 @@ from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
 from . import addon_updater_ops
-from .common import is_online, is_newer_than
+from .common import is_online, is_newer_than, icon_parser
 from .operators_bake import is_bakeable
 # from .. import __package__ as base_package
 
@@ -120,24 +120,19 @@ class MAT_PT_PaintSystemGroups(Panel):
         ob = ps.active_object
         mat = ps.get_active_material()
 
-        # if not mat:
-        #     layout.label(text="No active material")
-        #     return
         layout.label(text="Selected Material:")
         layout.template_ID(ob, "active_material", new="material.new")
 
-        # if not hasattr(mat, "paint_system"):
-        #     layout.operator("paint_system.add_paint_system")
-        #     return
-        # Add Group button and selector
+        if not mat:
+            layout.label(text="No active material")
+            return
+
         row = layout.row()
 
         if not ps.preferences.use_compact_design:
             row.scale_y = 2.0
-        # row.operator("paint_system.new_group",
-        #              text="Add New Group", icon='ADD')
 
-        if len(mat.paint_system.groups) > 0:
+        if hasattr(mat, "paint_system") and len(mat.paint_system.groups) > 0:
             row = layout.row(align=True)
             if not ps.preferences.use_compact_design:
                 row.scale_y = 1.5
@@ -173,13 +168,21 @@ def set_active_panel(context: Context, panel_name):
     context.region.active_panel_category = panel_name
 
 
+def get_unified_settings(context: Context, unified_name=None):
+    ups = context.tool_settings.unified_paint_settings
+    tool_settings = context.tool_settings.image_paint
+    brush = tool_settings.brush
+    prop_owner = brush
+    if unified_name and getattr(ups, unified_name):
+        prop_owner = ups
+    return prop_owner
+
+
 def prop_unified(
     layout,
     context,
-    brush,
     prop_name,
     unified_name=None,
-    pressure_name=None,
     icon='NONE',
     text=None,
     slider=False,
@@ -189,14 +192,9 @@ def prop_unified(
         along with their pen pressure setting and global toggle, if they exist. """
     row = layout.row(align=True)
     ups = context.tool_settings.unified_paint_settings
-    prop_owner = brush
-    if unified_name and getattr(ups, unified_name):
-        prop_owner = ups
+    prop_owner = get_unified_settings(context, unified_name)
 
     row.prop(prop_owner, prop_name, icon=icon, text=text, slider=slider)
-
-    if pressure_name:
-        row.prop(brush, pressure_name, text="")
 
     if unified_name and not header:
         # NOTE: We don't draw UnifiedPaintSettings in the header to reduce clutter. D5928#136281
@@ -278,9 +276,9 @@ class MAT_PT_Brush(Panel):
         col = box.column(align=True)
         if not ps.preferences.use_compact_design:
             col.scale_y = 1.5
-        prop_unified(col, context, brush, "size",
-                     "use_unified_strength", icon="WORLD", text="Size", slider=True)
-        prop_unified(col, context, brush, "strength",
+        prop_unified(col, context, "size",
+                     "use_unified_size", icon="WORLD", text="Size", slider=True)
+        prop_unified(col, context, "strength",
                      "use_unified_strength", icon="WORLD", text="Strength")
         # row.label(text="Brush Shortcuts")
 
@@ -328,11 +326,8 @@ class MAT_PT_BrushColor(Panel):
 
     def draw_header_preset(self, context):
         layout = self.layout
-        tool_settings = bpy.context.scene.tool_settings
-        unified_settings = tool_settings.unified_paint_settings
-        brush_settings = tool_settings.image_paint.brush
-        layout.prop(
-            unified_settings if unified_settings.use_unified_color else brush_settings, "color", text="", icon='IMAGE_RGB_ALPHA')
+        layout.prop(get_unified_settings(context, "use_unified_color"), "color",
+                    text="", icon='IMAGE_RGB_ALPHA')
         # layout.label(text="", icon="INFO")
 
     def draw(self, context):
@@ -346,6 +341,29 @@ class MAT_PT_BrushColor(Panel):
         brush_settings = tool_settings.image_paint.brush
         col.template_color_picker(
             unified_settings if unified_settings.use_unified_color else brush_settings, "color", value_slider=True)
+
+
+class MAT_PT_BrushColorPalette(Panel):
+    bl_idname = 'MAT_PT_BrushColorPalette'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Color Palette"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_BrushColor'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT' and is_newer_than(4, 3)
+
+    def draw(self, context):
+        layout = self.layout
+        settings = context.tool_settings.image_paint
+        layout.template_ID(settings, "palette", new="palette.new")
+        if settings.palette:
+            layout.template_palette(settings, "palette", color=True)
 
 
 class MAT_PT_BrushSettings(Panel):
@@ -448,7 +466,8 @@ class MAT_MT_LayersSettingsTooltips(Menu):
         layout.separator()
         layout.label(text="Clip to Layer Below", icon='SELECT_INTERSECT')
         layout.label(text="Lock Layer Alpha", icon='TEXTURE')
-        layout.label(text="Lock Layer Settings", icon='VIEW_LOCKED')
+        layout.label(text="Lock Layer Settings",
+                     icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more settings on Github!",
                         icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
@@ -492,15 +511,15 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = col.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
+        row.menu("MAT_MT_PaintSystemGroup", text="", icon='BRUSHES_ALL')
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
-                         text="Toggle Paint Mode", icon="BRUSHES_ALL", depress=current_mode == 'PAINT_TEXTURE')
+                         text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE')
         else:
             row.alert = True
             row.operator("paint_system.create_template_setup",
                          text="Setup Material", icon="ERROR")
             row.alert = False
-
         row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK")
 
@@ -565,7 +584,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.prop(active_layer, "lock_alpha",
                          text="", icon='TEXTURE')
                 row.prop(active_layer, "lock_layer",
-                         text="", icon='VIEW_LOCKED')
+                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(color_mix_node, "blend_type", text="")
                 row = box.row()
                 row.enabled = not active_layer.lock_layer
@@ -582,7 +601,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.prop(active_layer, "clip", text="",
                          icon="SELECT_INTERSECT")
                 row.prop(active_layer, "lock_layer",
-                         text="", icon='VIEW_LOCKED')
+                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
             case _:
@@ -593,7 +612,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.prop(active_layer, "clip", text="",
                          icon="SELECT_INTERSECT")
                 row.prop(active_layer, "lock_layer",
-                         text="", icon='VIEW_LOCKED')
+                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(color_mix_node, "blend_type", text="")
                 row = box.row()
                 row.enabled = not active_layer.lock_layer
@@ -669,10 +688,14 @@ class MAT_MT_PaintSystemAddImage(Menu):
                      text="Open External Image")
         col.operator("paint_system.open_existing_image",
                      text="Use Existing Image")
-        col = row.column()
+        col.separator()
         col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
-                     icon="SEQUENCE_COLOR_03" if not is_newer_than(4, 4) else 'STRIP_COLOR_03')
+                     icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
+
+        col.separator()
+        col.label(text="Shader:")
+
         col = row.column()
         col.label(text="Adjustment Layer:")
         for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
@@ -732,6 +755,7 @@ classes = (
     MAT_MT_PaintSystemGroup,
     MAT_PT_Brush,
     MAT_PT_BrushColor,
+    MAT_PT_BrushColorPalette,
     # MAT_PT_BrushSettings,
     MAT_PT_UL_PaintSystemLayerList,
     MAT_MT_LayersSettingsTooltips,

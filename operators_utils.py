@@ -209,7 +209,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     template: EnumProperty(
         name="Template",
         items=[
-            ('NONE', "None", "Just add node group to material"),
+            ('NONE', "Use Existing Material", "Just add node group to material"),
             ('STANDARD', "Standard", "Start off with a standard setup"),
             ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
             ('NORMAL', "Normal", "Start off with a normal painting setup"),
@@ -527,9 +527,9 @@ def register():
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
     if kc:
-        km = kc.keymaps.new(name='Screen', space_type='EMPTY')
+        km = kc.keymaps.new(name="3D View", space_type='VIEW_3D')
         kmi = km.keymap_items.new(
-            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'I', 'PRESS')
+            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'I', 'PRESS', repeat=True)
         kmi = km.keymap_items.new(
             PAINTSYSTEM_OT_ToggleBrushEraseAlpha.bl_idname, type='E', value='PRESS')
         addon_keymaps.append((km, kmi))

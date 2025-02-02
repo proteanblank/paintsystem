@@ -2,6 +2,16 @@ import bpy
 from bpy.types import Context
 
 
+icons = bpy.types.UILayout.bl_rna.functions["prop"].parameters["icon"].enum_items.keys(
+)
+
+
+def icon_parser(icon: str, default="NONE") -> str:
+    if icon in icons:
+        return icon
+    return default
+
+
 def is_online():
     return not bpy.app.version >= (4, 2, 0) or bpy.app.online_access
 
