@@ -136,7 +136,7 @@ class MAT_PT_PaintSystemGroups(Panel):
         # row.operator("paint_system.new_group",
         #              text="Add New Group", icon='ADD')
 
-        if len(mat.paint_system.groups) > 0:
+        if hasattr(mat, "paint_system") and len(mat.paint_system.groups) > 0:
             row = layout.row(align=True)
             if not ps.preferences.use_compact_design:
                 row.scale_y = 1.5
