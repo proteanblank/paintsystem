@@ -1,10 +1,17 @@
 import bpy
-from bpy.types import Operator, Context, Node, NodeTree
+from bpy.types import Operator, Context, Node, NodeTree, Image
+from bpy.props import (
+    BoolProperty,
+    StringProperty,
+    FloatVectorProperty,
+    EnumProperty,
+    IntProperty
+)
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, get_nodetree_from_library
 from typing import List, Tuple
 from mathutils import Vector
-from .common import redraw_panel, map_range
+from .common import NodeOrganizer, get_object_uv_maps
 import copy
 
 IMPOSSIBLE_NODES = (
@@ -85,19 +92,27 @@ def is_bakeable(context: Context) -> Tuple[bool, str, List[Node]]:
     connected_nodes = get_connected_nodes(output_node)
 
     ps_groups = []
+    ris_nodes = []
     impossible_nodes = []
 
     for node in connected_nodes:
         if node.bl_idname == "ShaderNodeGroup" and node.node_tree == node_tree:
             ps_groups.append(node)
+        if node.bl_idname in REQUIRES_INTERMEDIATE_STEP:
+            ris_nodes.append(node)
         if node.bl_idname in IMPOSSIBLE_NODES:
             impossible_nodes.append(node)
 
-    if len(ps_groups) != 1:
-        print(len(ps_groups))
-        return False, "Paint System group is not found or used multiple times.", ps_groups
+    if len(ps_groups) == 0:
+        return False, "Paint System group is not connceted to Material Output.", []
+    if len(ps_groups) > 1:
+        return False, "Paint System group used Multiple Times.", ps_groups
     if impossible_nodes:
         return False, "Unsupported nodes found.", impossible_nodes
+
+    # TODO: Remove until the intermediate step is implemented
+    if ris_nodes:
+        return False, "Unsupported nodes found.", ris_nodes
 
     return True, "", []
 
@@ -150,17 +165,27 @@ def rollback_cycles_settings(saved_settings):
             # You might want to handle the error more specifically, e.g., show a message to the user.
 
 
-def bake_node(context: Context, target_node: Node, width=1024, height=1024) -> Node:
+def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, output_socket_name: str, alpha_socket_name: str = None, width=1024, height=1024) -> Node:
     """
     Bakes a specific node from the active material with optimized settings
 
     Args:
-        node_name bpy.types.Node: The node to bake
-        bake_type (str): Type of bake to perform ('DIFFUSE', 'NORMAL', etc.)
+        context (bpy.types.Context): The context to bake in
+        target_node (bpy.types.Node): The node to bake
+        image (bpy.types.Image): The image to bake to
+        uv_layer (str): The UV layer to bake
+        output_socket_name (str): The output socket name
+        alpha_socket_name (str): The alpha socket name
+        width (int, optional): The width of the image. Defaults to 1024.
+        height (int, optional): The height of the image. Defaults to 1024.
 
     Returns:
         Image Texture Node: The baked image texture node
     """
+
+    # Debug
+    print(f"Baking {target_node.name}")
+
     obj = context.active_object
     if not obj or not obj.active_material:
         return None
@@ -176,30 +201,35 @@ def bake_node(context: Context, target_node: Node, width=1024, height=1024) -> N
     links = material.node_tree.links
     original_links = []
     for node in connected_nodes:
-        for input in node.inputs:
-            for link in input.links:
+        for input_socket in node.inputs:
+            for link in input_socket.links:
                 original_links.append(link)
 
-    try:
+    # try:
         # Store original settings
-        original_engine = getattr(context.scene.render, "engine")
+        original_engine = copy.deepcopy(
+            getattr(context.scene.render, "engine"))
         # Switch to Cycles if needed
         if context.scene.render.engine != 'CYCLES':
             context.scene.render.engine = 'CYCLES'
 
         cycles_settings = save_cycles_settings()
         cycles = context.scene.cycles
-        bake_nt = None
-        if 'Color' in target_node.outputs:
+        bake_node = None
+        node_organizer = NodeOrganizer(material)
+        socket_type = target_node.outputs[output_socket_name].type
+        if socket_type != 'SHADER':
             bake_nt = get_nodetree_from_library("_PS_Bake")
-            bake_node = nodes.new('ShaderNodeGroup')
-            bake_node.node_tree = bake_nt
-            links.new(bake_node.inputs['Color'], target_node.outputs['Color'])
-            links.new(material_output.inputs[0], bake_node.outputs['Shader'])
+            bake_node = node_organizer.create_node(
+                'ShaderNodeGroup', {'node_tree': bake_nt})
+            node_organizer.create_link(
+                target_node.name, bake_node.name, output_socket_name, 'Color')
+            node_organizer.create_link(
+                bake_node.name, material_output.name, 'Shader', 'Surface')
             # Check if target node has Alpha output
-            if 'Alpha' in target_node.outputs:
-                links.new(bake_node.inputs['Alpha'],
-                          target_node.outputs['Alpha'])
+            if alpha_socket_name:
+                node_organizer.create_link(
+                    target_node.name, bake_node.name, alpha_socket_name, 'Alpha')
             bake_params = {
                 "type": 'COMBINED',
                 "pass_filter": {'EMIT', 'DIRECT'},
@@ -208,40 +238,28 @@ def bake_node(context: Context, target_node: Node, width=1024, height=1024) -> N
             cycles.samples = 1
             cycles.use_denoising = False
             cycles.use_adaptive_sampling = False
-        elif 'Shader' in target_node.outputs:
-            links.new(material_output.inputs[0], target_node.outputs[0])
+        else:
+            node_organizer.create_link(
+                target_node.name, material_output.name, output_socket_name, 'Surface')
             bake_params = {
                 "type": 'COMBINED',
                 "use_clear": True,
             }
-            cycles.samples = 256
+            cycles.samples = 128
             cycles.use_denoising = True
             cycles.use_adaptive_sampling = True
-        else:
-            return None
-
-        # Create a new image with appropriate settings
-        image_name = f"{material.name}_{target_node.name}"
-        image = bpy.data.images.new(
-            name=image_name,
-            width=width,
-            height=height,
-            alpha=True,
-        )
-        image.colorspace_settings.name = 'sRGB'
 
         # Create and set up the image texture node
-        bake_tex_node = nodes.new('ShaderNodeTexImage')
-        bake_tex_node.name = "temp_bake_node"
-        bake_tex_node.image = image  # Link the image to the texture node
-        bake_tex_node.location = target_node.location + Vector((0, 300))
+        bake_tex_node = node_organizer.create_node('ShaderNodeTexImage', {
+                                                   "name": "temp_bake_node", "image": image, "location": target_node.location + Vector((0, 300))})
 
         for node in nodes:
             node.select = False
         bake_tex_node.select = True
+        nodes.active = bake_tex_node
 
         # Perform bake
-        bpy.ops.object.bake(**bake_params)
+        bpy.ops.object.bake(**bake_params, uv_layer=uv_layer)
 
         # Pack the image
         if not image.packed_file:
@@ -250,18 +268,22 @@ def bake_node(context: Context, target_node: Node, width=1024, height=1024) -> N
             print(f"Image {image.name} packed.")
 
         # Delete temporary bake node
-        nodes.remove(bake_node)
+        if bake_node:
+            nodes.remove(bake_node)
         rollback_cycles_settings(cycles_settings)
 
         # Restore original links
         links.new(material_output.inputs[0], last_node_socket)
         context.scene.render.engine = original_engine
 
+        # Debug
+        print(f"Backed {target_node.name} to {image.name}")
+
         return bake_node
 
-    except Exception as e:
-        print(f"Baking failed: {str(e)}")
-        return None
+    # except Exception as e:
+    #     print(f"Baking failed: {str(e)}")
+    #     return None
 
 
 class PAINTSYSTEM_OT_BakeGroup(Operator):
@@ -270,11 +292,19 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
     bl_description = "Bake the selected group"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
-    bake_started = False
-
-    # @classmethod
-    # def poll(cls, context):
-    #     return is_bakeable(context)[0]
+    image_resolution: EnumProperty(
+        items=[
+            ('1024', "1024", "1024x1024"),
+            ('2048', "2048", "2048x2048"),
+            ('4096', "4096", "4096x4096"),
+            ('8192', "8192", "8192x8192"),
+        ],
+        default='1024',
+    )
+    uv_map_name: EnumProperty(
+        name="UV Map",
+        items=get_object_uv_maps
+    )
 
     def execute(self, context):
         ps = PaintSystem(context)
@@ -290,22 +320,62 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
 
         connected_node = get_connected_nodes(
             get_active_material_output(mat.node_tree))
-        baking_steps: List[Tuple[Node, str]] = []
+        baking_steps: List[Tuple[Node, str, str, Image, str]] = []
+        image_resolution = int(self.image_resolution)
         for node in connected_node:
             if node.bl_idname in REQUIRES_INTERMEDIATE_STEP:
+                # Create a new image with appropriate settings
+                image_name = f"{mat.name}_{node.name}"
+                image = bpy.data.images.new(
+                    name=image_name,
+                    width=image_resolution,
+                    height=image_resolution,
+                    alpha=True,
+                )
+                image.colorspace_settings.name = 'sRGB'
+
                 if node.bl_idname == "ShaderNodeShaderToRGB":
-                    node = node.inputs[0].links[0].from_node
-                baking_steps.append((node, "COMBINED"))
+                    link = node.inputs[0].links[0]
+                    baking_steps.append(
+                        (link.from_node, link.from_socket.name, None, image, self.uv_map_name))
             if node.bl_idname == "ShaderNodeGroup" and node.node_tree == active_group.node_tree:
-                baking_steps.append((node, "EMIT"))
+                # Create a new image with appropriate settings
+                image_name = f"{active_group.name}_bake"
+                image = bpy.data.images.new(
+                    name=image_name,
+                    width=image_resolution,
+                    height=image_resolution,
+                    alpha=True,
+                )
+                image.colorspace_settings.name = 'sRGB'
+                baking_steps.append(
+                    (node, "Color", "Alpha", image, self.uv_map_name))
 
         baking_steps.reverse()
         print(baking_steps)
 
-        for idx, (node, bake_type) in enumerate(baking_steps):
-            tex_node = bake_node(context, node)
+        for idx, (node, output_socket_name, alpha_socket_name, image, uv_layer) in enumerate(baking_steps):
+            tex_node = bake_node(
+                context,
+                target_node=node,
+                image=image,
+                uv_layer=uv_layer,
+                output_socket_name=output_socket_name,
+                alpha_socket_name=alpha_socket_name
+            )
+            if not tex_node:
+                self.report({'ERROR'}, f"Failed to bake {node.name}.")
+                return {'CANCELLED'}
 
         return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "image_resolution", expand=True)
+        layout.prop(self, "uv_map_name")
 
 
 classes = (
