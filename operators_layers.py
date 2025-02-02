@@ -10,7 +10,7 @@ import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
-from .common import redraw_panel, intern_enum_items
+from .common import redraw_panel, get_object_uv_maps
 import re
 
 # bpy.types.Image.pack
@@ -424,13 +424,6 @@ def get_highest_number_with_prefix(prefix, string_list):
                 if number > highest_number:
                     highest_number = number
     return highest_number
-
-
-def get_object_uv_maps(self, context: Context):
-    items = [
-        (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
-    ]
-    return intern_enum_items(items)
 
 
 class PAINTSYSTEM_OT_CreateNewUVMap(Operator):

@@ -92,3 +92,10 @@ class NodeOrganizer:
             created_nodes, key=lambda node: node.location.x).location
         offset = self.rightmost - created_nodes_leftmost + Vector((200, 0))
         self.move_nodes_offset(offset)
+
+
+def get_object_uv_maps(self, context: Context):
+    items = [
+        (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
+    ]
+    return intern_enum_items(items)
