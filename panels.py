@@ -469,7 +469,8 @@ class MAT_MT_LayersSettingsTooltips(Menu):
         layout.separator()
         layout.label(text="Clip to Layer Below", icon='SELECT_INTERSECT')
         layout.label(text="Lock Layer Alpha", icon='TEXTURE')
-        layout.label(text="Lock Layer Settings", icon='VIEW_LOCKED')
+        layout.label(text="Lock Layer Settings",
+                     icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more settings on Github!",
                         icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
@@ -512,15 +513,15 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = box.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
+        row.menu("MAT_MT_PaintSystemGroup", text="", icon='BRUSHES_ALL')
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
-                         text="Toggle Paint Mode", icon="BRUSHES_ALL", depress=current_mode == 'PAINT_TEXTURE')
+                         text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE')
         else:
             row.alert = True
             row.operator("paint_system.create_template_setup",
                          text="Setup Material", icon="ERROR")
             row.alert = False
-
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         row.operator("wm.save_mainfile",
@@ -573,7 +574,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.prop(active_layer, "lock_alpha",
                          text="", icon='TEXTURE')
                 row.prop(active_layer, "lock_layer",
-                         text="", icon='VIEW_LOCKED')
+                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(color_mix_node, "blend_type", text="")
                 row = box.row()
                 row.enabled = not active_layer.lock_layer
@@ -590,7 +591,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.prop(active_layer, "clip", text="",
                          icon="SELECT_INTERSECT")
                 row.prop(active_layer, "lock_layer",
-                         text="", icon='VIEW_LOCKED')
+                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
             case _:
@@ -601,7 +602,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.prop(active_layer, "clip", text="",
                          icon="SELECT_INTERSECT")
                 row.prop(active_layer, "lock_layer",
-                         text="", icon='VIEW_LOCKED')
+                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(color_mix_node, "blend_type", text="")
                 row = box.row()
                 row.enabled = not active_layer.lock_layer
@@ -677,10 +678,14 @@ class MAT_MT_PaintSystemAddImage(Menu):
                      text="Open External Image")
         col.operator("paint_system.open_existing_image",
                      text="Use Existing Image")
-        col = row.column()
+        col.separator()
         col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
+
+        col.separator()
+        col.label(text="Shader:")
+
         col = row.column()
         col.label(text="Adjustment Layer:")
         for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
