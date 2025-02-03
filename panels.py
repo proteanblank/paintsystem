@@ -527,8 +527,10 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = col.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
-        row.menu("MAT_MT_PaintSystemBakeAndExport",
-                 icon='EXPORT', text="Bake and Export")
+
+        if not active_group.bake_image:
+            row.menu("MAT_MT_PaintSysteMergeAndExport",
+                     icon='EXPORT', text="Merge and Export")
 
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
@@ -538,6 +540,23 @@ class MAT_PT_PaintSystemLayers(Panel):
         if not any([item.image for (item, _) in flattened]):
             box.label(text="Add an image layer first!",
                       icon="ERROR")
+
+        if active_group.bake_image:
+            box = layout.box()
+            row = box.row(align=True)
+            if not ps.preferences.use_compact_design:
+                row.scale_x = 1.5
+                row.scale_y = 1.5
+            row.prop(active_group, "use_bake_image",
+                     text="Use Baked Image", icon='IMAGE')
+            row.operator("paint_system.export_baked_image",
+                         icon='EXPORT', text="")
+            row.operator("paint_system.delete_bake_image",
+                         text="", icon='TRASH')
+            if active_group.use_bake_image:
+                box.label(
+                    text="Baked Image Used. It's faster!", icon='INFO')
+                return
 
         row = layout.row()
         if not ps.preferences.use_compact_design:
@@ -643,7 +662,7 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
     def poll(cls, context):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
-        return active_group and ps.get_active_layer() and ps.get_active_layer().type == 'IMAGE'
+        return active_group and ps.get_active_layer() and ps.get_active_layer().type == 'IMAGE' and not active_group.use_bake_image
 
     def draw(self, context):
         layout = self.layout
@@ -703,14 +722,14 @@ class MAT_MT_PaintSystemAddImage(Menu):
         #              icon="FILE_FOLDER")
 
 
-class MAT_MT_PaintSystemBakeAndExport(Menu):
-    bl_label = "Bake and Export"
-    bl_idname = "MAT_MT_PaintSystemBakeAndExport"
+class MAT_MT_PaintSystemMergeAndExport(Menu):
+    bl_label = "Merge and Export"
+    bl_idname = "MAT_MT_PaintSysteMergeAndExport"
 
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        mat = ps.get_active_material()
+        active_group = ps.get_active_group()
         bakeable, error_message, nodes = is_bakeable(context)
         if not bakeable:
             col = layout.column()
@@ -723,11 +742,13 @@ class MAT_MT_PaintSystemBakeAndExport(Menu):
             # TODO: Add operator to find nodew
         else:
             col = layout.column()
-            col.label(text="Bake:")
-            col.operator("paint_system.bake_group",
-                         text="New Image Layer", icon="FILE")
+            col.label(text="Merge:")
+            col.operator("paint_system.merge_group",
+                         text="Merge All Layers (Optimize)", icon="FILE")
+            col.separator()
             col.label(text="Export:")
-
+            if not active_group.bake_image:
+                col.label(text="Bake first!", icon='ERROR')
 # -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
@@ -759,7 +780,7 @@ classes = (
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddImage,
     MAT_MT_BrushTooltips,
-    MAT_MT_PaintSystemBakeAndExport,
+    MAT_MT_PaintSystemMergeAndExport,
     # MAT_PT_PaintSystemTest,
 )
 
