@@ -548,7 +548,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.scale_x = 1.5
                 row.scale_y = 1.5
             row.prop(active_group, "use_bake_image",
-                     text="Use Baked Image", icon='IMAGE')
+                     text="Use Baked Image", icon='CHECKBOX_HLT' if active_group.use_bake_image else 'CHECKBOX_DEHLT')
             row.operator("paint_system.export_baked_image",
                          icon='EXPORT', text="")
             row.operator("paint_system.delete_bake_image",
@@ -744,7 +744,9 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
             col = layout.column()
             col.label(text="Merge:")
             col.operator("paint_system.merge_group",
-                         text="Merge All Layers (Optimize)", icon="FILE")
+                         text="Merge as New Layer", icon="FILE").as_new_layer = True
+            col.operator("paint_system.merge_group",
+                         text="Merge All Layers (Optimize)")
             col.separator()
             col.label(text="Export:")
             if not active_group.bake_image:
