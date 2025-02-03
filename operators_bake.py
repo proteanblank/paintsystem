@@ -306,13 +306,13 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
         name="UV Map",
         items=get_object_uv_maps
     )
-    use_bake_image: BoolProperty(
-        name="Use Bake Image",
-        default=True
-    )
     use_gpu: BoolProperty(
         name="Use GPU",
         default=True
+    )
+    as_new_layer: BoolProperty(
+        name="As New Layer",
+        default=False
     )
 
     def execute(self, context):
@@ -354,18 +354,28 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
                     baking_steps.append(
                         (link.from_node, link.from_socket.name, None, image, self.uv_map_name))
             if node.bl_idname == "ShaderNodeGroup" and node.node_tree == active_group.node_tree:
-                image = active_group.bake_image
-                if not image:
-                    # Create a new image with appropriate settings
-                    image_name = f"{active_group.name}_bake"
+                if self.as_new_layer:
                     image = bpy.data.images.new(
-                        name=image_name,
+                        name=f"{active_group.name}_Merge",
                         width=image_resolution,
                         height=image_resolution,
                         alpha=True,
                     )
-                    image.colorspace_settings.name = 'sRGB'
-                    active_group.bake_image = image
+                    ps.create_image_layer(
+                        image.name, image, self.uv_map_name)
+                else:
+                    image = active_group.bake_image
+                    if not image:
+                        # Create a new image with appropriate settings
+                        image_name = f"{active_group.name}_bake"
+                        image = bpy.data.images.new(
+                            name=image_name,
+                            width=image_resolution,
+                            height=image_resolution,
+                            alpha=True,
+                        )
+                        image.colorspace_settings.name = 'sRGB'
+                        active_group.bake_image = image
                 baking_steps.append(
                     (node, "Color", "Alpha", image, self.uv_map_name))
 
@@ -385,7 +395,7 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
                 self.report({'ERROR'}, f"Failed to bake {node.name}.")
                 return {'CANCELLED'}
 
-        if self.use_bake_image:
+        if not self.as_new_layer:
             active_group.use_bake_image = True
 
         return {'FINISHED'}
