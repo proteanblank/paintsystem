@@ -280,7 +280,7 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
         # Debug
         print(f"Backed {target_node.name} to {image.name}")
 
-        return bake_node
+        return bake_tex_node
 
     # except Exception as e:
     #     print(f"Baking failed: {str(e)}")
@@ -315,6 +315,11 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
         default=False
     )
 
+    @classmethod
+    def poll(cls, context):
+        bakeable, error_message, nodes = is_bakeable(context)
+        return bakeable
+
     def execute(self, context):
         context.window.cursor_set('WAIT')
         ps = PaintSystem(context)
@@ -328,7 +333,7 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
 
         active_group.use_bake_image = False
 
-        bakable, error, nodes = is_bakeable(context)
+        bakable, error, problem_nodes = is_bakeable(context)
         if not bakable:
             self.report({'ERROR'}, error)
             return {'CANCELLED'}
@@ -391,13 +396,61 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
                 alpha_socket_name=alpha_socket_name,
                 gpu=self.use_gpu
             )
+            # TODO: Handle nodes that require intermediate steps
+            nodes = mat.node_tree.nodes
+            nodes.remove(nodes.get(tex_node.name))
             if not tex_node:
                 self.report({'ERROR'}, f"Failed to bake {node.name}.")
                 return {'CANCELLED'}
 
         if not self.as_new_layer:
             active_group.use_bake_image = True
+            active_group.bake_uv_map = self.uv_map_name
 
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "use_gpu", text="Use GPU (Faster)")
+        layout.prop(self, "image_resolution", expand=True)
+        layout.prop(self, "uv_map_name")
+
+
+class PAINTSYSTEM_OT_MergeAndExportGroup(Operator):
+    bl_idname = "paint_system.merge_and_export_group"
+    bl_label = "Merge and Export Group"
+    bl_description = "Merge the selected group Layers and export the baked image"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    image_resolution: EnumProperty(
+        items=[
+            ('1024', "1024", "1024x1024"),
+            ('2048', "2048", "2048x2048"),
+            ('4096', "4096", "4096x4096"),
+            ('8192', "8192", "8192x8192"),
+        ],
+        default='1024',
+    )
+    uv_map_name: EnumProperty(
+        name="UV Map",
+        items=get_object_uv_maps
+    )
+    use_gpu: BoolProperty(
+        name="Use GPU",
+        default=True
+    )
+
+    def execute(self, context):
+        bpy.ops.paint_system.merge_group(
+            image_resolution=self.image_resolution,
+            uv_map_name=self.uv_map_name,
+            use_gpu=self.use_gpu,
+            as_new_layer=False
+        )
+        bpy.ops.paint_system.export_baked_image()
         return {'FINISHED'}
 
     def invoke(self, context, event):
@@ -441,6 +494,20 @@ class PAINTSYSTEM_OT_DeleteBakedImage(Operator):
             text="Click OK to delete the baked image.")
 
 
+def split_area(context: Context, direction='VERTICAL', factor=0.5):
+    current_area = context.area
+    screen = context.screen
+    areas_before = set(screen.areas)
+    bpy.ops.screen.area_split(direction=direction, factor=factor)
+    areas_after = set(screen.areas)
+    new_area_set = areas_after - areas_before
+    if not new_area_set:
+        print("Failed to create a new area.")
+        return
+    new_area = new_area_set.pop()
+    return new_area
+
+
 class PAINTSYSTEM_OT_ExportBakedImage(Operator):
     bl_idname = "paint_system.export_baked_image"
     bl_label = "Export Baked Image"
@@ -458,23 +525,58 @@ class PAINTSYSTEM_OT_ExportBakedImage(Operator):
             self.report({'ERROR'}, "No baked image found.")
             return {'CANCELLED'}
 
-        with bpy.context.temp_override(area=bpy.context.area):
-            bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
-            # Find the newly created area (it's usually the last one added)
-            image_editor_area = bpy.context.screen.areas[-1]
-            image_editor_area.type = 'IMAGE_EDITOR'  # Set the new area to be Image Editor
-            with bpy.context.temp_override(area=image_editor_area):
-                bpy.context.space_data.image = image
-                bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
-                bpy.ops.screen.area_close('INVOKE_DEFAULT')
+        image_editor_area = split_area(
+            context, direction='VERTICAL', factor=0.5)
+        image_editor_area.type = 'IMAGE_EDITOR'  # Set the new area to be Image Editor
+        with context.temp_override(area=image_editor_area):
+            context.space_data.image = image
+            bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
+            bpy.ops.screen.area_close('INVOKE_DEFAULT')
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_FocusNode(Operator):
+    bl_idname = "paint_system.focus_node"
+    bl_label = "Focus Node"
+    bl_description = "Focus on the selected node"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    node_name: StringProperty()
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        mat = ps.get_active_material()
+        nodes = mat.node_tree.nodes
+        select_node = nodes.get(self.node_name)
+        if not select_node:
+            return {'CANCELLED'}
+        # Check if Shader Editor is open
+        ne_area = None
+        for area in context.screen.areas:
+            if area.type == 'NODE_EDITOR' and area.ui_type == 'ShaderNodeTree':
+                ne_area = area
+                break
+        if not ne_area:
+            ne_area = split_area(context, direction='VERTICAL', factor=0.6)
+            ne_area.type = 'NODE_EDITOR'  # Set the new area to be Shader Editor
+            ne_area.ui_type = 'ShaderNodeTree'
+        with context.temp_override(area=ne_area, region=ne_area.regions[3]):
+            context.space_data.node_tree = mat.node_tree
+            for node in nodes:
+                node.select = False
+            select_node.select = True
+            nodes.active = select_node
+            bpy.ops.node.view_selected('INVOKE_DEFAULT')
 
         return {'FINISHED'}
 
 
 classes = (
     PAINTSYSTEM_OT_MergeGroup,
+    PAINTSYSTEM_OT_MergeAndExportGroup,
     PAINTSYSTEM_OT_DeleteBakedImage,
     PAINTSYSTEM_OT_ExportBakedImage,
+    PAINTSYSTEM_OT_FocusNode,
 )
 
 register, unregister = register_classes_factory(classes)
