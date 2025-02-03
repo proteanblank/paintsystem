@@ -136,11 +136,12 @@ class MAT_PT_PaintSystemGroups(Panel):
             row = layout.row(align=True)
             if not ps.preferences.use_compact_design:
                 row.scale_y = 1.5
-            # row.scale_x = 1.5
+                row.scale_x = 1.5
             row.prop(mat.paint_system, "active_group", text="")
             row.operator("paint_system.new_group",
                          text="", icon='ADD')
-            row.menu("MAT_MT_PaintSystemGroup", text="", icon='COLLAPSEMENU')
+            col = row.column(align=True)
+            col.menu("MAT_MT_PaintSystemGroup", text="", icon='COLLAPSEMENU')
         else:
             row = layout.row(align=True)
             if not ps.preferences.use_compact_design:
@@ -529,7 +530,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         row.scale_x = 1.5
 
         if not active_group.bake_image:
-            row.menu("MAT_MT_PaintSysteMergeAndExport",
+            row.menu("MAT_MT_PaintSystemMergeAndExport",
                      icon='EXPORT', text="Merge and Export")
 
         has_dirty_images = any(
@@ -548,14 +549,15 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.scale_x = 1.5
                 row.scale_y = 1.5
             row.prop(active_group, "use_bake_image",
-                     text="Use Baked Image", icon='CHECKBOX_HLT' if active_group.use_bake_image else 'CHECKBOX_DEHLT')
+                     text="Use Merged Image", icon='CHECKBOX_HLT' if active_group.use_bake_image else 'CHECKBOX_DEHLT')
             row.operator("paint_system.export_baked_image",
                          icon='EXPORT', text="")
-            row.operator("paint_system.delete_bake_image",
-                         text="", icon='TRASH')
+            col = row.column(align=True)
+            col.menu("MAT_MT_PaintSystemMergeOptimize",
+                     icon='COLLAPSEMENU', text="")
             if active_group.use_bake_image:
                 box.label(
-                    text="Baked Image Used. It's faster!", icon='INFO')
+                    text="Merged Image Used. It's faster!", icon='SOLO_ON')
                 return
 
         row = layout.row()
@@ -724,7 +726,7 @@ class MAT_MT_PaintSystemAddImage(Menu):
 
 class MAT_MT_PaintSystemMergeAndExport(Menu):
     bl_label = "Merge and Export"
-    bl_idname = "MAT_MT_PaintSysteMergeAndExport"
+    bl_idname = "MAT_MT_PaintSystemMergeAndExport"
 
     def draw(self, context):
         layout = self.layout
@@ -738,7 +740,9 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
 
             for node in nodes:
                 # row.operator("node.find_node")
-                col.label(text=node.name)
+                col.operator("paint_system.focus_node",
+                             text=node.name).node_name = node.name
+                # col.label(text=node.name)
             # TODO: Add operator to find nodew
         else:
             col = layout.column()
@@ -746,11 +750,28 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
             col.operator("paint_system.merge_group",
                          text="Merge as New Layer", icon="FILE").as_new_layer = True
             col.operator("paint_system.merge_group",
-                         text="Merge All Layers (Optimize)")
+                         text="Merge All Layers (Optimize)").as_new_layer = False
             col.separator()
             col.label(text="Export:")
-            if not active_group.bake_image:
-                col.label(text="Bake first!", icon='ERROR')
+            col.operator("paint_system.merge_and_export_group",
+                         text="Export Merged Image", icon='EXPORT')
+            # if not active_group.bake_image:
+            #     col.label(text="Bake first!", icon='ERROR')
+
+
+class MAT_MT_PaintSystemMergeOptimize(Menu):
+    bl_label = "Merge and Export"
+    bl_idname = "MAT_MT_PaintSystemMergeOptimize"
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column()
+        col.operator("paint_system.merge_group",
+                     text="Update Merge Layer", icon="FILE_REFRESH").as_new_layer = False
+        col.operator("paint_system.delete_bake_image",
+                     text="Delete Bake Image", icon='TRASH')
+        col.operator("paint_system.export_baked_image",
+                     text="Export Merged Image", icon='EXPORT')
 # -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
@@ -783,6 +804,7 @@ classes = (
     MAT_MT_PaintSystemAddImage,
     MAT_MT_BrushTooltips,
     MAT_MT_PaintSystemMergeAndExport,
+    MAT_MT_PaintSystemMergeOptimize,
     # MAT_PT_PaintSystemTest,
 )
 
