@@ -120,13 +120,16 @@ def get_paint_system_groups():
     return groups
 
 
-def get_paint_system_images(is_dirty=True):
+def get_paint_system_images(is_dirty_only=True):
     images = []
     groups = get_paint_system_groups()
     for group in groups:
+        bake_image = group.bake_image
+        if bake_image and (bake_image.is_dirty or not is_dirty_only):
+            images.append(image)
         for item in group.items:
             image = item.image
-            if image and (image.is_dirty or not is_dirty):
+            if image and (image.is_dirty or not is_dirty_only):
                 images.append(image)
     return images
 
