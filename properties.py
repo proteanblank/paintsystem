@@ -51,8 +51,7 @@ def update_active_image(self=None, context: Context = None):
             break
 
 
-def update_brush_settings(self=None, context: Context = None):
-    context = context or bpy.context
+def update_brush_settings(self=None, context: Context = bpy.context):
     if context.mode != 'PAINT_TEXTURE':
         return
     ps = PaintSystem(context)
@@ -161,14 +160,7 @@ class NodeEntry:
 
 class PaintSystemGroup(BaseNestedListManager):
 
-    name: StringProperty(
-        name="Name",
-        description="Group name",
-        default="Group",
-        update=update_paintsystem_image_name
-    )
-
-    def update_node_tree(self):
+    def update_node_tree(self, context=bpy.context):
         self.normalize_orders()
         flattened = self.flatten_hierarchy()
 
@@ -267,12 +259,26 @@ class PaintSystemGroup(BaseNestedListManager):
                     None)
 
         node_entry = ps_nodes_store[-1]
+        if self.bake_image and self.use_bake_image:
+            bake_image_node = nodes.new('ShaderNodeTexImage')
+            bake_image_node.image = self.bake_image
+            bake_image_node.location = ng_output.location + Vector((-300, 300))
+            links.new(ng_output.inputs['Color'],
+                      bake_image_node.outputs['Color'])
+            links.new(ng_output.inputs['Alpha'],
+                      bake_image_node.outputs['Alpha'])
         links.new(node_entry.color_input, ng_input.outputs['Color'])
         links.new(node_entry.alpha_input, ng_input.outputs['Alpha'])
         ng_input.location = node_entry.location + Vector((-200, 0))
 
     # Define the collection property directly in the class
     items: CollectionProperty(type=PaintSystemLayer)
+    name: StringProperty(
+        name="Name",
+        description="Group name",
+        default="Group",
+        update=update_paintsystem_image_name
+    )
     active_index: IntProperty(
         name="Active Index",
         description="Active layer index",
@@ -288,17 +294,8 @@ class PaintSystemGroup(BaseNestedListManager):
     )
     use_bake_image: BoolProperty(
         name="Use Bake Image",
-        default=False
-    )
-    bake_progress: FloatProperty(
-        name="Baking Progress",
-        default=0.0,
-        min=0.0,
-        max=1.0
-    )
-    bake_status: StringProperty(
-        name="Baking Status",
-        default=""
+        default=False,
+        update=update_node_tree
     )
 
     @property
