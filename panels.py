@@ -418,8 +418,8 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                     if display_item.image.preview:
                         row.label(
                             icon_value=display_item.image.preview.icon_id)
-                    elif not display_item.image.is_dirty:
-                        row.label(icon='IMAGE_DATA')
+                    # elif not display_item.image.is_dirty:
+                    #     row.label(icon='IMAGE_DATA')
                     else:
                         display_item.image.asset_generate_preview()
                         row.label(icon='BLANK1')
