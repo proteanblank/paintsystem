@@ -29,11 +29,12 @@ def update_active_image(self=None, context: Context = None):
     ps = PaintSystem(context)
     image_paint = context.tool_settings.image_paint
     mat = ps.get_active_material()
+    active_group = ps.get_active_group()
     active_layer = ps.get_active_layer()
     update_brush_settings(self, context)
     if not active_layer:
         return
-    if active_layer.type != 'IMAGE' or active_layer.lock_layer:
+    if active_layer.type != 'IMAGE' or active_layer.lock_layer or active_group.use_bake_image:
         if image_paint.mode == 'MATERIAL':
             image_paint.mode = 'IMAGE'
         image_paint.canvas = None
