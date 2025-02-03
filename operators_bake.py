@@ -165,7 +165,7 @@ def rollback_cycles_settings(saved_settings):
             # You might want to handle the error more specifically, e.g., show a message to the user.
 
 
-def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, output_socket_name: str, alpha_socket_name: str = None, width=1024, height=1024) -> Node:
+def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, output_socket_name: str, alpha_socket_name: str = None, gpu=True) -> Node:
     """
     Bakes a specific node from the active material with optimized settings
 
@@ -215,6 +215,7 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
 
         cycles_settings = save_cycles_settings()
         cycles = context.scene.cycles
+        cycles.device = 'GPU' if gpu else 'CPU'
         bake_node = None
         node_organizer = NodeOrganizer(material)
         socket_type = target_node.outputs[output_socket_name].type
@@ -361,7 +362,8 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
                 image=image,
                 uv_layer=uv_layer,
                 output_socket_name=output_socket_name,
-                alpha_socket_name=alpha_socket_name
+                alpha_socket_name=alpha_socket_name,
+                gpu=self.use_gpu
             )
             if not tex_node:
                 self.report({'ERROR'}, f"Failed to bake {node.name}.")
