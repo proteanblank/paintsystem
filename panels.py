@@ -746,11 +746,14 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
             # TODO: Add operator to find nodew
         else:
             col = layout.column()
+            col.label(text="This is Experimental!", icon='ERROR')
+            col.label(text="Be sure to save regularly!")
+            col.separator()
             col.label(text="Merge:")
             col.operator("paint_system.merge_group",
                          text="Merge as New Layer", icon="FILE").as_new_layer = True
             col.operator("paint_system.merge_group",
-                         text="Merge All Layers (Optimize)").as_new_layer = False
+                         text="Merge All Layers").as_new_layer = False
             col.separator()
             col.label(text="Export:")
             col.operator("paint_system.merge_and_export_group",
