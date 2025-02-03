@@ -263,10 +263,17 @@ class PaintSystemGroup(BaseNestedListManager):
             bake_image_node = nodes.new('ShaderNodeTexImage')
             bake_image_node.image = self.bake_image
             bake_image_node.location = ng_output.location + Vector((-300, 300))
+            bake_image_node.interpolation = 'Closest'
+            uvmap_node = nodes.new('ShaderNodeUVMap')
+            uvmap_node.uv_map = self.bake_uv_map
+            uvmap_node.location = bake_image_node.location + Vector((-200, 0))
+            links.new(uvmap_node.outputs['UV'],
+                      bake_image_node.inputs['Vector'])
             links.new(ng_output.inputs['Color'],
                       bake_image_node.outputs['Color'])
             links.new(ng_output.inputs['Alpha'],
                       bake_image_node.outputs['Alpha'])
+
         links.new(node_entry.color_input, ng_input.outputs['Color'])
         links.new(node_entry.alpha_input, ng_input.outputs['Alpha'])
         ng_input.location = node_entry.location + Vector((-200, 0))
@@ -291,6 +298,11 @@ class PaintSystemGroup(BaseNestedListManager):
     bake_image: PointerProperty(
         name="Bake Image",
         type=bpy.types.Image
+    )
+    bake_uv_map: StringProperty(
+        name="Bake Image UV Map",
+        default="UVMap",
+        update=update_node_tree
     )
     use_bake_image: BoolProperty(
         name="Use Bake Image",
