@@ -42,7 +42,7 @@ auto_load.init()
 @persistent
 def mode_change_handler(scene):
     # Get the active object and its mode
-    obj = getattr(bpy.context, "object")
+    obj = getattr(bpy.context, "object", None)
     if obj and hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT':
         update_active_image()
 
