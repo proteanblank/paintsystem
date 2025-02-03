@@ -128,9 +128,9 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         layout.prop(self, "group_name")
         row = layout.row(align=True)
         row.scale_y = 1.5
-        row.prop(self, "create_material_setup",
-                 text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
-        row.prop(self, "material_template", text="")
+        # row.prop(self, "create_material_setup",
+        #          text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
+        row.prop(self, "material_template", text="Template")
         # layout.label(text="Setup material for painting",
         #              icon='QUESTION')
         if context.scene.view_settings.view_transform != 'Standard':
