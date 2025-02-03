@@ -287,10 +287,10 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
     #     return None
 
 
-class PAINTSYSTEM_OT_BakeGroup(Operator):
-    bl_idname = "paint_system.bake_group"
-    bl_label = "Bake Group"
-    bl_description = "Bake the selected group"
+class PAINTSYSTEM_OT_MergeGroup(Operator):
+    bl_idname = "paint_system.merge_group"
+    bl_label = "Merge Group"
+    bl_description = "Merge the selected group Layers"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     image_resolution: EnumProperty(
@@ -306,13 +306,27 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
         name="UV Map",
         items=get_object_uv_maps
     )
+    use_bake_image: BoolProperty(
+        name="Use Bake Image",
+        default=True
+    )
+    use_gpu: BoolProperty(
+        name="Use GPU",
+        default=True
+    )
 
     def execute(self, context):
+        context.window.cursor_set('WAIT')
         ps = PaintSystem(context)
+        obj = ps.active_object
+        if obj.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
         mat = ps.get_active_material()
         active_group = ps.get_active_group()
         if not mat:
             return {'CANCELLED'}
+
+        active_group.use_bake_image = False
 
         bakable, error, nodes = is_bakeable(context)
         if not bakable:
@@ -340,20 +354,22 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
                     baking_steps.append(
                         (link.from_node, link.from_socket.name, None, image, self.uv_map_name))
             if node.bl_idname == "ShaderNodeGroup" and node.node_tree == active_group.node_tree:
-                # Create a new image with appropriate settings
-                image_name = f"{active_group.name}_bake"
-                image = bpy.data.images.new(
-                    name=image_name,
-                    width=image_resolution,
-                    height=image_resolution,
-                    alpha=True,
-                )
-                image.colorspace_settings.name = 'sRGB'
+                image = active_group.bake_image
+                if not image:
+                    # Create a new image with appropriate settings
+                    image_name = f"{active_group.name}_bake"
+                    image = bpy.data.images.new(
+                        name=image_name,
+                        width=image_resolution,
+                        height=image_resolution,
+                        alpha=True,
+                    )
+                    image.colorspace_settings.name = 'sRGB'
+                    active_group.bake_image = image
                 baking_steps.append(
                     (node, "Color", "Alpha", image, self.uv_map_name))
 
         baking_steps.reverse()
-        print(baking_steps)
 
         for idx, (node, output_socket_name, alpha_socket_name, image, uv_layer) in enumerate(baking_steps):
             tex_node = bake_node(
@@ -369,6 +385,9 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
                 self.report({'ERROR'}, f"Failed to bake {node.name}.")
                 return {'CANCELLED'}
 
+        if self.use_bake_image:
+            active_group.use_bake_image = True
+
         return {'FINISHED'}
 
     def invoke(self, context, event):
@@ -376,12 +395,76 @@ class PAINTSYSTEM_OT_BakeGroup(Operator):
 
     def draw(self, context):
         layout = self.layout
+        layout.prop(self, "use_gpu", text="Use GPU (Faster)")
         layout.prop(self, "image_resolution", expand=True)
         layout.prop(self, "uv_map_name")
 
 
+class PAINTSYSTEM_OT_DeleteBakedImage(Operator):
+    bl_idname = "paint_system.delete_bake_image"
+    bl_label = "Delete Baked Image"
+    bl_description = "Delete the baked image"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        if not active_group:
+            return {'CANCELLED'}
+
+        image = active_group.bake_image
+        if not image:
+            self.report({'ERROR'}, "No baked image found.")
+            return {'CANCELLED'}
+
+        bpy.data.images.remove(image)
+        active_group.bake_image = None
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(
+            text="Click OK to delete the baked image.")
+
+
+class PAINTSYSTEM_OT_ExportBakedImage(Operator):
+    bl_idname = "paint_system.export_baked_image"
+    bl_label = "Export Baked Image"
+    bl_description = "Export the baked image"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        if not active_group:
+            return {'CANCELLED'}
+
+        image = active_group.bake_image
+        if not image:
+            self.report({'ERROR'}, "No baked image found.")
+            return {'CANCELLED'}
+
+        with bpy.context.temp_override(area=bpy.context.area):
+            bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
+            # Find the newly created area (it's usually the last one added)
+            image_editor_area = bpy.context.screen.areas[-1]
+            image_editor_area.type = 'IMAGE_EDITOR'  # Set the new area to be Image Editor
+            with bpy.context.temp_override(area=image_editor_area):
+                bpy.context.space_data.image = image
+                bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
+                bpy.ops.screen.area_close('INVOKE_DEFAULT')
+
+        return {'FINISHED'}
+
+
 classes = (
-    PAINTSYSTEM_OT_BakeGroup,
+    PAINTSYSTEM_OT_MergeGroup,
+    PAINTSYSTEM_OT_DeleteBakedImage,
+    PAINTSYSTEM_OT_ExportBakedImage,
 )
 
 register, unregister = register_classes_factory(classes)
