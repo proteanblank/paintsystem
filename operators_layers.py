@@ -583,6 +583,7 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
             return {'CANCELLED'}
         image = bpy.data.images.get(self.image_name)
         if not image:
+            self.report({'ERROR'}, "Image not found")
             return {'CANCELLED'}
         if not get_object_uv_maps(self, context):
             bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
