@@ -9,6 +9,16 @@ on:
                 description: 'version'
                 required: false # Make this optional
                 default: ''
+            release_stage:
+                type: choice
+                description: 'release stage'
+                required: True
+                default: 'gold'
+                options:
+                    - alpha
+                    - beta
+                    - rc
+                    - gold
 
 permissions:
     contents: write
@@ -82,3 +92,4 @@ jobs:
                   artifact_name: paint-system
                   release_name: Paint System
                   version: ${{ needs.Build.outputs.version }}
+                  release_stage: ${{ github.event.inputs.release_stage }}
