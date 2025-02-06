@@ -10,7 +10,7 @@ import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
-from .common import redraw_panel, intern_enum_items
+from .common import redraw_panel, get_object_uv_maps
 import re
 
 # bpy.types.Image.pack
@@ -75,7 +75,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     material_template: EnumProperty(
         name="Template",
         items=[
-            ('NONE', "Use Existing Material", "Just add node group to material"),
+            ('NONE', "Manual Adjustment", "Just add node group to material"),
             ('STANDARD', "Standard", "Start off with a standard setup"),
             ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
             ('NORMAL', "Normal", "Start off with a normal painting setup"),
@@ -128,9 +128,9 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         layout.prop(self, "group_name")
         row = layout.row(align=True)
         row.scale_y = 1.5
-        row.prop(self, "create_material_setup",
-                 text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
-        row.prop(self, "material_template", text="")
+        # row.prop(self, "create_material_setup",
+        #          text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
+        row.prop(self, "material_template", text="Template")
         # layout.label(text="Setup material for painting",
         #              icon='QUESTION')
         if context.scene.view_settings.view_transform != 'Standard':
@@ -426,13 +426,6 @@ def get_highest_number_with_prefix(prefix, string_list):
     return highest_number
 
 
-def get_object_uv_maps(self, context: Context):
-    items = [
-        (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
-    ]
-    return intern_enum_items(items)
-
-
 class PAINTSYSTEM_OT_CreateNewUVMap(Operator):
     bl_idname = "paint_system.create_new_uv_map"
     bl_label = "Create New UV Map"
@@ -590,6 +583,7 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
             return {'CANCELLED'}
         image = bpy.data.images.get(self.image_name)
         if not image:
+            self.report({'ERROR'}, "Image not found")
             return {'CANCELLED'}
         if not get_object_uv_maps(self, context):
             bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')

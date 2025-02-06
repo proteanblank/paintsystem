@@ -1,6 +1,7 @@
 import bpy
 
 from bpy.props import (IntProperty,
+                       FloatProperty,
                        FloatVectorProperty,
                        BoolProperty,
                        StringProperty,
@@ -11,7 +12,7 @@ from bpy.types import (PropertyGroup, Context,
                        NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
-from .paint_system import PaintSystem, get_node_from_library
+from .paint_system import PaintSystem, get_nodetree_from_library
 from dataclasses import dataclass
 from typing import Dict
 
@@ -28,11 +29,12 @@ def update_active_image(self=None, context: Context = None):
     ps = PaintSystem(context)
     image_paint = context.tool_settings.image_paint
     mat = ps.get_active_material()
+    active_group = ps.get_active_group()
     active_layer = ps.get_active_layer()
     update_brush_settings(self, context)
     if not active_layer:
         return
-    if active_layer.type != 'IMAGE' or active_layer.lock_layer:
+    if active_layer.type != 'IMAGE' or active_layer.lock_layer or active_group.use_bake_image:
         if image_paint.mode == 'MATERIAL':
             image_paint.mode = 'IMAGE'
         image_paint.canvas = None
@@ -50,13 +52,14 @@ def update_active_image(self=None, context: Context = None):
             break
 
 
-def update_brush_settings(self=None, context: Context = None):
-    context = context or bpy.context
+def update_brush_settings(self=None, context: Context = bpy.context):
     if context.mode != 'PAINT_TEXTURE':
         return
     ps = PaintSystem(context)
     active_layer = ps.get_active_layer()
     brush = context.tool_settings.image_paint.brush
+    if not brush:
+        return
     brush.use_alpha = not active_layer.lock_alpha
 
 
@@ -158,14 +161,7 @@ class NodeEntry:
 
 class PaintSystemGroup(BaseNestedListManager):
 
-    name: StringProperty(
-        name="Name",
-        description="Group name",
-        default="Group",
-        update=update_paintsystem_image_name
-    )
-
-    def update_node_tree(self):
+    def update_node_tree(self, context=bpy.context):
         self.normalize_orders()
         flattened = self.flatten_hierarchy()
 
@@ -211,7 +207,7 @@ class PaintSystemGroup(BaseNestedListManager):
             is_clip = item.clip
             node_entry = ps_nodes_store[item.parent_id]
             if is_clip and not node_entry.is_clip:
-                alpha_over_nt = get_node_from_library(
+                alpha_over_nt = get_nodetree_from_library(
                     '_PS_Alpha_Over')
                 group_node = nodes.new('ShaderNodeGroup')
                 group_node.node_tree = alpha_over_nt
@@ -264,12 +260,33 @@ class PaintSystemGroup(BaseNestedListManager):
                     None)
 
         node_entry = ps_nodes_store[-1]
+        if self.bake_image and self.use_bake_image:
+            bake_image_node = nodes.new('ShaderNodeTexImage')
+            bake_image_node.image = self.bake_image
+            bake_image_node.location = ng_output.location + Vector((-300, 300))
+            bake_image_node.interpolation = 'Closest'
+            uvmap_node = nodes.new('ShaderNodeUVMap')
+            uvmap_node.uv_map = self.bake_uv_map
+            uvmap_node.location = bake_image_node.location + Vector((-200, 0))
+            links.new(uvmap_node.outputs['UV'],
+                      bake_image_node.inputs['Vector'])
+            links.new(ng_output.inputs['Color'],
+                      bake_image_node.outputs['Color'])
+            links.new(ng_output.inputs['Alpha'],
+                      bake_image_node.outputs['Alpha'])
+
         links.new(node_entry.color_input, ng_input.outputs['Color'])
         links.new(node_entry.alpha_input, ng_input.outputs['Alpha'])
         ng_input.location = node_entry.location + Vector((-200, 0))
 
     # Define the collection property directly in the class
     items: CollectionProperty(type=PaintSystemLayer)
+    name: StringProperty(
+        name="Name",
+        description="Group name",
+        default="Group",
+        update=update_paintsystem_image_name
+    )
     active_index: IntProperty(
         name="Active Index",
         description="Active layer index",
@@ -278,6 +295,20 @@ class PaintSystemGroup(BaseNestedListManager):
     node_tree: PointerProperty(
         name="Node Tree",
         type=bpy.types.NodeTree
+    )
+    bake_image: PointerProperty(
+        name="Bake Image",
+        type=bpy.types.Image
+    )
+    bake_uv_map: StringProperty(
+        name="Bake Image UV Map",
+        default="UVMap",
+        update=update_node_tree
+    )
+    use_bake_image: BoolProperty(
+        name="Use Bake Image",
+        default=False,
+        update=update_node_tree
     )
 
     @property

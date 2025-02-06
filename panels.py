@@ -15,6 +15,7 @@ from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM
 from . import addon_updater_ops
 from .common import is_online, is_newer_than, icon_parser
+from .operators_bake import is_bakeable
 # from .. import __package__ as base_package
 
 # -------------------------------------------------------------------
@@ -135,11 +136,12 @@ class MAT_PT_PaintSystemGroups(Panel):
             row = layout.row(align=True)
             if not ps.preferences.use_compact_design:
                 row.scale_y = 1.5
-            # row.scale_x = 1.5
+                row.scale_x = 1.5
             row.prop(mat.paint_system, "active_group", text="")
             row.operator("paint_system.new_group",
                          text="", icon='ADD')
-            row.menu("MAT_MT_PaintSystemGroup", text="", icon='COLLAPSEMENU')
+            col = row.column(align=True)
+            col.menu("MAT_MT_PaintSystemGroup", text="", icon='COLLAPSEMENU')
         else:
             row = layout.row(align=True)
             if not ps.preferences.use_compact_design:
@@ -296,6 +298,7 @@ class MAT_MT_BrushTooltips(Menu):
         row = col.row(align=True)
         row.label(icon='EVENT_SHIFT', text="")
         row.label(text="Eyedrop Layer Color", icon='EVENT_X')
+        col.label(text="Scale Brush Size", icon='EVENT_F')
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more shortcuts on Github!",
                         icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
@@ -416,8 +419,8 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                     if display_item.image.preview:
                         row.label(
                             icon_value=display_item.image.preview.icon_id)
-                    elif not display_item.image.is_dirty:
-                        row.label(icon='IMAGE_DATA')
+                    # elif not display_item.image.is_dirty:
+                    #     row.label(icon='IMAGE_DATA')
                     else:
                         display_item.image.asset_generate_preview()
                         row.label(icon='BLANK1')
@@ -505,7 +508,8 @@ class MAT_PT_PaintSystemLayers(Panel):
         # Toggle paint mode (switch between object and texture paint mode)
         current_mode = context.mode
         box = layout.box()
-        row = box.row(align=True)
+        col = box.column(align=True)
+        row = col.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
         row.menu("MAT_MT_PaintSystemGroup", text="", icon='BRUSHES_ALL')
@@ -517,16 +521,44 @@ class MAT_PT_PaintSystemLayers(Panel):
             row.operator("paint_system.create_template_setup",
                          text="Setup Material", icon="ERROR")
             row.alert = False
+        row.operator("wm.save_mainfile",
+                     text="", icon="FILE_TICK")
+
+        # Baking and Exporting
+        row = col.row(align=True)
+        row.scale_y = 1.5
+        row.scale_x = 1.5
+
+        if not active_group.bake_image:
+            row.menu("MAT_MT_PaintSystemMergeAndExport",
+                     icon='EXPORT', text="Merge and Export")
+
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
-        row.operator("wm.save_mainfile",
-                     text="", icon="FILE_TICK", emboss=has_dirty_images)
         if has_dirty_images:
             box.label(text="Don't forget to save!", icon="FUND")
 
         if not any([item.image for (item, _) in flattened]):
             box.label(text="Add an image layer first!",
                       icon="ERROR")
+
+        if active_group.bake_image:
+            box = layout.box()
+            row = box.row(align=True)
+            if not ps.preferences.use_compact_design:
+                row.scale_x = 1.5
+                row.scale_y = 1.5
+            row.prop(active_group, "use_bake_image",
+                     text="Use Merged Image", icon='CHECKBOX_HLT' if active_group.use_bake_image else 'CHECKBOX_DEHLT')
+            row.operator("paint_system.export_baked_image",
+                         icon='EXPORT', text="")
+            col = row.column(align=True)
+            col.menu("MAT_MT_PaintSystemMergeOptimize",
+                     icon='COLLAPSEMENU', text="")
+            if active_group.use_bake_image:
+                box.label(
+                    text="Merged Image Used. It's faster!", icon='SOLO_ON')
+                return
 
         row = layout.row()
         if not ps.preferences.use_compact_design:
@@ -537,7 +569,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         )
 
         col = row.column(align=True)
-        col.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE', text="")
+        col.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE_DATA', text="")
         col.operator("paint_system.new_folder", icon='NEWFOLDER', text="")
         col.separator()
         col.operator("paint_system.delete_item", icon="TRASH", text="")
@@ -632,7 +664,7 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
     def poll(cls, context):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
-        return active_group and ps.get_active_layer() and ps.get_active_layer().type == 'IMAGE'
+        return active_group and ps.get_active_layer() and ps.get_active_layer().type == 'IMAGE' and not active_group.use_bake_image
 
     def draw(self, context):
         layout = self.layout
@@ -692,9 +724,58 @@ class MAT_MT_PaintSystemAddImage(Menu):
         #              icon="FILE_FOLDER")
 
 
+class MAT_MT_PaintSystemMergeAndExport(Menu):
+    bl_label = "Merge and Export"
+    bl_idname = "MAT_MT_PaintSystemMergeAndExport"
+
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        bakeable, error_message, nodes = is_bakeable(context)
+        if not bakeable:
+            col = layout.column()
+            col.alert = True
+            col.label(text=error_message, icon='ERROR')
+
+            for node in nodes:
+                col.operator("paint_system.focus_node",
+                             text=node.name).node_name = node.name
+        else:
+            col = layout.column()
+            col.label(text="This is Experimental!", icon='ERROR')
+            col.label(text="Be sure to save regularly!")
+            col.separator()
+            col.label(text="Merge:")
+            col.operator("paint_system.merge_group",
+                         text="Merge as New Layer", icon="FILE").as_new_layer = True
+            col.operator("paint_system.merge_group",
+                         text="Merge All Layers (Bake)").as_new_layer = False
+            col.separator()
+            col.label(text="Export:")
+            col.operator("paint_system.merge_and_export_group",
+                         text="Export Merged Image", icon='EXPORT')
+            # if not active_group.bake_image:
+            #     col.label(text="Bake first!", icon='ERROR')
+
+
+class MAT_MT_PaintSystemMergeOptimize(Menu):
+    bl_label = "Merge and Export"
+    bl_idname = "MAT_MT_PaintSystemMergeOptimize"
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column()
+        col.operator("paint_system.merge_group",
+                     text="Update Merge Layer", icon="FILE_REFRESH").as_new_layer = False
+        col.operator("paint_system.delete_bake_image",
+                     text="Delete Bake Image", icon='TRASH')
+        col.operator("paint_system.export_baked_image",
+                     text="Export Merged Image", icon='EXPORT')
 # -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
+
 
 class MAT_PT_PaintSystemTest(Panel):
     bl_idname = 'MAT_PT_PaintSystemTest'
@@ -722,6 +803,8 @@ classes = (
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddImage,
     MAT_MT_BrushTooltips,
+    MAT_MT_PaintSystemMergeAndExport,
+    MAT_MT_PaintSystemMergeOptimize,
     # MAT_PT_PaintSystemTest,
 )
 

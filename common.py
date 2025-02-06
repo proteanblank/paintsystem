@@ -30,7 +30,12 @@ def redraw_panel(self, context: Context):
         context.area.tag_redraw()
 
 
+def map_range(num, inMin, inMax, outMin, outMax):
+    return outMin + (float(num - inMin) / float(inMax - inMin) * (outMax - outMin))
+
 # Fixes UnicodeDecodeError bug
+
+
 def intern_enum_items(items):
     def intern_string(s):
         if not isinstance(s, str):
@@ -87,3 +92,10 @@ class NodeOrganizer:
             created_nodes, key=lambda node: node.location.x).location
         offset = self.rightmost - created_nodes_leftmost + Vector((200, 0))
         self.move_nodes_offset(offset)
+
+
+def get_object_uv_maps(self, context: Context):
+    items = [
+        (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
+    ]
+    return intern_enum_items(items)

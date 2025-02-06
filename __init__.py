@@ -24,7 +24,7 @@ bl_info = {
     "author": "Tawan Sunflower, @blastframe",
     "description": "",
     "blender": (4, 1, 0),
-    "version": (1, 1, 9),
+    "version": (1, 2, 0),
     "location": "View3D > Sidebar > Paint System",
     "warning": "",
     "category": "Node",
@@ -42,7 +42,7 @@ auto_load.init()
 @persistent
 def mode_change_handler(scene):
     # Get the active object and its mode
-    obj = getattr(bpy.context, "object")
+    obj = getattr(bpy.context, "object", None)
     if obj and hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT':
         update_active_image()
 
@@ -71,6 +71,7 @@ submodules = [
     "properties",
     "operators_layers",
     "operators_utils",
+    "operators_bake",
     "panels",
     # "node_organizer",
     # "operation/test",
