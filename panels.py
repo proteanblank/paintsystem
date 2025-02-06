@@ -739,11 +739,8 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
             col.label(text=error_message, icon='ERROR')
 
             for node in nodes:
-                # row.operator("node.find_node")
                 col.operator("paint_system.focus_node",
                              text=node.name).node_name = node.name
-                # col.label(text=node.name)
-            # TODO: Add operator to find nodew
         else:
             col = layout.column()
             col.label(text="This is Experimental!", icon='ERROR')
@@ -753,7 +750,7 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
             col.operator("paint_system.merge_group",
                          text="Merge as New Layer", icon="FILE").as_new_layer = True
             col.operator("paint_system.merge_group",
-                         text="Merge All Layers").as_new_layer = False
+                         text="Merge All Layers (Bake)").as_new_layer = False
             col.separator()
             col.label(text="Export:")
             col.operator("paint_system.merge_and_export_group",
