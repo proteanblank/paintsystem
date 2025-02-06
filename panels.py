@@ -312,7 +312,8 @@ class MAT_PT_BrushColor(Panel):
     bl_region_type = "UI"
     bl_label = "Color"
     bl_category = 'Paint System'
-    bl_options = {'DEFAULT_CLOSED'}
+    if not is_newer_than(4, 3):
+        bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
