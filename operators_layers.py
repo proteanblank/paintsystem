@@ -75,12 +75,18 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     material_template: EnumProperty(
         name="Template",
         items=[
-            ('NONE', "Manual Adjustment", "Just add node group to material"),
+            ('NONE', "Manual", "Just add node group to material"),
             ('STANDARD', "Standard", "Start off with a standard setup"),
             ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
             ('NORMAL', "Normal", "Start off with a normal painting setup"),
         ],
         default='STANDARD'
+    )
+
+    use_alpha_blend: BoolProperty(
+        name="Use Alpha Blend",
+        description="Use alpha blend instead of alpha clip",
+        default=True
     )
 
     set_view_transform: BoolProperty(
@@ -106,7 +112,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
 
         if self.create_material_setup:
             bpy.ops.paint_system.create_template_setup(
-                'INVOKE_DEFAULT', template=self.material_template, disable_popup=True)
+                'INVOKE_DEFAULT', template=self.material_template, disable_popup=True, use_alpha_blend=self.use_alpha_blend)
 
         if self.set_view_transform:
             context.scene.view_settings.view_transform = 'Standard'
@@ -131,8 +137,8 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         # row.prop(self, "create_material_setup",
         #          text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
         row.prop(self, "material_template", text="Template")
-        # layout.label(text="Setup material for painting",
-        #              icon='QUESTION')
+        if self.material_template in ['STANDARD', 'TRANSPARENT']:
+            layout.prop(self, "use_alpha_blend", text="Use Alpha Blend")
         if context.scene.view_settings.view_transform != 'Standard':
             layout.prop(self, "set_view_transform",
                         text="Set View Transform to Standard")
