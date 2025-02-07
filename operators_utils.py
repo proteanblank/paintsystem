@@ -215,6 +215,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
             mat.blend_method = 'BLEND'
         if self.disable_show_backface:
             mat.show_transparent_back = False
+            mat.use_backface_culling = True
 
         if self.template in ['STANDARD', 'TRANSPARENT']:
             node_group = node_organizer.create_node(
