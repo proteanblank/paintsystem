@@ -12,7 +12,7 @@ from bpy.types import (PropertyGroup, Context,
                        NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
-from .paint_system import PaintSystem, get_nodetree_from_library
+from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, update_paintsystem_data
 from dataclasses import dataclass
 from typing import Dict
 
@@ -63,13 +63,9 @@ def update_brush_settings(self=None, context: Context = bpy.context):
     brush.use_alpha = not active_layer.lock_alpha
 
 
-def update_paintsystem_image_name(self, context):
+def update_paintsystem_data(self, context):
     ps = PaintSystem(context)
-    active_group = ps.get_active_group()
-    mat = ps.get_active_material()
-    for layer in active_group.items:
-        if layer.image:
-            layer.image.name = f"PS {mat.name} {active_group.name} {layer.name}"
+    ps._update_paintsystem_data()
 
 
 class PaintSystemLayer(BaseNestedListItem):
@@ -81,7 +77,7 @@ class PaintSystemLayer(BaseNestedListItem):
         name="Name",
         description="Layer name",
         default="Layer",
-        update=update_paintsystem_image_name
+        update=update_paintsystem_data
     )
 
     enabled: BoolProperty(
@@ -95,12 +91,7 @@ class PaintSystemLayer(BaseNestedListItem):
         type=bpy.types.Image
     )
     type: EnumProperty(
-        items=[
-            ('FOLDER', "Folder", "Folder layer"),
-            ('IMAGE', "Image", "Image layer"),
-            ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
-            ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
-        ],
+        items=LAYER_ENUM,
         default='IMAGE'
     )
     clip: BoolProperty(
@@ -285,7 +276,7 @@ class PaintSystemGroup(BaseNestedListManager):
         name="Name",
         description="Group name",
         default="Group",
-        update=update_paintsystem_image_name
+        update=update_paintsystem_data
     )
     active_index: IntProperty(
         name="Active Index",

@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import Context, Material, Image, NodeTree, Node, PropertyGroup
-from typing import Optional, Tuple
+from typing import Optional, Tuple, LiteralString
 from dataclasses import dataclass
 from mathutils import Vector
 import os
@@ -15,6 +15,12 @@ ADJUSTMENT_ENUM = [
     ('ShaderNodeHueSaturation', "Hue Saturation Value", ""),
     ('ShaderNodeInvert', "Invert", ""),
     ('ShaderNodeRGBCurve', "RGB Curves", ""),
+]
+LAYER_ENUM = [
+    ('FOLDER', "Folder", "Folder layer"),
+    ('IMAGE', "Image", "Image layer"),
+    ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
+    ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
 ]
 
 
@@ -132,6 +138,17 @@ def get_paint_system_images(is_dirty_only=True):
             if image and (image.is_dirty or not is_dirty_only):
                 images.append(image)
     return images
+
+
+def update_paintsystem_data(self, context):
+    ps = PaintSystem(context)
+    active_group = ps.get_active_group()
+    mat = ps.get_active_material()
+    for layer in active_group.items:
+        if layer.node_tree:
+            layer.node_tree.name = f"PS_{layer.type} {layer.name} (MAT: {mat.name})"
+        if layer.image:
+            layer.image.name = f"PS {mat.name} {active_group.name} {layer.name}"
 
 
 @dataclass
@@ -252,6 +269,29 @@ class PaintSystem:
         # Adjust existing items' order
         active_group.adjust_sibling_orders(parent_id, insert_order)
 
+        mat = self.get_active_material()
+        layer_template = get_nodetree_from_library(
+            '_PS_Layer_Template', False)
+        layer_nt = layer_template.copy()
+        layer_nt.name = f"PS {name} (MAT: {mat.name})"
+        # Find the image texture node
+        image_texture_node = None
+        for node in layer_nt.nodes:
+            if node.type == 'TEX_IMAGE':
+                image_texture_node = node
+                break
+        uv_map_node = None
+        # Find UV Map node
+        for node in layer_nt.nodes:
+            if node.type == 'UVMAP':
+                uv_map_node = node
+                break
+        # use uv_map_name or default to first uv map
+        if uv_map_name:
+            uv_map_node.uv_map = uv_map_name
+        else:
+            uv_map_node.uv_map = bpy.context.object.data.uv_layers[0].name
+        image_texture_node.image = image
         node_tree = self._create_layer_node_tree(name, image, uv_map_name)
 
         # Create the new item
@@ -495,66 +535,96 @@ class PaintSystem:
 
     def find_color_mix_node(self) -> Optional[Node]:
         layer_node_tree = self.get_layer_node_tree()
-        if not layer_node_tree:
-            return None
-        for node in layer_node_tree.nodes:
-            if node.type == 'MIX' and node.data_type == 'RGBA':
-                return node
-        return None
+        node_details = {'type': 'MIX', 'data_type': 'RGBA'}
+        return self._get_node(layer_node_tree, node_details)
 
     def find_uv_map_node(self) -> Optional[Node]:
         layer_node_tree = self.get_layer_node_tree()
-        if not layer_node_tree:
-            return None
-        for node in layer_node_tree.nodes:
-            if node.type == 'UVMAP':
-                return node
-        return None
+        node_details = {'type': 'UVMAP'}
+        return self._get_node(layer_node_tree, node_details)
 
     def find_opacity_mix_node(self) -> Optional[Node]:
         layer_node_tree = self.get_layer_node_tree()
-        if not layer_node_tree:
-            return None
-        for node in layer_node_tree.nodes:
-            if node.type == 'MIX' and node.name == 'Opacity':
-                # print("Found opacity mix node")
-                return node
-        return None
+        node_details = {'type': 'MIX', 'name': 'Opacity'}
+        return self._get_node(layer_node_tree, node_details) or self.find_color_mix_node()
 
     def find_clip_mix_node(self) -> Optional[Node]:
         layer_node_tree = self.get_layer_node_tree()
-        if not layer_node_tree:
-            return None
-        for node in layer_node_tree.nodes:
-            if node.type == 'MIX' and node.name == 'Clip':
-                # print("Found clip mix node")
-                return node
-        return None
+        node_details = {'type': 'MIX', 'name': 'Clip'}
+        return self._get_node(layer_node_tree, node_details)
 
     def find_image_texture_node(self) -> Optional[Node]:
         layer_node_tree = self.get_layer_node_tree()
-        if not layer_node_tree:
-            return None
-        for node in layer_node_tree.nodes:
-            if node.type == 'TEX_IMAGE':
-                return node
-        return None
+        node_details = {'type': 'TEX_IMAGE'}
+        return self._get_node(layer_node_tree, node_details)
 
     def find_rgb_node(self) -> Optional[Node]:
         layer_node_tree = self.get_layer_node_tree()
-        if not layer_node_tree:
-            return None
-        for node in layer_node_tree.nodes:
-            if node.name == 'RGB':
-                return node
-        return None
+        node_details = {'name': 'RGB'}
+        return self._get_node(layer_node_tree, node_details)
 
     def find_adjustment_node(self) -> Optional[Node]:
         layer_node_tree = self.get_layer_node_tree()
-        if not layer_node_tree:
+        node_details = {'label': 'Adjustment'}
+        return self._get_node(layer_node_tree, node_details)
+
+    def _update_paintsystem_data(self):
+        active_group = self.get_active_group()
+        mat = self.get_active_material()
+        for layer in active_group.items:
+            if layer.node_tree:
+                layer.node_tree.name = f"PS_{layer.type} {layer.name} (MAT: {mat.name})"
+            if layer.image:
+                layer.image.name = f"PS {mat.name} {active_group.name} {layer.name}"
+
+    def _add_layer(self, layer_name, tree_name: str, item_type: str, force_reload=False, make_copy=False) -> NodeTree:
+        active_group = self.get_active_group()
+        # Get insertion position
+        parent_id, insert_order = active_group.get_insertion_data()
+        # Adjust existing items' order
+        active_group.adjust_sibling_orders(parent_id, insert_order)
+        nt = get_nodetree_from_library(
+            tree_name, force_reload)
+        if make_copy:
+            nt = nt.copy()
+        # Create the new item
+        new_id = active_group.add_item(
+            name=layer_name,
+            item_type=item_type,
+            parent_id=parent_id,
+            order=insert_order,
+            node_tree=nt
+        )
+
+        # Update active index
+        if new_id != -1:
+            flattened = active_group.flatten_hierarchy()
+            for i, (item, _) in enumerate(flattened):
+                if item.id == new_id:
+                    active_group.active_index = i
+                    break
+        self._update_paintsystem_data()
+        return nt
+
+    def _value_set(self, obj, path, value):
+        if '.' in path:
+            path_prop, path_attr = path.rsplit('.', 1)
+            prop = obj.path_resolve(path_prop)
+        else:
+            prop = obj
+            path_attr = path
+        setattr(prop, path_attr, value)
+
+    def _get_node(self, node_tree, node_details):
+        if not node_tree:
             return None
-        for node in layer_node_tree.nodes:
-            if node.label == 'Adjustment':
+        for node in node_tree.nodes:
+            match = True
+            for key, value in node_details.items():
+                if getattr(node, key) != value:
+                    match = False
+                    break
+            if match:
                 return node
         return None
 

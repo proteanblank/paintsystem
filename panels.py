@@ -121,11 +121,17 @@ class MAT_PT_PaintSystemGroups(Panel):
         mat = ps.get_active_material()
 
         layout.label(text="Selected Material:")
-        layout.template_ID(ob, "active_material", new="material.new")
+
+        col = layout.column(align=True)
+        if not ps.preferences.use_compact_design:
+            col.scale_y = 1.2
+        col.template_ID(ob, "active_material", new="material.new")
 
         if not mat:
             layout.label(text="No active material")
             return
+
+        col.prop(mat, "surface_render_method", text="")
 
         row = layout.row()
 
@@ -513,7 +519,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = col.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
-        row.menu("MAT_MT_PaintSystemGroup", text="", icon='BRUSHES_ALL')
+        # row.menu("MAT_MT_PaintSystemGroup", text="", icon='BRUSHES_ALL')
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
                          text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE')
