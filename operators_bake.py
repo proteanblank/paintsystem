@@ -206,81 +206,79 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
                 original_links.append(link)
 
     # try:
-        # Store original settings
-        original_engine = copy.deepcopy(
-            getattr(context.scene.render, "engine"))
-        # Switch to Cycles if needed
-        if context.scene.render.engine != 'CYCLES':
-            context.scene.render.engine = 'CYCLES'
+    # Store original settings
+    original_engine = copy.deepcopy(
+        getattr(context.scene.render, "engine"))
+    # Switch to Cycles if needed
+    if context.scene.render.engine != 'CYCLES':
+        context.scene.render.engine = 'CYCLES'
 
-        cycles_settings = save_cycles_settings()
-        cycles = context.scene.cycles
-        cycles.device = 'GPU' if gpu else 'CPU'
-        bake_node = None
-        node_organizer = NodeOrganizer(material)
-        socket_type = target_node.outputs[output_socket_name].type
-        if socket_type != 'SHADER':
-            bake_nt = get_nodetree_from_library("_PS_Bake")
-            bake_node = node_organizer.create_node(
-                'ShaderNodeGroup', {'node_tree': bake_nt})
+    cycles_settings = save_cycles_settings()
+    cycles = context.scene.cycles
+    cycles.device = 'GPU' if gpu else 'CPU'
+    bake_node = None
+    node_organizer = NodeOrganizer(material)
+    socket_type = target_node.outputs[output_socket_name].type
+    if socket_type != 'SHADER':
+        bake_nt = get_nodetree_from_library("_PS_Bake")
+        bake_node = node_organizer.create_node(
+            'ShaderNodeGroup', {'node_tree': bake_nt})
+        node_organizer.create_link(
+            target_node.name, bake_node.name, output_socket_name, 'Color')
+        node_organizer.create_link(
+            bake_node.name, material_output.name, 'Shader', 'Surface')
+        # Check if target node has Alpha output
+        if alpha_socket_name:
             node_organizer.create_link(
-                target_node.name, bake_node.name, output_socket_name, 'Color')
-            node_organizer.create_link(
-                bake_node.name, material_output.name, 'Shader', 'Surface')
-            # Check if target node has Alpha output
-            if alpha_socket_name:
-                node_organizer.create_link(
-                    target_node.name, bake_node.name, alpha_socket_name, 'Alpha')
-            bake_params = {
-                "type": 'COMBINED',
-                "pass_filter": {'EMIT', 'DIRECT'},
-                "use_clear": True,
-            }
-            cycles.samples = 1
-            cycles.use_denoising = False
-            cycles.use_adaptive_sampling = False
-        else:
-            node_organizer.create_link(
-                target_node.name, material_output.name, output_socket_name, 'Surface')
-            bake_params = {
-                "type": 'COMBINED',
-                "use_clear": True,
-            }
-            cycles.samples = 128
-            cycles.use_denoising = True
-            cycles.use_adaptive_sampling = True
+                target_node.name, bake_node.name, alpha_socket_name, 'Alpha')
+        bake_params = {
+            "type": 'COMBINED',
+            "pass_filter": {'EMIT', 'DIRECT'},
+        }
+        cycles.samples = 1
+        cycles.use_denoising = False
+        cycles.use_adaptive_sampling = False
+    else:
+        node_organizer.create_link(
+            target_node.name, material_output.name, output_socket_name, 'Surface')
+        bake_params = {
+            "type": 'COMBINED',
+        }
+        cycles.samples = 128
+        cycles.use_denoising = True
+        cycles.use_adaptive_sampling = True
 
-        # Create and set up the image texture node
-        bake_tex_node = node_organizer.create_node('ShaderNodeTexImage', {
-                                                   "name": "temp_bake_node", "image": image, "location": target_node.location + Vector((0, 300))})
+    # Create and set up the image texture node
+    bake_tex_node = node_organizer.create_node('ShaderNodeTexImage', {
+        "name": "temp_bake_node", "image": image, "location": target_node.location + Vector((0, 300))})
 
-        for node in nodes:
-            node.select = False
-        bake_tex_node.select = True
-        nodes.active = bake_tex_node
+    for node in nodes:
+        node.select = False
+    bake_tex_node.select = True
+    nodes.active = bake_tex_node
 
-        # Perform bake
-        bpy.ops.object.bake(**bake_params, uv_layer=uv_layer)
+    # Perform bake
+    bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
 
-        # Pack the image
-        if not image.packed_file:
-            image.pack()
-            image.reload()
-            print(f"Image {image.name} packed.")
+    # Pack the image
+    if not image.packed_file:
+        image.pack()
+        image.reload()
+        print(f"Image {image.name} packed.")
 
-        # Delete temporary bake node
-        if bake_node:
-            nodes.remove(bake_node)
-        rollback_cycles_settings(cycles_settings)
+    # Delete temporary bake node
+    if bake_node:
+        nodes.remove(bake_node)
+    rollback_cycles_settings(cycles_settings)
 
-        # Restore original links
-        links.new(material_output.inputs[0], last_node_socket)
-        context.scene.render.engine = original_engine
+    # Restore original links
+    links.new(material_output.inputs[0], last_node_socket)
+    context.scene.render.engine = original_engine
 
-        # Debug
-        print(f"Backed {target_node.name} to {image.name}")
+    # Debug
+    # print(f"Backed {target_node.name} to {image.name}")
 
-        return bake_tex_node
+    return bake_tex_node
 
     # except Exception as e:
     #     print(f"Baking failed: {str(e)}")
@@ -332,6 +330,7 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
             return {'CANCELLED'}
 
         active_group.use_bake_image = False
+        active_group.update_node_tree()
 
         bakable, error, problem_nodes = is_bakeable(context)
         if not bakable:
