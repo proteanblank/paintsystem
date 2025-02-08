@@ -60,6 +60,16 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     bl_description = "Add a new group"
 
+    def get_next_group_name(self, context: Context) -> str:
+        ps = PaintSystem(context)
+        mat = ps.get_active_material()
+        if not hasattr(mat, "paint_system"):
+            return "New Group 1"
+        groups = ps.get_groups()
+        number = get_highest_number_with_prefix(
+            'New Group', [item.name for item in groups]) + 1
+        return f"New Group {number}"
+
     group_name: StringProperty(
         name="Group Name",
         description="Name for the new group",
@@ -104,8 +114,9 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         # Check for duplicate names
         for group in mat.paint_system.groups:
             if group.name == self.group_name:
-                bpy.ops.paint_system.duplicate_group_warning(
-                    'INVOKE_DEFAULT', group_name=self.group_name)
+                # bpy.ops.paint_system.duplicate_group_warning(
+                #     'INVOKE_DEFAULT', group_name=self.group_name)
+                self.report({'ERROR'}, "Group name already exists")
                 return {'CANCELLED'}
 
         new_group = ps.add_group(self.group_name)
@@ -125,6 +136,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     def invoke(self, context, event):
         ps = PaintSystem(context)
         groups = ps.get_groups()
+        self.group_name = self.get_next_group_name(context)
         if groups:
             self.material_template = "NONE"
         return context.window_manager.invoke_props_dialog(self)
@@ -736,6 +748,8 @@ class PAINTSYSTEM_OT_NewAdjustmentLayer(Operator):
     # def draw(self, context):
     #     layout = self.layout
     #     layout.prop(self, "adjustment_name")
+
+# class PAINTSYSTEM_OT_
 
 
 classes = (
