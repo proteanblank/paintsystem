@@ -27,6 +27,8 @@ def get_all_group_names(self, context):
 def update_active_image(self=None, context: Context = None):
     context = context or bpy.context
     ps = PaintSystem(context)
+    if not ps.settings.allow_image_overwrite:
+        return
     image_paint = context.tool_settings.image_paint
     mat = ps.get_active_material()
     active_group = ps.get_active_group()
@@ -346,15 +348,15 @@ class PaintSystemGroups(PropertyGroup):
 
 
 class PaintSystemSettings(PropertyGroup):
-    brush_color: FloatVectorProperty(
-        name="Brush Color",
-        subtype='COLOR',
-        default=(1.0, 1.0, 1.0)
-    )
     brush_xray: BoolProperty(
         name="Brush X-Ray",
         description="Brush X-Ray",
         default=False
+    )
+    allow_image_overwrite: BoolProperty(
+        name="Allow Image Overwrite",
+        description="Make Image in 3D Viewport the same as the active layer",
+        default=True
     )
 
 

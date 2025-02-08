@@ -239,6 +239,7 @@ class MAT_PT_Brush(Panel):
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
+        obj = ps.active_object
         # row = layout.row()
         # if not ps.preferences.use_compact_design:
         #     row.scale_y = 1.5
@@ -287,6 +288,9 @@ class MAT_PT_Brush(Panel):
                      "use_unified_size", icon="WORLD", text="Size", slider=True)
         prop_unified(col, context, "strength",
                      "use_unified_strength", icon="WORLD", text="Strength")
+        if obj and obj.mode == 'TEXTURE_PAINT':
+            box.prop(ps.settings, "allow_image_overwrite",
+                     text="Auto Update Image", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
         # row.label(text="Brush Shortcuts")
 
 
@@ -318,8 +322,7 @@ class MAT_PT_BrushColor(Panel):
     bl_region_type = "UI"
     bl_label = "Color"
     bl_category = 'Paint System'
-    if not is_newer_than(4, 3):
-        bl_options = {'DEFAULT_CLOSED'}
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
@@ -491,6 +494,15 @@ class MAT_PT_PaintSystemLayers(Panel):
     bl_category = 'Paint System'
     # bl_parent_id = 'MAT_PT_PaintSystemGroups'
 
+    # def draw_header_preset(self, context):
+    #     layout = self.layout
+    #     ps = PaintSystem(context)
+    #     obj = ps.active_object
+
+    #     if obj and obj.mode == 'TEXTURE_PAINT':
+    #         layout.prop(ps.settings, "allow_image_overwrite",
+    #                     text="Auto Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
+
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
@@ -530,7 +542,6 @@ class MAT_PT_PaintSystemLayers(Panel):
             row.alert = False
         row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK")
-
         # Baking and Exporting
         row = col.row(align=True)
         row.scale_y = 1.5
@@ -539,14 +550,13 @@ class MAT_PT_PaintSystemLayers(Panel):
         if not active_group.bake_image:
             row.menu("MAT_MT_PaintSystemMergeAndExport",
                      icon='EXPORT', text="Merge and Export")
-
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         if has_dirty_images:
-            box.label(text="Don't forget to save!", icon="FUND")
+            col.label(text="Don't forget to save!", icon="FUND")
 
         if not any([item.image for (item, _) in flattened]):
-            box.label(text="Add an image layer first!",
+            col.label(text="Add an image layer first!",
                       icon="ERROR")
 
         if active_group.bake_image:
@@ -658,6 +668,9 @@ class MAT_PT_PaintSystemLayers(Panel):
             col.template_node_inputs(adjustment_node)
 
 
+# class MAT_MT_PaintSystemLayerMenu(Menu):
+
+
 class MAT_PT_PaintSystemLayersAdvanced(Panel):
     bl_idname = 'MAT_PT_PaintSystemLayersAdvanced'
     bl_space_type = "VIEW_3D"
@@ -667,7 +680,7 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
     bl_parent_id = 'MAT_PT_PaintSystemLayers'
     bl_options = {'DEFAULT_CLOSED'}
 
-    @ classmethod
+    @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
@@ -774,9 +787,9 @@ class MAT_MT_PaintSystemMergeOptimize(Menu):
         layout = self.layout
         col = layout.column()
         col.operator("paint_system.merge_group",
-                     text="Update Merge Layer", icon="FILE_REFRESH").as_new_layer = False
+                     text="Update Merged Layer", icon="FILE_REFRESH").as_new_layer = False
         col.operator("paint_system.delete_bake_image",
-                     text="Delete Bake Image", icon='TRASH')
+                     text="Delete Merged Image", icon='TRASH')
         col.operator("paint_system.export_baked_image",
                      text="Export Merged Image", icon='EXPORT')
 # -------------------------------------------------------------------
