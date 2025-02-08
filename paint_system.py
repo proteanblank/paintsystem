@@ -162,6 +162,7 @@ class PaintSystem:
     def __init__(self, context: Context):
         self.preferences: PaintSystemPreferences = bpy.context.preferences.addons[
             __package__].preferences
+        self.settings = context.scene.paint_system_settings
         self.context = context
         self.active_object = context.active_object
         # self.settings = self.get_settings()
@@ -190,7 +191,7 @@ class PaintSystem:
         new_group = mat.paint_system.groups.add()
         new_group.name = name
         node_tree = bpy.data.node_groups.new(
-            name=f"PS_GRP {name} (MAT: {mat.name})", type='ShaderNodeTree')
+            name=f"PS_GROUP {name} (MAT: {mat.name})", type='ShaderNodeTree')
         new_group.node_tree = node_tree
         new_group.update_node_tree()
         # Set the active group to the newly created one
@@ -265,15 +266,21 @@ class PaintSystem:
         active_group = self.get_active_group()
 
         # Get insertion position
-        parent_id, insert_order = active_group.get_insertion_data()
-        # Adjust existing items' order
-        active_group.adjust_sibling_orders(parent_id, insert_order)
+        # parent_id, insert_order = active_group.get_insertion_data()
+        # # Adjust existing items' order
+        # active_group.adjust_sibling_orders(parent_id, insert_order)
 
-        mat = self.get_active_material()
-        layer_template = get_nodetree_from_library(
-            '_PS_Layer_Template', False)
-        layer_nt = layer_template.copy()
-        layer_nt.name = f"PS {name} (MAT: {mat.name})"
+        # mat = self.get_active_material()
+        # layer_template = get_nodetree_from_library(
+        #     '_PS_Layer_Template', False)
+        # layer_nt = layer_template.copy()
+        # layer_nt.name = f"PS {name} (MAT: {mat.name})"
+
+        new_layer = self._add_layer(
+            name, f'_PS_Layer_Template', 'IMAGE', image=image, force_reload=False, make_copy=True)
+        layer_nt = new_layer.node_tree
+        print(layer_nt)
+
         # Find the image texture node
         image_texture_node = None
         for node in layer_nt.nodes:
@@ -295,26 +302,26 @@ class PaintSystem:
         node_tree = self._create_layer_node_tree(name, image, uv_map_name)
 
         # Create the new item
-        new_id = active_group.add_item(
-            name=name,
-            item_type='IMAGE',
-            parent_id=parent_id,
-            order=insert_order,
-            image=image,
-            node_tree=node_tree,
-        )
+        # new_id = active_group.add_item(
+        #     name=name,
+        #     item_type='IMAGE',
+        #     parent_id=parent_id,
+        #     order=insert_order,
+        #     image=image,
+        #     node_tree=node_tree,
+        # )
 
         # Update active index
-        if new_id != -1:
-            flattened = active_group.flatten_hierarchy()
-            for i, (item, _) in enumerate(flattened):
-                if item.id == new_id:
-                    active_group.active_index = i
-                    break
+        # if new_id != -1:
+        #     flattened = active_group.flatten_hierarchy()
+        #     for i, (item, _) in enumerate(flattened):
+        #         if item.id == new_id:
+        #             active_group.active_index = i
+        #             break
 
         active_group.update_node_tree()
 
-        return active_group.get_item_by_id(new_id)
+        return new_layer
 
     def create_solid_color_layer(self, name: str, color: Tuple[float, float, float, float]) -> PropertyGroup:
         """Creates a new solid color layer in the active group.
@@ -325,39 +332,42 @@ class PaintSystem:
         Returns:
             PropertyGroup: The newly created solid color layer.
         """
-        mat = self.get_active_material()
+        # mat = self.get_active_material()
         active_group = self.get_active_group()
-        # Get insertion position
-        parent_id, insert_order = active_group.get_insertion_data()
-        # Adjust existing items' order
-        active_group.adjust_sibling_orders(parent_id, insert_order)
+        # # Get insertion position
+        # parent_id, insert_order = active_group.get_insertion_data()
+        # # Adjust existing items' order
+        # active_group.adjust_sibling_orders(parent_id, insert_order)
 
-        solid_color_template = get_nodetree_from_library(
-            '_PS_Solid_Color_Template', False)
-        solid_color_nt = solid_color_template.copy()
-        solid_color_nt.name = f"PS_IMG {name} (MAT: {mat.name})"
+        # solid_color_template = get_nodetree_from_library(
+        #     '_PS_Solid_Color_Template', False)
+        # solid_color_nt = solid_color_template.copy()
+        # solid_color_nt.name = f"PS_IMG {name} (MAT: {mat.name})"
+        new_layer = self._add_layer(
+            name, f'_PS_Solid_Color_Template', 'SOLID_COLOR', make_copy=True)
+        solid_color_nt = new_layer.node_tree
         solid_color_nt.nodes['RGB'].outputs[0].default_value = color
 
         # Create the new item
-        new_id = active_group.add_item(
-            name=name,
-            item_type='SOLID_COLOR',
-            parent_id=parent_id,
-            order=insert_order,
-            node_tree=solid_color_nt,
-        )
+        # new_id = active_group.add_item(
+        #     name=name,
+        #     item_type='SOLID_COLOR',
+        #     parent_id=parent_id,
+        #     order=insert_order,
+        #     node_tree=solid_color_nt,
+        # )
 
         # Update active index
-        if new_id != -1:
-            flattened = active_group.flatten_hierarchy()
-            for i, (item, _) in enumerate(flattened):
-                if item.id == new_id:
-                    active_group.active_index = i
-                    break
+        # if new_id != -1:
+        #     flattened = active_group.flatten_hierarchy()
+        #     for i, (item, _) in enumerate(flattened):
+        #         if item.id == new_id:
+        #             active_group.active_index = i
+        #             break
 
         active_group.update_node_tree()
 
-        return active_group.get_item_by_id(new_id)
+        return new_layer
 
     def create_folder(self, name: str) -> PropertyGroup:
         """Creates a new folder in the active group.
@@ -368,37 +378,42 @@ class PaintSystem:
         Returns:
             PropertyGroup: The newly created folder.
         """
-        mat = self.get_active_material()
+        # mat = self.get_active_material()
         active_group = self.get_active_group()
-        # Get insertion position
-        parent_id, insert_order = active_group.get_insertion_data()
+        # # Get insertion position
+        # parent_id, insert_order = active_group.get_insertion_data()
 
-        # Adjust existing items' order
-        active_group.adjust_sibling_orders(parent_id, insert_order)
+        # # Adjust existing items' order
+        # active_group.adjust_sibling_orders(parent_id, insert_order)
 
-        folder_template = get_nodetree_from_library(
-            '_PS_Folder_Template', False)
-        folder_nt = folder_template.copy()
-        folder_nt.name = f"PS_FLD {name} (MAT: {mat.name})"
+        # folder_template = get_nodetree_from_library(
+        #     '_PS_Folder_Template', False)
+        # folder_nt = folder_template.copy()
+        # folder_nt.name = f"PS_FLD {name} (MAT: {mat.name})"
+
+        new_layer = self._add_layer(
+            name, f'_PS_Folder_Template', 'FOLDER', make_copy=True)
 
         # Create the new item
-        new_id = active_group.add_item(
-            name=name,
-            item_type='FOLDER',
-            parent_id=parent_id,
-            order=insert_order,
-            node_tree=folder_nt
-        )
+        # new_id = active_group.add_item(
+        #     name=name,
+        #     item_type='FOLDER',
+        #     parent_id=parent_id,
+        #     order=insert_order,
+        #     node_tree=folder_nt
+        # )
 
         # Update active index
-        if new_id != -1:
-            flattened = active_group.flatten_hierarchy()
-            for i, (item, _) in enumerate(flattened):
-                if item.id == new_id:
-                    active_group.active_index = i
-                    break
+        # if new_id != -1:
+        #     flattened = active_group.flatten_hierarchy()
+        #     for i, (item, _) in enumerate(flattened):
+        #         if item.id == new_id:
+        #             active_group.active_index = i
+        #             break
 
         active_group.update_node_tree()
+
+        return new_layer
 
     def create_adjustment_layer(self, name: str, adjustment_type: str) -> PropertyGroup:
         """Creates a new adjustment layer in the active group.
@@ -412,16 +427,19 @@ class PaintSystem:
         """
         mat = self.get_active_material()
         active_group = self.get_active_group()
-        # Get insertion position
-        parent_id, insert_order = active_group.get_insertion_data()
+        # # Get insertion position
+        # parent_id, insert_order = active_group.get_insertion_data()
 
-        # Adjust existing items' order
-        active_group.adjust_sibling_orders(parent_id, insert_order)
+        # # Adjust existing items' order
+        # active_group.adjust_sibling_orders(parent_id, insert_order)
 
-        adjustment_template = get_nodetree_from_library(
-            f'_PS_Adjustment_Template', False)
-        adjustment_nt: NodeTree = adjustment_template.copy()
-        adjustment_nt.name = f"PS_ADJ {name} (MAT: {mat.name})"
+        # adjustment_template = get_nodetree_from_library(
+        #     f'_PS_Adjustment_Template', False)
+        # adjustment_nt: NodeTree = adjustment_template.copy()
+        # adjustment_nt.name = f"PS_ADJ {name} (MAT: {mat.name})"
+        new_layer = self._add_layer(
+            name, f'_PS_Adjustment_Template', 'ADJUSTMENT', make_copy=True)
+        adjustment_nt = new_layer.node_tree
         nodes = adjustment_nt.nodes
         links = adjustment_nt.links
         # Find Vector Math node
@@ -457,28 +475,25 @@ class PaintSystem:
         links.new(mix_node.inputs['B'], adjustment_node.outputs['Color'])
 
         # Create the new item
-        new_id = active_group.add_item(
-            name=name,
-            item_type='ADJUSTMENT',
-            parent_id=parent_id,
-            order=insert_order,
-            node_tree=adjustment_nt
-        )
+        # new_id = active_group.add_item(
+        #     name=name,
+        #     item_type='ADJUSTMENT',
+        #     parent_id=parent_id,
+        #     order=insert_order,
+        #     node_tree=adjustment_nt
+        # )
 
         # Update active index
-        if new_id != -1:
-            flattened = active_group.flatten_hierarchy()
-            for i, (item, _) in enumerate(flattened):
-                if item.id == new_id:
-                    active_group.active_index = i
-                    break
+        # if new_id != -1:
+        #     flattened = active_group.flatten_hierarchy()
+        #     for i, (item, _) in enumerate(flattened):
+        #         if item.id == new_id:
+        #             active_group.active_index = i
+        #             break
 
         active_group.update_node_tree()
 
-        return active_group.get_item_by_id(new_id)
-
-    def get_settings(self) -> Optional[PropertyGroup]:
-        return bpy.context.scene.paint_system_settings
+        return new_layer
 
     def get_active_material(self) -> Optional[Material]:
         if not self.active_object or self.active_object.type != 'MESH':
@@ -571,13 +586,17 @@ class PaintSystem:
     def _update_paintsystem_data(self):
         active_group = self.get_active_group()
         mat = self.get_active_material()
+        # active_group.update_node_tree()
+        if active_group.node_tree:
+            active_group.node_tree.name = f"PS_GROUP {active_group.name} (MAT: {mat.name})"
         for layer in active_group.items:
             if layer.node_tree:
-                layer.node_tree.name = f"PS_{layer.type} {layer.name} (MAT: {mat.name})"
+                layer.node_tree.name = f"PS_{layer.type} {active_group.name} {layer.name} (MAT: {mat.name})"
             if layer.image:
-                layer.image.name = f"PS {mat.name} {active_group.name} {layer.name}"
+                layer.image.name = f"PS {active_group.name} {layer.name} (MAT: {mat.name})"
 
-    def _add_layer(self, layer_name, tree_name: str, item_type: str, force_reload=False, make_copy=False) -> NodeTree:
+    def _add_layer(self, layer_name, tree_name: str, item_type: str, image=None, force_reload=False, make_copy=False) -> NodeTree:
+        print("Adding layer")
         active_group = self.get_active_group()
         # Get insertion position
         parent_id, insert_order = active_group.get_insertion_data()
@@ -593,7 +612,8 @@ class PaintSystem:
             item_type=item_type,
             parent_id=parent_id,
             order=insert_order,
-            node_tree=nt
+            node_tree=nt,
+            image=image,
         )
 
         # Update active index
@@ -604,7 +624,7 @@ class PaintSystem:
                     active_group.active_index = i
                     break
         self._update_paintsystem_data()
-        return nt
+        return active_group.get_item_by_id(new_id)
 
     def _value_set(self, obj, path, value):
         if '.' in path:
