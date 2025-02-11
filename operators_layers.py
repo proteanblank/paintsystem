@@ -456,11 +456,15 @@ class PAINTSYSTEM_OT_CreateNewUVMap(Operator):
     )
 
     def execute(self, context):
-        current_mode = context.object.mode
-        context.object.data.uv_layers.new(name=self.uv_map_name)
+        current_mode = copy.deepcopy(context.object.mode)
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.uv.smart_project(island_margin=0.05)
+        mesh = context.object.data
+        uvmap = mesh.uv_layers.new(name=self.uv_map_name)
+        # Set active UV Map
+        mesh.uv_layers.active = mesh.uv_layers.get(uvmap.name)
+        bpy.ops.uv.lightmap_pack(
+            PREF_CONTEXT='ALL_FACES', PREF_PACK_IN_ONE=True, PREF_MARGIN_DIV=0.2)
         bpy.ops.object.mode_set(mode=current_mode)
         return {'FINISHED'}
 
