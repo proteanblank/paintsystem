@@ -78,7 +78,6 @@ jobs:
               with:
                   name: paint-system
                   exclude-files: '.git;.github;README.md'
-                  build-location: ./paintsystem/
 
     Release:
         runs-on: ubuntu-latest
