@@ -18,6 +18,12 @@ from .common import is_online, is_newer_than, icon_parser
 from .operators_bake import is_bakeable
 # from .. import __package__ as base_package
 
+
+def node_input_prop(layout, node, name, text=None):
+    """Draw a property for a node input."""
+    if name in node.inputs:
+        layout.prop(node.inputs[name], "default_value", text=text)
+
 # -------------------------------------------------------------------
 # Addon Preferences
 # -------------------------------------------------------------------
@@ -677,34 +683,50 @@ class MAT_PT_PaintSystemLayers(Panel):
             col.template_node_inputs(adjustment_node)
 
         if active_layer.type == 'SHADER':
-            col.label(text="Shader Settings:", icon='SHADING_RENDERED')
+            box = layout.box()
+            row = box.row()
+            row.label(text="Shader Settings:", icon='SHADING_RENDERED')
+            col = box.column()
             if active_layer.sub_type == "_PS_Toon_Shader":
                 layer_node_group = ps.get_active_layer_node_group()
                 use_color_ramp = layer_node_group.inputs['Use Color Ramp']
-
                 row = col.row()
-                row.scale_y = 1.5
-                row.label(text="Shadow Color:")
+                row.label(text="Colors:", icon='COLOR')
                 row.prop(
                     use_color_ramp, "default_value", text="Color Ramp", icon='CHECKBOX_HLT' if use_color_ramp.default_value else 'CHECKBOX_DEHLT')
-                if layer_node_group.inputs['Use Color Ramp'].default_value:
+                box = col.box()
+                colors_col = box.column()
+                row = colors_col.row()
+                row.label(text="Shadow:")
+                if use_color_ramp.default_value:
                     color_ramp_node = ps.find_node(active_layer.node_tree, {
                         "label": "Shading Color Ramp"})
                     if color_ramp_node:
-                        col.template_node_inputs(color_ramp_node)
+                        colors_col.template_node_inputs(color_ramp_node)
                 else:
                     mix_color_node = ps.find_node(active_layer.node_tree, {
                         "label": "Shading Mix"})
                     if mix_color_node:
-
-                        col.prop(mix_color_node.inputs['A'], "default_value",
-                                 text="", icon='IMAGE_RGB_ALPHA')
-
+                        colors_col.prop(mix_color_node.inputs['A'], "default_value",
+                                        text="", icon='IMAGE_RGB_ALPHA')
+                        colors_col.separator()
+                        row = colors_col.row()
+                        row.label(text="Light:")
+                        use_clamp_value = layer_node_group.inputs['Clamp Value']
+                        intensity_multiplier = layer_node_group.inputs['Intensity Multiplier']
+                        row.prop(
+                            use_clamp_value, "default_value", text="Clamp Value", icon='CHECKBOX_HLT' if use_clamp_value.default_value else 'CHECKBOX_DEHLT')
+                        colors_col.prop(mix_color_node.inputs['B'], "default_value",
+                                        text="", icon='IMAGE_RGB_ALPHA')
+                        colors_col.prop(intensity_multiplier, "default_value",
+                                        text="Intensity Multiplier")
+                use_cell_shaded = layer_node_group.inputs['Cel-Shaded']
                 col.prop(
-                    layer_node_group.inputs['Cel-Shaded'], "default_value", text="Cel-Shaded")
-                if layer_node_group.inputs['Cel-Shaded'].default_value:
-                    col.prop(
-                        layer_node_group.inputs['Steps'], "default_value", text="Cel-Shaded Steps")
+                    use_cell_shaded, "default_value", text="Cel-Shaded")
+                col = col.column()
+                col.enabled = use_cell_shaded.default_value
+                col.prop(
+                    layer_node_group.inputs['Steps'], "default_value", text="Cel-Shaded Steps")
 
 
 # class MAT_MT_PaintSystemLayerMenu(Menu):
