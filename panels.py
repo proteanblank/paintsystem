@@ -297,7 +297,7 @@ class MAT_PT_Brush(Panel):
                      "use_unified_strength", icon="WORLD", text="Strength")
         if obj and obj.mode == 'TEXTURE_PAINT':
             box.prop(ps.settings, "allow_image_overwrite",
-                     text="Auto Update Image", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
+                     text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
         # row.label(text="Brush Shortcuts")
 
 
