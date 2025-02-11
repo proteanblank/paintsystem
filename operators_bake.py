@@ -257,6 +257,14 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
     bake_tex_node.select = True
     nodes.active = bake_tex_node
 
+    # Change the only selected object to the active one
+    # TODO: Allow baking multiple objects
+    for obj in context.scene.objects:
+        if obj != context.active_object:
+            obj.select_set(False)
+        else:
+            obj.select_set(True)
+
     # Perform bake
     bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
 
