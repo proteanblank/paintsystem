@@ -90,6 +90,5 @@ jobs:
               uses: natapol2547/blender-addon-release@main
               with:
                   artifact_name: paint-system
-                  release_name: Paint System
                   version: ${{ needs.Build.outputs.version }}
                   release_stage: ${{ github.event.inputs.release_stage }}
