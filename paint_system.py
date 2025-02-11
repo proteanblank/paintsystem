@@ -155,7 +155,7 @@ def update_paintsystem_data(self, context):
 class PaintSystemPreferences:
     show_tooltips: bool
     use_compact_design: bool
-    pass
+    name_layers_group: bool
 
 
 class PaintSystem:
