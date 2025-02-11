@@ -15,12 +15,17 @@ ADJUSTMENT_ENUM = [
     ('ShaderNodeHueSaturation', "Hue Saturation Value", ""),
     ('ShaderNodeInvert', "Invert", ""),
     ('ShaderNodeRGBCurve', "RGB Curves", ""),
+    # ('ShaderNodeAmbientOcclusion', "Ambient Occlusion", ""),
 ]
 LAYER_ENUM = [
     ('FOLDER', "Folder", "Folder layer"),
     ('IMAGE', "Image", "Image layer"),
     ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
     ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
+    ('SHADER', "Shader", "Shader layer"),
+]
+SHADER_ENUM = [
+    ('_PS_Toon_Shader', "Toon Shader (EEVEE)", "Toon Shader"),
 ]
 
 
@@ -162,16 +167,18 @@ class PaintSystem:
     def __init__(self, context: Context):
         self.preferences: PaintSystemPreferences = bpy.context.preferences.addons[
             __package__].preferences
-        self.settings = context.scene.paint_system_settings
+        self.settings = context.scene.paint_system_settings if hasattr(
+            context, "scene") else None
         self.context = context
-        self.active_object = context.active_object
+        self.active_object = context.active_object if hasattr(
+            context, "active_object") else None
         # self.settings = self.get_settings()
         # mat = self.get_active_material()
         # self.groups = self.get_groups()
         # active_group = self.get_active_group()
         # active_layer = self.get_active_layer()
-        # layer_node_tree = self.get_layer_node_tree()
-        # self.layer_node_group = self.get_layer_node_group()
+        # layer_node_tree = self.get_active_layer().node_tree
+        # self.layer_node_group = self.get_active_layer_node_group()
         # self.color_mix_node = self.find_color_mix_node()
         # self.uv_map_node = self.find_uv_map_node()
         # self.opacity_mix_node = self.find_opacity_mix_node()
@@ -495,6 +502,13 @@ class PaintSystem:
 
         return new_layer
 
+    def create_shader_layer(self, name: str, shader_type: str) -> PropertyGroup:
+        active_group = self.get_active_group()
+        new_layer = self._add_layer(
+            name, shader_type, 'SHADER', sub_type=shader_type, make_copy=True)
+        active_group.update_node_tree()
+        return new_layer
+
     def get_active_material(self) -> Optional[Material]:
         if not self.active_object or self.active_object.type != 'MESH':
             return None
@@ -538,50 +552,56 @@ class PaintSystem:
             return None
         return active_layer.node_tree
 
-    def get_layer_node_group(self) -> Optional[Node]:
+    def get_active_layer_node_group(self) -> Optional[Node]:
         active_group = self.get_active_group()
-        active_layer = self.get_active_layer()
-        layer_node_tree = self.get_layer_node_tree()
+        layer_node_tree = self.get_active_layer().node_tree
         if not layer_node_tree:
             return None
-        node = self._find_node_group(
-            active_group.node_tree, active_layer.node_tree.name)
+        node_details = {'type': 'GROUP', 'node_tree': layer_node_tree}
+        node = self.find_node(active_group.node_tree, node_details)
         return node
 
     def find_color_mix_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_layer_node_tree()
+        layer_node_tree = self.get_active_layer().node_tree
         node_details = {'type': 'MIX', 'data_type': 'RGBA'}
-        return self._get_node(layer_node_tree, node_details)
+        return self.find_node(layer_node_tree, node_details)
 
     def find_uv_map_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_layer_node_tree()
+        layer_node_tree = self.get_active_layer().node_tree
         node_details = {'type': 'UVMAP'}
-        return self._get_node(layer_node_tree, node_details)
+        return self.find_node(layer_node_tree, node_details)
 
     def find_opacity_mix_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_layer_node_tree()
+        layer_node_tree = self.get_active_layer().node_tree
         node_details = {'type': 'MIX', 'name': 'Opacity'}
-        return self._get_node(layer_node_tree, node_details) or self.find_color_mix_node()
+        return self.find_node(layer_node_tree, node_details) or self.find_color_mix_node()
 
     def find_clip_mix_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_layer_node_tree()
+        layer_node_tree = self.get_active_layer().node_tree
         node_details = {'type': 'MIX', 'name': 'Clip'}
-        return self._get_node(layer_node_tree, node_details)
+        return self.find_node(layer_node_tree, node_details)
 
     def find_image_texture_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_layer_node_tree()
+        layer_node_tree = self.get_active_layer().node_tree
         node_details = {'type': 'TEX_IMAGE'}
-        return self._get_node(layer_node_tree, node_details)
+        return self.find_node(layer_node_tree, node_details)
 
     def find_rgb_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_layer_node_tree()
+        layer_node_tree = self.get_active_layer().node_tree
         node_details = {'name': 'RGB'}
-        return self._get_node(layer_node_tree, node_details)
+        return self.find_node(layer_node_tree, node_details)
 
     def find_adjustment_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_layer_node_tree()
+        layer_node_tree = self.get_active_layer().node_tree
         node_details = {'label': 'Adjustment'}
-        return self._get_node(layer_node_tree, node_details)
+        return self.find_node(layer_node_tree, node_details)
+
+    def find_node_group(self, node_tree: NodeTree) -> Optional[Node]:
+        node_tree = self.get_active_group().node_tree
+        for node in node_tree.nodes:
+            if hasattr(node, 'node_tree') and node.node_tree and node.node_tree.name == node_tree.name:
+                return node
+        return None
 
     def _update_paintsystem_data(self):
         active_group = self.get_active_group()
@@ -595,7 +615,7 @@ class PaintSystem:
             if layer.image:
                 layer.image.name = f"PS {active_group.name} {layer.name} (MAT: {mat.name})"
 
-    def _add_layer(self, layer_name, tree_name: str, item_type: str, image=None, force_reload=False, make_copy=False) -> NodeTree:
+    def _add_layer(self, layer_name, tree_name: str, item_type: str, sub_type="", image=None, force_reload=False, make_copy=False) -> NodeTree:
         print("Adding layer")
         active_group = self.get_active_group()
         # Get insertion position
@@ -610,6 +630,7 @@ class PaintSystem:
         new_id = active_group.add_item(
             name=layer_name,
             item_type=item_type,
+            sub_type=sub_type,
             parent_id=parent_id,
             order=insert_order,
             node_tree=nt,
@@ -635,7 +656,7 @@ class PaintSystem:
             path_attr = path
         setattr(prop, path_attr, value)
 
-    def _get_node(self, node_tree, node_details):
+    def find_node(self, node_tree, node_details):
         if not node_tree:
             return None
         for node in node_tree.nodes:
@@ -694,9 +715,3 @@ class PaintSystem:
             if item.image and item.image.users <= 2:
                 # print("Removing image")
                 bpy.data.images.remove(item.image)
-
-    def _find_node_group(self, node_tree: NodeTree, name: str) -> Optional[Node]:
-        for node in node_tree.nodes:
-            if node.type == 'GROUP' and node.node_tree and node.node_tree.name == name:
-                return node
-        return None

@@ -12,7 +12,7 @@ from bpy.types import (Panel,
                        Context)
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
-from .paint_system import PaintSystem, ADJUSTMENT_ENUM
+from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
 from . import addon_updater_ops
 from .common import is_online, is_newer_than, icon_parser
 from .operators_bake import is_bakeable
@@ -453,6 +453,8 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                             rgb_node.outputs[0], "default_value", text="", icon='IMAGE_RGB_ALPHA')
                 case 'ADJUSTMENT':
                     row.label(icon='SHADERFX')
+                case 'SHADER':
+                    row.label(icon='SHADING_RENDERED')
             row.prop(display_item, "name", text="", emboss=False)
             if display_item.clip:
                 row.label(icon="SELECT_INTERSECT")
@@ -674,6 +676,36 @@ class MAT_PT_PaintSystemLayers(Panel):
             col.label(text="Adjustment Settings:", icon='SHADERFX')
             col.template_node_inputs(adjustment_node)
 
+        if active_layer.type == 'SHADER':
+            col.label(text="Shader Settings:", icon='SHADING_RENDERED')
+            if active_layer.sub_type == "_PS_Toon_Shader":
+                layer_node_group = ps.get_active_layer_node_group()
+                use_color_ramp = layer_node_group.inputs['Use Color Ramp']
+
+                row = col.row()
+                row.scale_y = 1.5
+                row.label(text="Shadow Color:")
+                row.prop(
+                    use_color_ramp, "default_value", text="Color Ramp", icon='CHECKBOX_HLT' if use_color_ramp.default_value else 'CHECKBOX_DEHLT')
+                if layer_node_group.inputs['Use Color Ramp'].default_value:
+                    color_ramp_node = ps.find_node(active_layer.node_tree, {
+                        "label": "Shading Color Ramp"})
+                    if color_ramp_node:
+                        col.template_node_inputs(color_ramp_node)
+                else:
+                    mix_color_node = ps.find_node(active_layer.node_tree, {
+                        "label": "Shading Mix"})
+                    if mix_color_node:
+
+                        col.prop(mix_color_node.inputs['A'], "default_value",
+                                 text="", icon='IMAGE_RGB_ALPHA')
+
+                col.prop(
+                    layer_node_group.inputs['Cel-Shaded'], "default_value", text="Cel-Shaded")
+                if layer_node_group.inputs['Cel-Shaded'].default_value:
+                    col.prop(
+                        layer_node_group.inputs['Steps'], "default_value", text="Cel-Shaded Steps")
+
 
 # class MAT_MT_PaintSystemLayerMenu(Menu):
 
@@ -732,13 +764,14 @@ class MAT_MT_PaintSystemAddLayer(Menu):
                      text="Open External Image")
         col.operator("paint_system.open_existing_image",
                      text="Use Existing Image")
-        col.separator()
-        col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
 
         col.separator()
         col.label(text="Shader:")
+        for idx, (node_type, name, description) in enumerate(SHADER_ENUM):
+            col.operator("paint_system.new_shader_layer",
+                         text=name, icon='SHADING_RENDERED' if idx == 0 else 'NONE').shader_type = node_type
 
         col = row.column()
         col.label(text="Adjustment Layer:")

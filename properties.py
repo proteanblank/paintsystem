@@ -81,7 +81,6 @@ class PaintSystemLayer(BaseNestedListItem):
         default="Layer",
         update=update_paintsystem_data
     )
-
     enabled: BoolProperty(
         name="Enabled",
         description="Toggle layer visibility",
@@ -95,6 +94,10 @@ class PaintSystemLayer(BaseNestedListItem):
     type: EnumProperty(
         items=LAYER_ENUM,
         default='IMAGE'
+    )
+    sub_type: StringProperty(
+        name="Sub Type",
+        default="",
     )
     clip: BoolProperty(
         name="Clip to Below",
@@ -157,17 +160,36 @@ class PaintSystemGroup(BaseNestedListManager):
     def update_node_tree(self, context=bpy.context):
         self.normalize_orders()
         flattened = self.flatten_hierarchy()
-
         interface: NodeTreeInterface = self.node_tree.interface
         nodes: Nodes = self.node_tree.nodes
         links: NodeLinks = self.node_tree.links
 
         # Delete every node
-        for node in self.node_tree.nodes:
-            self.node_tree.nodes.remove(node)
+        # for node in self.node_tree.nodes:
+        #     self.node_tree.nodes.remove(node)
+
+        # Create new node group
+        def ensure_node_group(item):
+            node_group = None
+            for node in nodes:
+                if node.type == 'GROUP' and node.node_tree == item.node_tree:
+                    node_group = node
+                    break
+            if not node_group:
+                node_group = nodes.new('ShaderNodeGroup')
+                node_group.node_tree = item.node_tree
+            return node_group
+
+        # Remove unused node groups
+        for node in nodes:
+            if node.type == 'GROUP':
+                if node.node_tree not in [item.node_tree for item, _ in flattened]:
+                    nodes.remove(node)
+            else:
+                nodes.remove(node)
 
         # Check inputs and outputs
-        if not self.node_tree.interface.items_tree:
+        if not interface.items_tree:
             interface.new_socket(
                 name="Color", in_out='INPUT', socket_type="NodeSocketColor")
             new_socket = interface.new_socket(
@@ -182,6 +204,28 @@ class PaintSystemGroup(BaseNestedListManager):
             new_socket.subtype = 'FACTOR'
             new_socket.min_value = 0.0
             new_socket.max_value = 1.0
+
+        # Check if any node uses the normal input
+        special_inputs = ['Normal']
+        # special_sockets: list[NodeSocket] = []
+        for input_name in special_inputs:
+            socket = interface.items_tree.get(input_name)
+
+            special_socket_type = [item.node_tree.interface.items_tree.get(input_name)
+                                   for item, _ in flattened if item.node_tree]
+            # special_sockets.extend(special_socket_type)
+            if any(special_socket_type) != bool(socket):
+                if socket:
+                    interface.remove(socket)
+                else:
+                    new_socket = interface.new_socket(
+                        name=input_name, in_out='INPUT', socket_type=special_socket_type[0].socket_type)
+                    new_socket.hide_value = special_socket_type[0].hide_value
+
+        # use_normal = any([item.node_tree.inputs['Normal']
+        #                  if item.node_tree else False for item, _ in flattened])
+        # if use_normal:
+        #     print("Use Normal")
 
         # Contains the inputs for each depth level and position in the hierarchy
         # depth_inputs = {}
@@ -217,8 +261,9 @@ class PaintSystemGroup(BaseNestedListManager):
                 node_entry.clip_alpha_input = group_node.inputs['Over Alpha']
 
             # Connect layer node group
-            group_node = nodes.new('ShaderNodeGroup')
-            group_node.node_tree = item.node_tree
+            group_node = ensure_node_group(item)
+            # group_node = nodes.new('ShaderNodeGroup')
+            # group_node.node_tree = item.node_tree
             group_node.location = node_entry.location + \
                 Vector((-200, 0))
             group_node.mute = not item.enabled

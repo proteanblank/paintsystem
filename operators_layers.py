@@ -1,5 +1,4 @@
 import bpy
-
 from bpy.props import (
     BoolProperty,
     StringProperty,
@@ -9,9 +8,10 @@ from bpy.props import (
 import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
-from .paint_system import PaintSystem, ADJUSTMENT_ENUM
+from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
 from .common import redraw_panel, get_object_uv_maps
 import re
+import copy
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
@@ -782,14 +782,35 @@ class PAINTSYSTEM_OT_NewAdjustmentLayer(Operator):
 
         return {'FINISHED'}
 
-    # def invoke(self, context, event):
-    #     return context.window_manager.invoke_props_dialog(self)
 
-    # def draw(self, context):
-    #     layout = self.layout
-    #     layout.prop(self, "adjustment_name")
+class PAINTSYSTEM_OT_NewShaderLayer(Operator):
+    bl_idname = "paint_system.new_shader_layer"
+    bl_label = "Add Shader Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add a new shader layer"
 
-# class PAINTSYSTEM_OT_
+    shader_type: EnumProperty(
+        name="Shader",
+        items=SHADER_ENUM,
+    )
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        return active_group
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        # Look for get name from in adjustment_enum based on adjustment_type
+        layer_name = next(name for identifier, name,
+                          _ in SHADER_ENUM if identifier == self.shader_type)
+        ps.create_shader_layer(layer_name, self.shader_type)
+
+        # Force the UI to update
+        redraw_panel(self, context)
+
+        return {'FINISHED'}
 
 
 classes = (
@@ -807,6 +828,7 @@ classes = (
     PAINTSYSTEM_OT_NewSolidColor,
     PAINTSYSTEM_OT_NewFolder,
     PAINTSYSTEM_OT_NewAdjustmentLayer,
+    PAINTSYSTEM_OT_NewShaderLayer,
 )
 
 register, unregister = register_classes_factory(classes)
