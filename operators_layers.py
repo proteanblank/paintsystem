@@ -484,10 +484,12 @@ class PAINTSYSTEM_OT_NewImage(Operator):
 
     def get_next_image_name(self, context: Context) -> str:
         ps = PaintSystem(context)
+        base_layer_name = ps.get_active_group(
+        ).name if ps.preferences.name_layers_group else "Image"
         flattened = ps.get_active_group().flatten_hierarchy()
         number = get_highest_number_with_prefix(
-            'Image', [item[0].name for item in flattened]) + 1
-        return f"Image {number}"
+            base_layer_name, [item[0].name for item in flattened]) + 1
+        return f"{base_layer_name} {number}"
 
     name: StringProperty(
         name="Name",
@@ -502,11 +504,13 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         ],
         default='1024'
     )
-    # high_bit_float: BoolProperty(
-    #     name="High Bit Float",
-    #     description="Use 32-bit float instead of 16-bit",
-    #     default=False
-    # )
+    uv_map_mode: EnumProperty(
+        name="UV Map",
+        items=[
+            ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
+            ('OPEN', "Use Existing", "Open an existing UV Map"),
+        ]
+    )
     uv_map_name: EnumProperty(
         name="UV Map",
         items=get_object_uv_maps
@@ -517,8 +521,14 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
         mat = ps.get_active_material()
-        if not get_object_uv_maps(self, context):
-            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
+        if self.uv_map_mode == 'PAINT_SYSTEM':
+            if 'PaintSystemUVMap' not in [uvmap[0] for uvmap in get_object_uv_maps(self, context)]:
+                bpy.ops.paint_system.create_new_uv_map(
+                    'INVOKE_DEFAULT', uv_map_name="PaintSystemUVMap")
+            self.uv_map_name = "PaintSystemUVMap"
+        elif not self.uv_map_name:
+            self.report({'ERROR'}, "No UV Map selected")
+            return {'CANCELLED'}
         image = bpy.data.images.new(
             name=f"PS {mat.name} {active_group.name} {self.name}",
             width=int(self.image_resolution),
@@ -539,9 +549,9 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         layout = self.layout
         layout.prop(self, "name")
         layout.prop(self, "image_resolution", expand=True)
-        if not get_object_uv_maps(self, context):
-            layout.label(text="No UV Maps found. Creating new UV Map")
-        else:
+        layout.label(text="UV Map")
+        layout.prop(self, "uv_map_mode", expand=True)
+        if self.uv_map_mode == 'OPEN':
             layout.prop(self, "uv_map_name")
 
 
@@ -560,6 +570,14 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
         options={'HIDDEN'}
     )
 
+    uv_map_mode: EnumProperty(
+        name="UV Map",
+        items=[
+            ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
+            ('OPEN', "Use Existing", "Open an existing UV Map"),
+        ]
+    )
+
     uv_map_name: EnumProperty(
         name="UV Map",
         items=get_object_uv_maps
@@ -568,8 +586,14 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         image = bpy.data.images.load(self.filepath, check_existing=True)
-        if not get_object_uv_maps(self, context):
-            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
+        if self.uv_map_mode == 'PAINT_SYSTEM':
+            if 'PaintSystemUVMap' not in [uvmap[0] for uvmap in get_object_uv_maps(self, context)]:
+                bpy.ops.paint_system.create_new_uv_map(
+                    'INVOKE_DEFAULT', uv_map_name="PaintSystemUVMap")
+            self.uv_map_name = "PaintSystemUVMap"
+        elif not self.uv_map_name:
+            self.report({'ERROR'}, "No UV Map selected")
+            return {'CANCELLED'}
         ps.create_image_layer(image.name, image, self.uv_map_name)
         return {'FINISHED'}
 
@@ -579,9 +603,8 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
 
     def draw(self, context):
         layout = self.layout
-        if not get_object_uv_maps(self, context):
-            layout.label(text="No UV Maps found. Creating new UV Map")
-        else:
+        layout.prop(self, "uv_map_mode", expand=True)
+        if self.uv_map_mode == 'OPEN':
             layout.prop(self, "uv_map_name")
 
 
@@ -592,6 +615,14 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
     bl_description = "Open an image from the existing images"
 
     image_name: StringProperty()
+
+    uv_map_mode: EnumProperty(
+        name="UV Map",
+        items=[
+            ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
+            ('OPEN', "Use Existing", "Open an existing UV Map"),
+        ]
+    )
 
     uv_map_name: EnumProperty(
         name="UV Map",
@@ -607,8 +638,14 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
         if not image:
             self.report({'ERROR'}, "Image not found")
             return {'CANCELLED'}
-        if not get_object_uv_maps(self, context):
-            bpy.ops.paint_system.create_new_uv_map('INVOKE_DEFAULT')
+        if self.uv_map_mode == 'PAINT_SYSTEM':
+            if 'PaintSystemUVMap' not in [uvmap[0] for uvmap in get_object_uv_maps(self, context)]:
+                bpy.ops.paint_system.create_new_uv_map(
+                    'INVOKE_DEFAULT', uv_map_name="PaintSystemUVMap")
+            self.uv_map_name = "PaintSystemUVMap"
+        elif not self.uv_map_name:
+            self.report({'ERROR'}, "No UV Map selected")
+            return {'CANCELLED'}
         ps.create_image_layer(self.image_name, image, self.uv_map_name)
         return {'FINISHED'}
 
@@ -620,9 +657,8 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
         layout = self.layout
         layout.prop_search(self, "image_name", bpy.data,
                            "images", text="Image")
-        if not get_object_uv_maps(self, context):
-            layout.label(text="No UV Maps found. Creating new UV Map")
-        else:
+        layout.prop(self, "uv_map_mode", expand=True)
+        if self.uv_map_mode == 'OPEN':
             layout.prop(self, "uv_map_name")
 
 

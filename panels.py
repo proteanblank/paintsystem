@@ -74,11 +74,18 @@ class PaintSystemPreferences(AddonPreferences):
         default=False
     )
 
+    name_layers_group = BoolProperty(
+        name="Name Layers According to Group Name",
+        default=False
+    )
+
     def draw(self, context):
         layout = self.layout
 
         layout.prop(self, "show_tooltips", text="Show Tooltips")
         layout.prop(self, "use_compact_design", text="Use Compact Design")
+        layout.prop(self, "name_layers_group",
+                    text="Name Layers According to Group Name")
 
         if is_online():
             # Updater draw function, could also pass in col as third arg.
