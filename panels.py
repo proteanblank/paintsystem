@@ -593,7 +593,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         )
 
         col = row.column(align=True)
-        col.menu("MAT_MT_PaintSystemAddImage", icon='IMAGE_DATA', text="")
+        col.menu("MAT_MT_PaintSystemAddLayer", icon='IMAGE_DATA', text="")
         col.operator("paint_system.new_folder", icon='NEWFOLDER', text="")
         col.separator()
         col.operator("paint_system.delete_item", icon="TRASH", text="")
@@ -717,9 +717,9 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
 # -------------------------------------------------------------------
 
 
-class MAT_MT_PaintSystemAddImage(Menu):
+class MAT_MT_PaintSystemAddLayer(Menu):
     bl_label = "Add Image"
-    bl_idname = "MAT_MT_PaintSystemAddImage"
+    bl_idname = "MAT_MT_PaintSystemAddLayer"
 
     def draw(self, context):
         layout = self.layout
@@ -828,7 +828,7 @@ classes = (
     MAT_MT_LayersSettingsTooltips,
     MAT_PT_PaintSystemLayers,
     MAT_PT_PaintSystemLayersAdvanced,
-    MAT_MT_PaintSystemAddImage,
+    MAT_MT_PaintSystemAddLayer,
     MAT_MT_BrushTooltips,
     MAT_MT_PaintSystemMergeAndExport,
     MAT_MT_PaintSystemMergeOptimize,
