@@ -9,12 +9,13 @@ from bpy.props import (IntProperty,
                        CollectionProperty,
                        EnumProperty)
 from bpy.types import (PropertyGroup, Context,
-                       NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket)
+                       NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket, Node)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
 from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, update_paintsystem_data
 from dataclasses import dataclass
 from typing import Dict
+import itertools
 
 
 def get_all_group_names(self, context):
@@ -180,6 +181,42 @@ class PaintSystemGroup(BaseNestedListManager):
                 node_group.node_tree = item.node_tree
             return node_group
 
+        def reset_node_properties(node: Node) -> Node:
+            # From https://blender.stackexchange.com/questions/42306/reset-nodes-to-their-default-values
+            node_tree = node.id_data
+            props_to_copy = ['bl_idname', 'name', 'location',
+                             'height', 'width', 'node_tree']
+
+            reconnections = []
+            mappings = itertools.chain.from_iterable(
+                [node.inputs, node.outputs])
+            for i in (i for i in mappings if i.is_linked):
+                for L in i.links:
+                    reconnections.append(
+                        [L.from_socket.path_from_id(), L.to_socket.path_from_id()])
+
+            props = {j: getattr(node, j)
+                     for j in props_to_copy if hasattr(node, j)}
+
+            new_node = node_tree.nodes.new(props['bl_idname'])
+            props_to_copy.pop(0)
+
+            for prop in props_to_copy:
+                setattr(new_node, prop, props[prop])
+
+            nodes = node_tree.nodes
+            nodes.remove(node)
+            new_node.name = props['name']
+
+            for str_from, str_to in reconnections:
+                node_tree.links.new(eval(str_from), eval(str_to))
+
+            return new_node
+
+        # Remode every links
+        for link in links:
+            links.remove(link)
+
         # Remove unused node groups
         for node in nodes:
             if node.type == 'GROUP':
@@ -262,6 +299,8 @@ class PaintSystemGroup(BaseNestedListManager):
 
             # Connect layer node group
             group_node = ensure_node_group(item)
+            # group_node = reset_node_properties(group_node)
+            group_node.inputs['Alpha'].default_value = 0.0
             # group_node = nodes.new('ShaderNodeGroup')
             # group_node.node_tree = item.node_tree
             group_node.location = node_entry.location + \
