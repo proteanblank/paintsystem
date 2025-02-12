@@ -181,41 +181,8 @@ class PaintSystemGroup(BaseNestedListManager):
                 node_group.node_tree = item.node_tree
             return node_group
 
-        def reset_node_properties(node: Node) -> Node:
-            # From https://blender.stackexchange.com/questions/42306/reset-nodes-to-their-default-values
-            node_tree = node.id_data
-            props_to_copy = ['bl_idname', 'name', 'location',
-                             'height', 'width', 'node_tree']
-
-            reconnections = []
-            mappings = itertools.chain.from_iterable(
-                [node.inputs, node.outputs])
-            for i in (i for i in mappings if i.is_linked):
-                for L in i.links:
-                    reconnections.append(
-                        [L.from_socket.path_from_id(), L.to_socket.path_from_id()])
-
-            props = {j: getattr(node, j)
-                     for j in props_to_copy if hasattr(node, j)}
-
-            new_node = node_tree.nodes.new(props['bl_idname'])
-            props_to_copy.pop(0)
-
-            for prop in props_to_copy:
-                setattr(new_node, prop, props[prop])
-
-            nodes = node_tree.nodes
-            nodes.remove(node)
-            new_node.name = props['name']
-
-            for str_from, str_to in reconnections:
-                node_tree.links.new(eval(str_from), eval(str_to))
-
-            return new_node
-
         # Remode every links
-        for link in links:
-            links.remove(link)
+        links.clear()
 
         # Remove unused node groups
         for node in nodes:
@@ -351,6 +318,15 @@ class PaintSystemGroup(BaseNestedListManager):
                       bake_image_node.outputs['Color'])
             links.new(ng_output.inputs['Alpha'],
                       bake_image_node.outputs['Alpha'])
+
+        # Connect special inputs
+        for input_name in special_inputs:
+            for node in nodes:
+                if node.type == 'GROUP':
+                    socket = node.inputs.get(
+                        input_name)
+                    if socket:
+                        links.new(socket, ng_input.outputs[socket.name])
 
         links.new(node_entry.color_input, ng_input.outputs['Color'])
         links.new(node_entry.alpha_input, ng_input.outputs['Alpha'])

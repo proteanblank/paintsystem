@@ -26,6 +26,8 @@ LAYER_ENUM = [
 ]
 SHADER_ENUM = [
     ('_PS_Toon_Shader', "Toon Shader (EEVEE)", "Toon Shader"),
+    ('_PS_Light', "Light (EEVEE)", "Light"),
+    ('_PS_Ambient_Occlusion', "Ambient Occlusion", "Ambient Occlusion"),
 ]
 
 

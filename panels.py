@@ -687,46 +687,83 @@ class MAT_PT_PaintSystemLayers(Panel):
             row = box.row()
             row.label(text="Shader Settings:", icon='SHADING_RENDERED')
             col = box.column()
-            if active_layer.sub_type == "_PS_Toon_Shader":
-                layer_node_group = ps.get_active_layer_node_group()
-                use_color_ramp = layer_node_group.inputs['Use Color Ramp']
-                row = col.row()
-                row.label(text="Colors:", icon='COLOR')
-                row.prop(
-                    use_color_ramp, "default_value", text="Color Ramp", icon='CHECKBOX_HLT' if use_color_ramp.default_value else 'CHECKBOX_DEHLT')
-                box = col.box()
-                colors_col = box.column()
-                row = colors_col.row()
-                row.label(text="Shadow:")
-                if use_color_ramp.default_value:
-                    color_ramp_node = ps.find_node(active_layer.node_tree, {
-                        "label": "Shading Color Ramp"})
-                    if color_ramp_node:
-                        colors_col.template_node_inputs(color_ramp_node)
-                else:
-                    mix_color_node = ps.find_node(active_layer.node_tree, {
-                        "label": "Shading Mix"})
-                    if mix_color_node:
-                        colors_col.prop(mix_color_node.inputs['A'], "default_value",
+            match active_layer.sub_type:
+                case "_PS_Toon_Shader":
+                    layer_node_group = ps.get_active_layer_node_group()
+                    use_color_ramp = layer_node_group.inputs['Use Color Ramp']
+                    row = col.row()
+                    row.label(text="Colors:", icon='COLOR')
+                    row.prop(
+                        use_color_ramp, "default_value", text="Color Ramp", icon='CHECKBOX_HLT' if use_color_ramp.default_value else 'CHECKBOX_DEHLT')
+                    box = col.box()
+                    colors_col = box.column()
+                    row = colors_col.row()
+                    row.label(text="Shadow:")
+                    if use_color_ramp.default_value:
+                        color_ramp_node = ps.find_node(active_layer.node_tree, {
+                            "label": "Shading Color Ramp"})
+                        if color_ramp_node:
+                            colors_col.template_node_inputs(color_ramp_node)
+                    else:
+
+                        colors_col.prop(layer_node_group.inputs['Shadow Color'], "default_value",
                                         text="", icon='IMAGE_RGB_ALPHA')
                         colors_col.separator()
                         row = colors_col.row()
                         row.label(text="Light:")
                         use_clamp_value = layer_node_group.inputs['Clamp Value']
                         intensity_multiplier = layer_node_group.inputs['Intensity Multiplier']
+                        light_col_influence = layer_node_group.inputs['Light Color Influence']
                         row.prop(
                             use_clamp_value, "default_value", text="Clamp Value", icon='CHECKBOX_HLT' if use_clamp_value.default_value else 'CHECKBOX_DEHLT')
-                        colors_col.prop(mix_color_node.inputs['B'], "default_value",
+                        colors_col.prop(layer_node_group.inputs['Light Color'], "default_value",
                                         text="", icon='IMAGE_RGB_ALPHA')
                         colors_col.prop(intensity_multiplier, "default_value",
                                         text="Intensity Multiplier")
-                use_cell_shaded = layer_node_group.inputs['Cel-Shaded']
-                col.prop(
-                    use_cell_shaded, "default_value", text="Cel-Shaded")
-                col = col.column()
-                col.enabled = use_cell_shaded.default_value
-                col.prop(
-                    layer_node_group.inputs['Steps'], "default_value", text="Cel-Shaded Steps")
+                        colors_col.prop(light_col_influence, "default_value",
+                                        text="Light Color Influence")
+                    use_cell_shaded = layer_node_group.inputs['Cel-Shaded']
+                    col.prop(
+                        use_cell_shaded, "default_value", text="Cel-Shaded")
+                    col = col.column()
+                    col.enabled = use_cell_shaded.default_value
+                    col.prop(
+                        layer_node_group.inputs['Steps'], "default_value", text="Cel-Shaded Steps")
+                case "_PS_Light":
+                    layer_node_group = ps.get_active_layer_node_group()
+                    row = col.row()
+                    row.label(text="Colors:", icon='COLOR')
+                    box = col.box()
+                    colors_col = box.column()
+                    row = colors_col.row()
+                    row.label(text="Light:")
+                    use_clamp_value = layer_node_group.inputs['Clamp Value']
+                    intensity_multiplier = layer_node_group.inputs['Intensity Multiplier']
+                    light_col_influence = layer_node_group.inputs['Light Color Influence']
+                    row.prop(
+                        use_clamp_value, "default_value", text="Clamp Value", icon='CHECKBOX_HLT' if use_clamp_value.default_value else 'CHECKBOX_DEHLT')
+                    colors_col.prop(layer_node_group.inputs['Light Color'], "default_value",
+                                    text="", icon='IMAGE_RGB_ALPHA')
+                    colors_col.prop(intensity_multiplier, "default_value",
+                                    text="Intensity Multiplier")
+                    colors_col.prop(light_col_influence, "default_value",
+                                    text="Light Color Influence")
+                    use_cell_shaded = layer_node_group.inputs['Cel-Shaded']
+                    col.prop(
+                        use_cell_shaded, "default_value", text="Cel-Shaded")
+                    col = col.column()
+                    col.enabled = use_cell_shaded.default_value
+                    col.prop(
+                        layer_node_group.inputs['Steps'], "default_value", text="Cel-Shaded Steps")
+                case _:
+                    layer_node_group = ps.get_active_layer_node_group()
+                    inputs = []
+                    for input in layer_node_group.inputs:
+                        if not input.is_linked:
+                            inputs.append(input)
+                    for input in inputs:
+                        node_input_prop(col, layer_node_group,
+                                        input.name, text=input.name)
 
 
 # class MAT_MT_PaintSystemLayerMenu(Menu):
