@@ -166,3 +166,4 @@ paintsystem_updater/
 bl_ext.vscode_development.paintsystem_updater/
 
 .vscode
+.VSCodeCounter
