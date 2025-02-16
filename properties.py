@@ -15,7 +15,6 @@ from mathutils import Vector
 from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, update_paintsystem_data
 from dataclasses import dataclass
 from typing import Dict
-import itertools
 
 
 def get_all_group_names(self, context):

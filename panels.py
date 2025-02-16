@@ -13,10 +13,10 @@ from bpy.types import (Panel,
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
-from . import addon_updater_ops
-from .common import is_online, is_newer_than, icon_parser
+from .common import is_online, is_newer_than, icon_parser, import_legacy_updater
 from .operators_bake import is_bakeable
 # from .. import __package__ as base_package
+addon_updater_ops = import_legacy_updater()
 
 
 def node_input_prop(layout, node, name, text=None):
@@ -24,12 +24,32 @@ def node_input_prop(layout, node, name, text=None):
     if name in node.inputs:
         layout.prop(node.inputs[name], "default_value", text=text)
 
+
+def make_annotations(cls):
+    """Add annotation attribute to fields to avoid Blender 2.8+ warnings"""
+    if not hasattr(bpy.app, "version") or bpy.app.version < (2, 80):
+        return cls
+    if bpy.app.version < (2, 93, 0):
+        bl_props = {k: v for k, v in cls.__dict__.items()
+                    if isinstance(v, tuple)}
+    else:
+        bl_props = {k: v for k, v in cls.__dict__.items()
+                    if isinstance(v, bpy.props._PropertyDeferred)}
+    if bl_props:
+        if '__annotations__' not in cls.__dict__:
+            setattr(cls, '__annotations__', {})
+        annotations = cls.__dict__['__annotations__']
+        for k, v in bl_props.items():
+            annotations[k] = v
+            delattr(cls, k)
+    return cls
+
 # -------------------------------------------------------------------
 # Addon Preferences
 # -------------------------------------------------------------------
 
 
-@addon_updater_ops.make_annotations
+@make_annotations
 class PaintSystemPreferences(AddonPreferences):
     """Demo bare-bones preferences"""
     bl_idname = __package__
@@ -95,7 +115,8 @@ class PaintSystemPreferences(AddonPreferences):
 
         if is_online():
             # Updater draw function, could also pass in col as third arg.
-            addon_updater_ops.update_settings_ui(self, context)
+            if addon_updater_ops:
+                addon_updater_ops.update_settings_ui(self, context)
         else:
             self.auto_check_update = False
             layout.label(
@@ -116,8 +137,9 @@ class MAT_PT_PaintSystemGroups(Panel):
 
     @classmethod
     def poll(cls, context):
-        addon_updater_ops.check_for_update_background()
-        return (context.active_object and context.active_object.type == 'MESH' and context.active_object.mode != 'TEXTURE_PAINT') or addon_updater_ops.updater.update_ready
+        if addon_updater_ops:
+            addon_updater_ops.check_for_update_background()
+        return (context.active_object and context.active_object.type == 'MESH' and context.active_object.mode != 'TEXTURE_PAINT')
 
     def draw_header(self, context):
         layout = self.layout
@@ -127,7 +149,8 @@ class MAT_PT_PaintSystemGroups(Panel):
     def draw(self, context):
         layout = self.layout
 
-        addon_updater_ops.update_notice_box_ui(self, context)
+        if addon_updater_ops:
+            addon_updater_ops.update_notice_box_ui(self, context)
 
         ps = PaintSystem(context)
         ob = ps.active_object

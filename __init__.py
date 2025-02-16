@@ -16,7 +16,7 @@ import bpy
 from .properties import update_active_image
 from bpy.app.handlers import persistent
 from .paint_system import PaintSystem, get_paint_system_images
-from . import addon_updater_ops
+from .common import import_legacy_updater
 from . import auto_load
 
 bl_info = {
@@ -37,6 +37,7 @@ bl_info_copy = bl_info.copy()
 print("Paint System: Registering...", __package__)
 
 auto_load.init()
+addon_updater_ops = import_legacy_updater()
 
 
 @persistent
@@ -82,8 +83,9 @@ _register, _unregister = register_submodule_factory(__name__, submodules)
 
 def register():
     _register()
-    addon_updater_ops.register(bl_info_copy)
-    bpy.app.handlers.depsgraph_update_post.append(mode_change_handler)
+    if addon_updater_ops:
+        addon_updater_ops.register(bl_info_copy)
+    bpy.app.handlers.depsgraph_update_post.append(texture_paint_handler)
     bpy.app.handlers.save_pre.append(save_handler)
     bpy.app.handlers.load_post.append(refresh_image)
 
@@ -91,6 +93,7 @@ def register():
 def unregister():
     bpy.app.handlers.load_post.remove(refresh_image)
     bpy.app.handlers.save_pre.remove(save_handler)
-    bpy.app.handlers.depsgraph_update_post.remove(mode_change_handler)
-    addon_updater_ops.unregister()
+    bpy.app.handlers.depsgraph_update_post.remove(texture_paint_handler)
+    if addon_updater_ops:
+        addon_updater_ops.unregister()
     _unregister()

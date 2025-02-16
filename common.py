@@ -2,7 +2,6 @@ import bpy
 from bpy.types import Context
 from typing import List
 from mathutils import Vector
-
 icons = bpy.types.UILayout.bl_rna.functions["prop"].parameters["icon"].enum_items.keys(
 )
 
@@ -21,7 +20,12 @@ def is_newer_than(major, minor=0, patch=0):
     return bpy.app.version >= (major, minor, patch)
 
 
-STRING_CACHE = {}
+def import_legacy_updater():
+    try:
+        from . import addon_updater_ops
+        return addon_updater_ops
+    except ImportError:
+        return None
 
 
 def redraw_panel(self, context: Context):
@@ -33,7 +37,9 @@ def redraw_panel(self, context: Context):
 def map_range(num, inMin, inMax, outMin, outMax):
     return outMin + (float(num - inMin) / float(inMax - inMin) * (outMax - outMin))
 
+
 # Fixes UnicodeDecodeError bug
+STRING_CACHE = {}
 
 
 def intern_enum_items(items):
