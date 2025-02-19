@@ -288,7 +288,6 @@ class PaintSystem:
         new_layer = self._add_layer(
             name, f'_PS_Layer_Template', 'IMAGE', image=image, force_reload=False, make_copy=True)
         layer_nt = new_layer.node_tree
-        print(layer_nt)
 
         # Find the image texture node
         image_texture_node = None
@@ -618,7 +617,6 @@ class PaintSystem:
                 layer.image.name = f"PS {active_group.name} {layer.name} (MAT: {mat.name})"
 
     def _add_layer(self, layer_name, tree_name: str, item_type: str, sub_type="", image=None, force_reload=False, make_copy=False) -> NodeTree:
-        print("Adding layer")
         active_group = self.get_active_group()
         # Get insertion position
         parent_id, insert_order = active_group.get_insertion_data()

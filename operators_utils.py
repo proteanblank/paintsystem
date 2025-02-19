@@ -98,7 +98,6 @@ def set_active_panel_category(category, area_type):
                         bpy.ops.wm.context_toggle(
                             data_path='space_data.show_region_ui')
                 try:
-                    print(r.active_panel_category)
                     if r.active_panel_category != category:
                         r.active_panel_category = category
                         a.tag_redraw()
@@ -120,7 +119,6 @@ class PAINTSYSTEM_OT_SetActivePanel(Operator):
     )
 
     def execute(self, context: Context):
-        print(self.category, self.area_type)
         set_active_panel_category(self.category, self.area_type)
         return {'FINISHED'}
 
@@ -188,7 +186,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         default=True
     )
 
-    @ classmethod
+    @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
         return ps.get_active_group()
@@ -366,7 +364,6 @@ class PAINTSYSTEM_OT_ColorSampler(Operator):
         pixel = buffer.read_color(x, y, 1, 1, 3, 0, 'FLOAT')
         pixel.dimensions = 1 * 1 * 3
         pix_value = [float(item) for item in pixel]
-        # print(f"Sampled Color: {pix_value}")
 
         tool_settings = bpy.context.scene.tool_settings
         unified_settings = tool_settings.unified_paint_settings
@@ -376,7 +373,7 @@ class PAINTSYSTEM_OT_ColorSampler(Operator):
 
         return {'FINISHED'}
 
-    @ classmethod
+    @classmethod
     def poll(cls, context):
         return context.area.type == 'VIEW_3D' and context.active_object.mode == 'TEXTURE_PAINT'
 
