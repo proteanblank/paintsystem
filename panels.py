@@ -822,9 +822,13 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
 
         image_texture_node = ps.find_image_texture_node()
         if image_texture_node:
+            layout.prop(active_layer.image, "source",
+                        text="Source")
             layout.prop(image_texture_node, "interpolation",
                         text="Interpolation")
             layout.prop(active_layer.image, "alpha_mode", text="Alpha Mode")
+            layout.template_colorspace_settings(
+                active_layer.image, "colorspace_settings")
 
 # -------------------------------------------------------------------
 # Images Panels
