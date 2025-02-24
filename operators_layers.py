@@ -105,6 +105,12 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         default=True
     )
 
+    use_paintsystem_uv: BoolProperty(
+        name="Use Paint System UV",
+        description="Use the Paint System UV Map",
+        default=True
+    )
+
     def execute(self, context):
         ps = PaintSystem(context)
         mat = ps.get_active_material()
@@ -123,7 +129,12 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
 
         if self.create_material_setup:
             bpy.ops.paint_system.create_template_setup(
-                'INVOKE_DEFAULT', template=self.material_template, disable_popup=True, use_alpha_blend=self.use_alpha_blend)
+                'INVOKE_DEFAULT',
+                template=self.material_template,
+                disable_popup=True,
+                use_alpha_blend=self.use_alpha_blend,
+                use_paintsystem_uv=self.use_paintsystem_uv,
+            )
 
         if self.set_view_transform:
             context.scene.view_settings.view_transform = 'Standard'
@@ -149,6 +160,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         # row.prop(self, "create_material_setup",
         #          text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
         row.prop(self, "material_template", text="Template")
+        layout.prop(self, "use_paintsystem_uv", text="Use Paint System UV")
         if self.material_template in ['STANDARD', 'TRANSPARENT']:
             layout.prop(self, "use_alpha_blend", text="Use Alpha Blend")
         if context.scene.view_settings.view_transform != 'Standard':

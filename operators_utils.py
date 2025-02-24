@@ -186,6 +186,12 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         default=True
     )
 
+    use_paintsystem_uv: BoolProperty(
+        name="Use Paint System UV",
+        description="Use Paint System UV",
+        default=True
+    )
+
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
@@ -200,7 +206,8 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         if self.template in ('STANDARD', 'NONE'):
             bpy.ops.paint_system.new_solid_color(
                 'INVOKE_DEFAULT', disable_popup=True)
-        bpy.ops.paint_system.new_image('INVOKE_DEFAULT', disable_popup=True)
+        bpy.ops.paint_system.new_image('INVOKE_DEFAULT', disable_popup=True,
+                                       uv_map_mode='PAINT_SYSTEM' if self.use_paintsystem_uv else 'OPEN')
 
         node_organizer = NodeOrganizer(mat)
         if self.template == 'NONE':
