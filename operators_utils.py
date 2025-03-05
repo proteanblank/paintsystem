@@ -177,7 +177,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     use_alpha_blend: BoolProperty(
         name="Use Alpha Blend",
         description="Use alpha blend instead of alpha clip",
-        default=True
+        default=False
     )
 
     disable_show_backface: BoolProperty(
