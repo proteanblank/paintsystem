@@ -13,7 +13,7 @@ from bpy.types import (Panel,
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
-from .common import is_online, is_newer_than, icon_parser, import_legacy_updater
+from .common import is_online, is_newer_than, icon_parser, import_legacy_updater, find_keymap, get_event_icons
 from .operators_bake import is_bakeable
 # from .. import __package__ as base_package
 addon_updater_ops = import_legacy_updater()
@@ -105,6 +105,13 @@ class PaintSystemPreferences(AddonPreferences):
         default=False
     )
 
+    def draw_shortcut(self, layout, kmi, text):
+        row = layout.row(align=True)
+        row.prop(kmi, "active",
+                 text="", emboss=False)
+        row.label(text=text)
+        row.prop(kmi, "type", text="", full_event=True)
+
     def draw(self, context):
         layout = self.layout
 
@@ -112,6 +119,16 @@ class PaintSystemPreferences(AddonPreferences):
         layout.prop(self, "use_compact_design", text="Use Compact Design")
         layout.prop(self, "name_layers_group",
                     text="Name Layers According to Group Name")
+
+        box = layout.box()
+        box.label(text="Paint System Shortcuts:")
+
+        kmi = find_keymap('paint_system.color_sampler')
+        if kmi:
+            self.draw_shortcut(box, kmi, "Color Sampler Shortcut")
+        kmi = find_keymap('paint_system.toggle_brush_erase_alpha')
+        if kmi:
+            self.draw_shortcut(box, kmi, "Toggle Eraser")
 
         if is_online():
             # Updater draw function, could also pass in col as third arg.
@@ -190,6 +207,20 @@ class MAT_PT_PaintSystemGroups(Panel):
                 row.scale_y = 1.5
             row.operator("paint_system.new_group",
                          text="Add Group", icon='ADD')
+
+
+class MAT_MT_PaintSystemMaterialMenu(Menu):
+    bl_label = "Material Menu"
+    bl_idname = "MAT_MT_PaintSystemMaterialMenu"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("paint_system.new_group",
+                        text="New Group", icon='ADD')
+        layout.operator("paint_system.delete_group",
+                        text="Delete Group", icon='TRASH')
+        layout.operator("paint_system.rename_group",
+                        text="Rename Group", icon='GREASEPENCIL')
 
 
 class MAT_MT_PaintSystemGroup(Menu):
@@ -335,15 +366,20 @@ class MAT_MT_BrushTooltips(Menu):
     bl_description = "Brush Tooltips"
     bl_idname = "MAT_MT_BrushTooltips"
 
+    def draw_shortcut(self, layout, kmi, text):
+        row = layout.row(align=True)
+        icons = get_event_icons(kmi)
+        for idx, icon in enumerate(icons):
+            row.label(icon=icon, text=text if idx == len(icons)-1 else "")
+
     def draw(self, context):
         layout = self.layout
         # split = layout.split(factor=0.1)
         col = layout.column()
-        col.label(text="Switch to Eraser", icon='EVENT_E')
-        col.label(text="Eyedrop Screen Color", icon='EVENT_I')
-        row = col.row(align=True)
-        row.label(icon='EVENT_SHIFT', text="")
-        row.label(text="Eyedrop Layer Color", icon='EVENT_X')
+        kmi = find_keymap("paint_system.toggle_brush_erase_alpha")
+        self.draw_shortcut(col, kmi, "Toggle Erase Alpha")
+        kmi = find_keymap("paint_system.color_sampler")
+        self.draw_shortcut(col, kmi, "Eyedropper")
         col.label(text="Scale Brush Size", icon='EVENT_F')
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more shortcuts on Github!",
