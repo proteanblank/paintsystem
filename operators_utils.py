@@ -12,7 +12,7 @@ from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, get_brushes_from_library
 from mathutils import Vector
-from .common import redraw_panel, NodeOrganizer
+from .common import redraw_panel, NodeOrganizer, get_active_material_output
 from typing import List
 
 # bpy.types.Image.pack
@@ -160,7 +160,8 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     template: EnumProperty(
         name="Template",
         items=[
-            ('NONE', "Use Existing Material", "Just add node group to material"),
+            ('NONE', "Manual", "Just add node group to material"),
+            ('EXISTING', "Use Existing Setup", "Add to existing material setup"),
             ('STANDARD', "Standard", "Start off with a standard setup"),
             ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
             ('NORMAL', "Normal", "Start off with a normal painting setup"),
@@ -214,6 +215,49 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
             node_group = node_organizer.create_node(
                 'ShaderNodeGroup', {'node_tree': active_group.node_tree})
             node_organizer.move_nodes_to_end()
+            return {'FINISHED'}
+
+        if self.template == 'EXISTING':
+            # Use existing connected node to surface
+            material_output = get_active_material_output(mat.node_tree)
+            link = material_output.inputs['Surface'].links[0]
+            linked_node = link.from_node
+            socket = link.from_socket
+            is_shader = socket.type == 'SHADER'
+            if is_shader:
+                shader_to_rgb_node = node_organizer.create_node(
+                    'ShaderNodeShaderToRGB', {'location': linked_node.location + Vector((200, 0))})
+                node_organizer.create_link(
+                    linked_node.name, shader_to_rgb_node.name, socket.name, 'Shader')
+                linked_node = shader_to_rgb_node
+                socket = shader_to_rgb_node.outputs['Color']
+            node_group = node_organizer.create_node(
+                'ShaderNodeGroup', {'node_tree': active_group.node_tree, 'location': linked_node.location + Vector((200, 0))})
+            node_group.inputs['Alpha'].default_value = 1
+            node_organizer.create_link(
+                linked_node.name, node_group.name, socket.name, 'Color')
+            if is_shader:
+                node_organizer.create_link(
+                    linked_node.name, node_group.name, linked_node.outputs['Alpha'].name, 'Alpha')
+            emission_node = node_organizer.create_node(
+                'ShaderNodeEmission', {'location': node_group.location + Vector((200, -100))})
+            transparent_node = node_organizer.create_node(
+                'ShaderNodeBsdfTransparent', {'location': node_group.location + Vector((200, 100))})
+            shader_mix_node = node_organizer.create_node(
+                'ShaderNodeMixShader', {'location': node_group.location + Vector((400, 0))})
+            node_organizer.create_link(
+                node_group.name, emission_node.name, 'Color', 'Color')
+            node_organizer.create_link(
+                node_group.name, shader_mix_node.name, 'Alpha', 0)
+            node_organizer.create_link(
+                transparent_node.name, shader_mix_node.name, 'BSDF', 1)
+            node_organizer.create_link(
+                emission_node.name, shader_mix_node.name, 'Emission', 2)
+            node_organizer.create_link(
+                shader_mix_node.name, material_output.name, 'Shader', 'Surface')
+            material_output.location = shader_mix_node.location + \
+                Vector((200, 0))
+
             return {'FINISHED'}
 
         if self.use_alpha_blend:

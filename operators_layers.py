@@ -87,6 +87,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         name="Template",
         items=[
             ('NONE', "Manual", "Just add node group to material"),
+            ('EXISTING', "Use Existing Setup", "Add to existing material setup"),
             ('STANDARD', "Standard", "Start off with a standard setup"),
             ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
             ('NORMAL', "Normal", "Start off with a normal painting setup"),
@@ -120,6 +121,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
+        ps.get_material_settings().use_paintsystem_uv = self.use_paintsystem_uv
         mat = ps.get_active_material()
 
         if not mat:
@@ -162,6 +164,8 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         self.group_name = self.get_next_group_name(context)
         if groups:
             self.material_template = "NONE"
+        self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
+        ).use_paintsystem_uv else 'OPEN'
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
@@ -546,6 +550,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
+        ps.get_material_settings().use_paintsystem_uv = self.uv_map_mode == "PAINT_SYSTEM"
         active_group = ps.get_active_group()
         mat = ps.get_active_material()
         if self.uv_map_mode == 'PAINT_SYSTEM':
@@ -567,6 +572,9 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        ps = PaintSystem(context)
+        self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
+        ).use_paintsystem_uv else 'OPEN'
         self.name = self.get_next_image_name(context)
         if self.disable_popup:
             return self.execute(context)
@@ -612,6 +620,7 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
+        ps.get_material_settings().use_paintsystem_uv = self.uv_map_mode == "PAINT_SYSTEM"
         image = bpy.data.images.load(self.filepath, check_existing=True)
         if self.uv_map_mode == 'PAINT_SYSTEM':
             if 'PaintSystemUVMap' not in [uvmap[0] for uvmap in get_object_uv_maps(self, context)]:
@@ -625,6 +634,9 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        ps = PaintSystem(context)
+        self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
+        ).use_paintsystem_uv else 'OPEN'
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
@@ -658,6 +670,7 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
+        ps.get_material_settings().use_paintsystem_uv = self.uv_map_mode == "PAINT_SYSTEM"
         active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
@@ -677,6 +690,9 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        ps = PaintSystem(context)
+        self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
+        ).use_paintsystem_uv else 'OPEN'
         self.image_name = bpy.data.images[0].name
         return context.window_manager.invoke_props_dialog(self)
 

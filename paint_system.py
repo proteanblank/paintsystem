@@ -516,19 +516,22 @@ class PaintSystem:
 
         return self.active_object.active_material
 
-    def get_groups(self) -> Optional[PropertyGroup]:
+    def get_material_settings(self):
         mat = self.get_active_material()
         if not mat or not hasattr(mat, "paint_system"):
             return None
-        paint_system = mat.paint_system
+        return mat.paint_system
+
+    def get_groups(self) -> Optional[PropertyGroup]:
+        paint_system = self.get_material_settings()
+        if not paint_system:
+            return None
         return paint_system.groups
 
     def get_active_group(self) -> Optional[PropertyGroup]:
-        mat = self.get_active_material()
-        if not self.get_groups():
+        paint_system = self.get_material_settings()
+        if not paint_system:
             return None
-        paint_system = mat.paint_system
-
         active_group_idx = int(paint_system.active_group)
         if active_group_idx >= len(paint_system.groups):
             return None  # handle cases where active index is invalid

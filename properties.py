@@ -405,6 +405,11 @@ class PaintSystemGroups(PropertyGroup):
         items=get_all_group_names,
         update=update_active_image
     )
+    use_paintsystem_uv: BoolProperty(
+        name="Use Paint System UV",
+        description="Use the Paint System UV Map",
+        default=True
+    )
 
 
 class PaintSystemSettings(PropertyGroup):
