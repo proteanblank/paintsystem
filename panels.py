@@ -944,10 +944,11 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
                      text="Merge as New Layer", icon="FILE").as_new_layer = True
         col.operator("paint_system.merge_group",
                      text="Merge All Layers (Bake)").as_new_layer = False
-        col.separator()
-        col.label(text="Export:")
-        col.operator("paint_system.merge_and_export_group",
-                     text="Export Merged Image", icon='EXPORT')
+        # TODO: Fix export merged image
+        # col.separator()
+        # col.label(text="Export:")
+        # col.operator("paint_system.merge_and_export_group",
+        #              text="Export Merged Image", icon='EXPORT')
         # if not active_group.bake_image:
         #     col.label(text="Bake first!", icon='ERROR')
 
