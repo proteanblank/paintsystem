@@ -22,33 +22,31 @@ REQUIRES_INTERMEDIATE_STEP = (
 )
 
 
-def get_connected_nodes(output_node: Node) -> List[Node]:
+def get_connected_nodes(output_node: Node) -> List[Tuple[Node, int]]:
     """
-    Gets all nodes connected to the given output_node, 
+    Gets all nodes connected to the given output_node with their search depth,
     maintaining the order in which they were found and removing duplicates.
 
     Args:
-        node: The output node.
+        output_node: The output node.
 
     Returns:
-        A list of nodes, preserving the order of discovery and removing duplicates.
+        A list of tuples (Node, depth), preserving the order of discovery and removing duplicates.
     """
-
     nodes = []
-    visited = set()  # Here's where the set is used
+    visited = set()  # Track visited nodes to avoid duplicates
 
-    def traverse(node: Node):
-
+    def traverse(node: Node, depth: int = 0):
         if node not in visited:  # Check if the node has been visited
             visited.add(node)  # Add the node to the visited set
             if not node.mute:
-                nodes.append(node)
+                nodes.append((node, depth))
                 if hasattr(node, 'node_tree') and node.node_tree:
                     for sub_node in node.node_tree.nodes:
-                        traverse(sub_node)
+                        traverse(sub_node, depth + 1)
             for input in node.inputs:
                 for link in input.links:
-                    traverse(link.from_node)
+                    traverse(link.from_node, depth)
 
     traverse(output_node)
     return nodes
@@ -100,7 +98,7 @@ def is_bakeable(context: Context) -> Tuple[bool, str, List[Node]]:
     ris_nodes = []
     impossible_nodes = []
 
-    for node in connected_nodes:
+    for node, depth in connected_nodes:
         if node.bl_idname == "ShaderNodeGroup" and node.node_tree == node_tree:
             ps_groups.append(node)
         if node.bl_idname in REQUIRES_INTERMEDIATE_STEP:
@@ -205,7 +203,7 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
     # Save the original links from connected_nodes
     links = material.node_tree.links
     original_links = []
-    for node in connected_nodes:
+    for node, depth in connected_nodes:
         for input_socket in node.inputs:
             for link in input_socket.links:
                 original_links.append(link)
@@ -354,7 +352,10 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
             get_active_material_output(mat.node_tree))
         baking_steps: List[Tuple[Node, str, str, Image, str]] = []
         image_resolution = int(self.image_resolution)
-        for node in connected_node:
+        for node, depth in connected_node:
+            # TODO: Allow Baking inside groups
+            if depth != 0:
+                continue
             if node.bl_idname in REQUIRES_INTERMEDIATE_STEP:
                 # Create a new image with appropriate settings
                 image_name = f"{mat.name}_{node.name}"
