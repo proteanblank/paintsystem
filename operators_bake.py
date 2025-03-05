@@ -38,12 +38,14 @@ def get_connected_nodes(output_node: Node) -> List[Node]:
     visited = set()  # Here's where the set is used
 
     def traverse(node: Node):
+
         if node not in visited:  # Check if the node has been visited
             visited.add(node)  # Add the node to the visited set
-            nodes.append(node)
-            if hasattr(node, 'node_tree') and node.node_tree:
-                for sub_node in node.node_tree.nodes:
-                    traverse(sub_node)
+            if not node.mute:
+                nodes.append(node)
+                if hasattr(node, 'node_tree') and node.node_tree:
+                    for sub_node in node.node_tree.nodes:
+                        traverse(sub_node)
             for input in node.inputs:
                 for link in input.links:
                     traverse(link.from_node)
