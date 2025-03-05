@@ -156,23 +156,20 @@ class MAT_PT_PaintSystemGroups(Panel):
         ob = ps.active_object
         mat = ps.get_active_material()
 
-        layout.label(text="Selected Material:")
+        # layout.label(text="Selected Material:")
 
-        col = layout.column(align=True)
-        if not ps.preferences.use_compact_design:
-            col.scale_y = 1.2
-        col.template_ID(ob, "active_material", new="material.new")
+        # col.template_ID(ob, "active_material", new="material.new")
 
-        if not mat:
-            layout.label(text="No active material")
-            return
+        # if not mat:
+        #     layout.label(text="No active material")
+        #     return
 
-        col.prop(mat, "surface_render_method", text="")
-
-        row = layout.row()
-
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 2.0
+        if mat:
+            col = layout.column(align=True)
+            col.template_ID(ob, "active_material", new="material.new")
+            if not ps.preferences.use_compact_design:
+                col.scale_y = 1.2
+            col.prop(mat, "surface_render_method", text="")
 
         if hasattr(mat, "paint_system") and len(mat.paint_system.groups) > 0:
             row = layout.row(align=True)
@@ -891,22 +888,29 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
             for node in nodes:
                 col.operator("paint_system.focus_node",
                              text=node.name).node_name = node.name
-        else:
+            return
+        # Check if the file is saved
+        if not bpy.data.filepath:
             col = layout.column()
-            col.label(text="This is Experimental!", icon='ERROR')
-            col.label(text="Be sure to save regularly!")
-            col.separator()
-            col.label(text="Merge:")
-            col.operator("paint_system.merge_group",
-                         text="Merge as New Layer", icon="FILE").as_new_layer = True
-            col.operator("paint_system.merge_group",
-                         text="Merge All Layers (Bake)").as_new_layer = False
-            col.separator()
-            col.label(text="Export:")
-            col.operator("paint_system.merge_and_export_group",
-                         text="Export Merged Image", icon='EXPORT')
-            # if not active_group.bake_image:
-            #     col.label(text="Bake first!", icon='ERROR')
+            col.alert = True
+            col.label(text="Save the file first!", icon='ERROR')
+            return
+
+        col = layout.column()
+        col.label(text="This is Experimental!", icon='ERROR')
+        col.label(text="Be sure to save regularly!")
+        col.separator()
+        col.label(text="Merge:")
+        col.operator("paint_system.merge_group",
+                     text="Merge as New Layer", icon="FILE").as_new_layer = True
+        col.operator("paint_system.merge_group",
+                     text="Merge All Layers (Bake)").as_new_layer = False
+        col.separator()
+        col.label(text="Export:")
+        col.operator("paint_system.merge_and_export_group",
+                     text="Export Merged Image", icon='EXPORT')
+        # if not active_group.bake_image:
+        #     col.label(text="Bake first!", icon='ERROR')
 
 
 class MAT_MT_PaintSystemMergeOptimize(Menu):

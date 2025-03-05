@@ -120,8 +120,12 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         mat = ps.get_active_material()
-        if not mat or not hasattr(mat, "paint_system"):
-            return {'CANCELLED'}
+
+        if not mat:
+            # Create a new material
+            mat = bpy.data.materials.new("New Material")
+            mat.use_nodes = True
+            context.active_object.data.materials.append(mat)
 
         # Check for duplicate names
         for group in mat.paint_system.groups:
