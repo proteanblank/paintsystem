@@ -11,7 +11,7 @@ from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, get_nodetree_from_library
 from typing import List, Tuple
 from mathutils import Vector
-from .common import NodeOrganizer, get_object_uv_maps
+from .common import NodeOrganizer, get_object_uv_maps, get_connected_nodes, get_active_material_output
 import copy
 
 IMPOSSIBLE_NODES = (
@@ -20,51 +20,6 @@ IMPOSSIBLE_NODES = (
 REQUIRES_INTERMEDIATE_STEP = (
     "ShaderNodeShaderToRGB"
 )
-
-
-def get_connected_nodes(output_node: Node) -> List[Tuple[Node, int]]:
-    """
-    Gets all nodes connected to the given output_node with their search depth,
-    maintaining the order in which they were found and removing duplicates.
-
-    Args:
-        output_node: The output node.
-
-    Returns:
-        A list of tuples (Node, depth), preserving the order of discovery and removing duplicates.
-    """
-    nodes = []
-    visited = set()  # Track visited nodes to avoid duplicates
-
-    def traverse(node: Node, depth: int = 0):
-        if node not in visited:  # Check if the node has been visited
-            visited.add(node)  # Add the node to the visited set
-            if not node.mute:
-                nodes.append((node, depth))
-                if hasattr(node, 'node_tree') and node.node_tree:
-                    for sub_node in node.node_tree.nodes:
-                        traverse(sub_node, depth + 1)
-            for input in node.inputs:
-                for link in input.links:
-                    traverse(link.from_node, depth)
-
-    traverse(output_node)
-    return nodes
-
-
-def get_active_material_output(node_tree: NodeTree) -> Node:
-    """Get the active material output node
-
-    Args:
-        node_tree (bpy.types.NodeTree): The node tree to check
-
-    Returns:
-        bpy.types.Node: The active material output node
-    """
-    for node in node_tree.nodes:
-        if node.bl_idname == "ShaderNodeOutputMaterial" and node.is_active_output:
-            return node
-    return None
 
 
 def is_bakeable(context: Context) -> Tuple[bool, str, List[Node]]:

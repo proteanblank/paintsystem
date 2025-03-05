@@ -1,7 +1,8 @@
 import bpy
-from bpy.types import Context
+from bpy.types import Context, Node, NodeTree, Image
 from typing import List
 from mathutils import Vector
+from typing import List, Tuple
 icons = bpy.types.UILayout.bl_rna.functions["prop"].parameters["icon"].enum_items.keys(
 )
 
@@ -80,11 +81,11 @@ class NodeOrganizer:
         self.created_nodes_names.append(node.name)
         return node
 
-    def create_link(self, output_node_name: str, input_node_name: str, output_name, input_name):
-        output_node = self.nodes[output_node_name]
-        input_node = self.nodes[input_node_name]
-        self.links.new(input_node.inputs[input_name],
-                       output_node.outputs[output_name])
+    def create_link(self, from_node_name: str, to_node_name: str, from_socket_name, to_socket_name):
+        output_node = self.nodes[from_node_name]
+        input_node = self.nodes[to_node_name]
+        self.links.new(input_node.inputs[to_socket_name],
+                       output_node.outputs[from_socket_name])
 
     def move_nodes_offset(self, offset: Vector):
         created_nodes = [self.nodes[name] for name in self.created_nodes_names]
@@ -249,3 +250,48 @@ def get_event_icons(kmi):
         icons.append('KEYINGSET')
 
     return icons
+
+
+def get_connected_nodes(output_node: Node) -> List[Tuple[Node, int]]:
+    """
+    Gets all nodes connected to the given output_node with their search depth,
+    maintaining the order in which they were found and removing duplicates.
+
+    Args:
+        output_node: The output node.
+
+    Returns:
+        A list of tuples (Node, depth), preserving the order of discovery and removing duplicates.
+    """
+    nodes = []
+    visited = set()  # Track visited nodes to avoid duplicates
+
+    def traverse(node: Node, depth: int = 0):
+        if node not in visited:  # Check if the node has been visited
+            visited.add(node)  # Add the node to the visited set
+            if not node.mute:
+                nodes.append((node, depth))
+                if hasattr(node, 'node_tree') and node.node_tree:
+                    for sub_node in node.node_tree.nodes:
+                        traverse(sub_node, depth + 1)
+            for input in node.inputs:
+                for link in input.links:
+                    traverse(link.from_node, depth)
+
+    traverse(output_node)
+    return nodes
+
+
+def get_active_material_output(node_tree: NodeTree) -> Node:
+    """Get the active material output node
+
+    Args:
+        node_tree (bpy.types.NodeTree): The node tree to check
+
+    Returns:
+        bpy.types.Node: The active material output node
+    """
+    for node in node_tree.nodes:
+        if node.bl_idname == "ShaderNodeOutputMaterial" and node.is_active_output:
+            return node
+    return None
