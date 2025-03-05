@@ -190,8 +190,8 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
 
     # Debug
     print(f"Baking {target_node.name}")
-
-    obj = context.active_object
+    ps = PaintSystem(context)
+    obj = ps.active_object
     if not obj or not obj.active_material:
         return None
 

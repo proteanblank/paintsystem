@@ -173,7 +173,7 @@ class PaintSystem:
             context, "scene") else None
         self.context = context
         self.active_object = context.active_object if hasattr(
-            context, "active_object") else None
+            context, "active_object") and context.selected_objects else None
         # self.settings = self.get_settings()
         # mat = self.get_active_material()
         # self.groups = self.get_groups()

@@ -29,7 +29,8 @@ class PAINTSYSTEM_OT_DuplicateGroupWarning(Operator):
     group_name: StringProperty()
 
     def execute(self, context):
-        mat = context.active_object.active_material
+        ps = PaintSystem(context)
+        mat = ps.get_active_material()
         new_group = mat.paint_system.groups.add()
         new_group.name = self.group_name
 
@@ -123,9 +124,9 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
 
         if not mat:
             # Create a new material
-            mat = bpy.data.materials.new("New Material")
+            mat = bpy.data.materials.new("Material")
             mat.use_nodes = True
-            context.active_object.data.materials.append(mat)
+            ps.active_object.data.materials.append(mat)
 
         # Check for duplicate names
         for group in mat.paint_system.groups:

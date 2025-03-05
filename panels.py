@@ -137,9 +137,11 @@ class MAT_PT_PaintSystemGroups(Panel):
 
     @classmethod
     def poll(cls, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
         if addon_updater_ops:
             addon_updater_ops.check_for_update_background()
-        return (context.active_object and context.active_object.type == 'MESH' and context.active_object.mode != 'TEXTURE_PAINT')
+        return (obj and obj.type == 'MESH' and obj.mode != 'TEXTURE_PAINT')
 
     def draw_header(self, context):
         layout = self.layout
@@ -165,11 +167,12 @@ class MAT_PT_PaintSystemGroups(Panel):
         #     return
 
         if mat:
-            col = layout.column(align=True)
-            col.template_ID(ob, "active_material", new="material.new")
+            row = layout.row(align=True)
+            # col.label(text="Material Settings:")
+            row.template_ID(ob, "active_material")
             if not ps.preferences.use_compact_design:
-                col.scale_y = 1.2
-            col.prop(mat, "surface_render_method", text="")
+                row.scale_y = 1.2
+            # col.prop(mat, "surface_render_method", text="")
 
         if hasattr(mat, "paint_system") and len(mat.paint_system.groups) > 0:
             row = layout.row(align=True)

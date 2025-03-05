@@ -382,7 +382,8 @@ class PAINTSYSTEM_OT_ColorSampler(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.area.type == 'VIEW_3D' and context.active_object.mode == 'TEXTURE_PAINT'
+        ps = PaintSystem(context)
+        return context.area.type == 'VIEW_3D' and ps.active_object.mode == 'TEXTURE_PAINT'
 
     def invoke(self, context, event):
         self.x = event.mouse_x

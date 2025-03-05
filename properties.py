@@ -18,7 +18,8 @@ from typing import Dict
 
 
 def get_all_group_names(self, context):
-    mat = context.active_object.active_material
+    ps = PaintSystem(context)
+    mat = ps.active_object.active_material
     if not mat or not hasattr(mat, "paint_system"):
         return []
     return [(str(i), group.name, f"Group {i}") for i, group in enumerate(mat.paint_system.groups)]
