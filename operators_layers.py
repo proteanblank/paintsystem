@@ -121,7 +121,6 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        ps.get_material_settings().use_paintsystem_uv = self.use_paintsystem_uv
         mat = ps.get_active_material()
 
         if not mat:
@@ -129,7 +128,8 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
             mat = bpy.data.materials.new("Material")
             mat.use_nodes = True
             ps.active_object.data.materials.append(mat)
-
+        
+        ps.get_material_settings().use_paintsystem_uv = self.use_paintsystem_uv
         # Check for duplicate names
         for group in mat.paint_system.groups:
             if group.name == self.group_name:
