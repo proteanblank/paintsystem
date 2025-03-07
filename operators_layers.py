@@ -164,7 +164,8 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         self.group_name = self.get_next_group_name(context)
         if groups:
             self.material_template = "NONE"
-        self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
+        if ps.get_active_material():
+            self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
         ).use_paintsystem_uv else 'OPEN'
         return context.window_manager.invoke_props_dialog(self)
 
