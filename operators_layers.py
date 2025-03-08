@@ -74,7 +74,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         return f"New Group {number}"
 
     group_name: StringProperty(
-        name="Name",
+        name="Group Name",
         description="Name for the new group",
         default="New Group"
     )
@@ -114,6 +114,8 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         description="Use the Paint System UV Map",
         default=True
     )
+    
+    hide_template: BoolProperty(default=False)
 
     def execute(self, context):
         ps = PaintSystem(context)
@@ -174,27 +176,26 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     def draw(self, context):
         ps = PaintSystem(context)
         layout = self.layout
-        row = layout.row()
-        row.scale_y = 1.5
-        row.prop(self, "group_name")
-        # row = layout.row(align=True)
-        # row.scale_y = 1.5
-        # row.prop(self, "create_material_setup",
-        #          text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
-        # row.prop(self, "material_template", text="Template")
+        if not self.hide_template:
+            row = layout.row(align=True)
+            row.scale_y = 1.5
+            # row.prop(self, "create_material_setup",
+            #         text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
+            row.prop(self, "material_template", text="Template")
         row = layout.row()
         row.scale_y = 1.2
         row.prop(self, "use_paintsystem_uv", text="Use Paint System UV", icon='CHECKBOX_HLT' if self.use_paintsystem_uv else 'CHECKBOX_DEHLT')
-        if self.material_template in ['STANDARD', 'TRANSPARENT'] or context.scene.view_settings.view_transform != 'Standard':
-            box = layout.box()
-            if self.material_template in ['STANDARD', 'TRANSPARENT']:
-                split = box.split()
-                split.prop(self, "use_alpha_blend", text="Use Alpha Blend")
-                split.prop(self, "use_backface_culling",
-                            text="Use Backface Culling")
-            if context.scene.view_settings.view_transform != 'Standard':
-                box.prop(self, "set_view_transform",
-                            text="Set View Transform to Standard")
+        box = layout.box()
+        split = box.split(factor=0.4)
+        split.label(text="Group Name:")
+        split.prop(self, "group_name", text="", icon='NODETREE')
+        if self.material_template in ['STANDARD', 'TRANSPARENT']:
+            box.prop(self, "use_alpha_blend", text="Use Alpha Blend")
+            box.prop(self, "use_backface_culling",
+                        text="Use Backface Culling")
+        if context.scene.view_settings.view_transform != 'Standard':
+            box.prop(self, "set_view_transform",
+                        text="Set View Transform to Standard")
 
 
 class PAINTSYSTEM_OT_DeleteGroup(Operator):

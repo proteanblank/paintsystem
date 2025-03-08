@@ -190,24 +190,30 @@ class MAT_PT_PaintSystemGroups(Panel):
         #     if not ps.preferences.use_compact_design:
         #         row.scale_y = 1.2
         #     # col.prop(mat, "surface_render_method", text="")
+        
+        if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
+            layout.label(text="Selected Material:")
+            layout.template_ID(ob, "active_material")
 
         if not hasattr(mat, "paint_system") or len(mat.paint_system.groups) == 0:
             col = layout.column(align=True)
             if not ps.preferences.use_compact_design:
                 col.scale_y = 1.5
-            col.operator("paint_system.new_group",
-                         text="Add Paint System Material" if not mat else "Add Paint System", icon='ADD').material_template = ps.settings.template
+            ops = col.operator("paint_system.new_group",
+                         text="Add Paint System Material" if not mat else "Add Paint System", icon='MATERIAL' if not mat else "ADD")
+            ops.material_template = ps.settings.template
+            ops.hide_template = True
             col.prop(ps.settings, "template", text="")
             # if ps.settings.template == 'EXISTING':
             #     layout.prop(ob, "active_material", text="")
-        else:
-            row = layout.row(align=True)
-            if not ps.preferences.use_compact_design:
-                row.scale_y = 1.5
-                row.scale_x = 1.5
-            active_group = ps.get_active_group()
-            row.prop(active_group, "name", text="")
-            row.operator("paint_system.delete_group", text="", icon='TRASH')
+        # else:
+        #     row = layout.row(align=True)
+        #     if not ps.preferences.use_compact_design:
+        #         row.scale_y = 1.5
+        #         row.scale_x = 1.5
+        #     active_group = ps.get_active_group()
+        #     row.prop(active_group, "name", text="")
+        #     row.operator("paint_system.delete_group", text="", icon='TRASH')
             # row.prop(mat.paint_system, "active_group", text="")
             # row.operator("paint_system.new_group",
             #              text="", icon='ADD')
@@ -234,9 +240,8 @@ class MAT_PT_GroupAdvanced(Panel):
         ps = PaintSystem(context)
         mat = ps.get_active_material()
         
-        box = layout.box()
-        box.label(text="Active Group:")
-        row = box.row(align=True)
+        layout.label(text="Editing Node Group:", icon="NODETREE")
+        row = layout.row(align=True)
         if not ps.preferences.use_compact_design:
             row.scale_y = 1.5
             row.scale_x = 1.5
@@ -250,14 +255,15 @@ class MAT_PT_GroupAdvanced(Panel):
         
         ob = ps.active_object
         box = layout.box()
-        box.label(text="Material Settings:")
-        box.template_ID(ob, "active_material", new="material.new")
+        box.label(text="Material Settings:", icon="MATERIAL")
         box.prop(mat, "surface_render_method", text="")
+        box.prop(ob, "visible_shadow")
+        box.prop(mat, "use_backface_culling", text="Backface Culling")
         
         
         
-        layout.prop(ps.settings, "allow_image_overwrite",
-                     text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
+        # layout.prop(ps.settings, "allow_image_overwrite",
+        #              text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
 
 
 class MAT_MT_PaintSystemMaterialMenu(Menu):
@@ -420,8 +426,8 @@ class MAT_PT_Brush(Panel):
                      "use_unified_size", icon="WORLD", text="Size", slider=True)
         prop_unified(col, context, "strength",
                      "use_unified_strength", icon="WORLD", text="Strength")
-        box.prop(ps.settings, "allow_image_overwrite",
-                    text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
+        # box.prop(ps.settings, "allow_image_overwrite",
+        #             text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
         # row.label(text="Brush Shortcuts")
 
 

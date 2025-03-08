@@ -30,11 +30,11 @@ SHADER_ENUM = [
     ('_PS_Ambient_Occlusion', "Ambient Occlusion", "Ambient Occlusion"),
 ]
 TEMPLATE_ENUM = [
-    ('NONE', "None", "Just add node group to material", "NONE", 0),
-    ('STANDARD', "Standard", "Start off with a standard setup", "PLUS", 1),
-    ('EXISTING', "Convert Existing Material", "Add to existing material setup", "FILE_REFRESH", 2),
+    ('STANDARD', "Standard", "Start off with a standard setup", "IMAGE", 0),
+    ('EXISTING', "Convert Existing Material", "Add to existing material setup", "FILE_REFRESH", 1),
     # ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
-    ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 3),
+    ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 2),
+    ('NONE', "None", "Just add node group to material", "NONE", 3),
 ]
 
 
