@@ -72,6 +72,11 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         number = get_highest_number_with_prefix(
             'New Group', [item.name for item in groups]) + 1
         return f"New Group {number}"
+    
+    material_name: StringProperty(
+        name="Material Name",
+        default="New Material"
+    )
 
     group_name: StringProperty(
         name="Group Name",
@@ -124,7 +129,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
 
         if not mat:
             # Create a new material
-            mat = bpy.data.materials.new(f"{self.group_name}")
+            mat = bpy.data.materials.new(f"{self.material_name}")
             obj = ps.active_object
             mat.use_nodes = True
             if obj.material_slots and not obj.material_slots[obj.active_material_index].material:
@@ -176,6 +181,13 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     def draw(self, context):
         ps = PaintSystem(context)
         layout = self.layout
+        mat = ps.get_active_material()
+        obj = ps.active_object
+        if not mat:
+            layout.label(text="Material Name:")
+            row = layout.row()
+            row.scale_y = 1.5
+            row.prop(self, "material_name", text="")
         if not self.hide_template:
             row = layout.row(align=True)
             row.scale_y = 1.5
@@ -185,6 +197,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         row = layout.row()
         row.scale_y = 1.2
         row.prop(self, "use_paintsystem_uv", text="Use Paint System UV", icon='CHECKBOX_HLT' if self.use_paintsystem_uv else 'CHECKBOX_DEHLT')
+        layout.separator()
         box = layout.box()
         split = box.split(factor=0.4)
         split.label(text="Group Name:")
