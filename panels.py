@@ -193,7 +193,11 @@ class MAT_PT_PaintSystemGroups(Panel):
         
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
             layout.label(text="Selected Material:")
-            layout.template_ID(ob, "active_material")
+            row = layout.row(align=True)
+            if not ps.preferences.use_compact_design:
+                row.scale_x = 1.5
+                row.scale_y = 1.5
+            row.template_ID(ob, "active_material")
 
         if not hasattr(mat, "paint_system") or len(mat.paint_system.groups) == 0:
             col = layout.column(align=True)
@@ -225,7 +229,7 @@ class MAT_PT_GroupAdvanced(Panel):
     bl_idname = 'MAT_PT_Group_Advanced'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_label = "Advanced"
+    bl_label = "Advanced Settings"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_PaintSystemGroups'
     bl_options = {'DEFAULT_CLOSED'}

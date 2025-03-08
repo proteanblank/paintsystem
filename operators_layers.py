@@ -184,10 +184,17 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         mat = ps.get_active_material()
         obj = ps.active_object
         if not mat:
-            layout.label(text="Material Name:")
-            row = layout.row()
-            row.scale_y = 1.5
-            row.prop(self, "material_name", text="")
+            split = layout.split(factor=0.4)
+            split.scale_y = 1.5
+            split.label(text="New Material Name:")
+            split.prop(self, "material_name", text="")
+        else:
+            split = layout.split(factor=0.4)
+            split.scale_y = 1.5
+            split.label(text="Selected Material:")
+            row = split.row(align=True)
+            row.prop(obj, "active_material", text="")
+            # row.operator("material.new", text="", icon='ADD')
         if not self.hide_template:
             row = layout.row(align=True)
             row.scale_y = 1.5
@@ -199,6 +206,9 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         row.prop(self, "use_paintsystem_uv", text="Use Paint System UV", icon='CHECKBOX_HLT' if self.use_paintsystem_uv else 'CHECKBOX_DEHLT')
         layout.separator()
         box = layout.box()
+        row = box.row()
+        row.alignment = "CENTER"
+        row.label(text="Advanced Settings:", icon="TOOL_SETTINGS")
         split = box.split(factor=0.4)
         split.label(text="Group Name:")
         split.prop(self, "group_name", text="", icon='NODETREE')
