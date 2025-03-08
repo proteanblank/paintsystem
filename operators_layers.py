@@ -57,7 +57,7 @@ class PAINTSYSTEM_OT_DuplicateGroupWarning(Operator):
 class PAINTSYSTEM_OT_NewGroup(Operator):
     """Add a new group"""
     bl_idname = "paint_system.new_group"
-    bl_label = "Add Group"
+    bl_label = "Add Paint System"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     bl_description = "Add a new group"
 
