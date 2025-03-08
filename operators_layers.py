@@ -174,20 +174,27 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
     def draw(self, context):
         ps = PaintSystem(context)
         layout = self.layout
-        layout.prop(self, "group_name")
-        row = layout.row(align=True)
+        row = layout.row()
         row.scale_y = 1.5
+        row.prop(self, "group_name")
+        # row = layout.row(align=True)
+        # row.scale_y = 1.5
         # row.prop(self, "create_material_setup",
         #          text="Setup Material", icon='CHECKBOX_HLT' if self.create_material_setup else 'CHECKBOX_DEHLT')
-        row.prop(self, "material_template", text="Template")
-        layout.prop(self, "use_paintsystem_uv", text="Use Paint System UV")
-        if self.material_template in ['STANDARD', 'TRANSPARENT']:
-            layout.prop(self, "use_alpha_blend", text="Use Alpha Blend")
-            layout.prop(self, "use_backface_culling",
-                        text="Use Backface Culling")
-        if context.scene.view_settings.view_transform != 'Standard':
-            layout.prop(self, "set_view_transform",
-                        text="Set View Transform to Standard")
+        # row.prop(self, "material_template", text="Template")
+        row = layout.row()
+        row.scale_y = 1.2
+        row.prop(self, "use_paintsystem_uv", text="Use Paint System UV", icon='CHECKBOX_HLT' if self.use_paintsystem_uv else 'CHECKBOX_DEHLT')
+        if self.material_template in ['STANDARD', 'TRANSPARENT'] or context.scene.view_settings.view_transform != 'Standard':
+            box = layout.box()
+            if self.material_template in ['STANDARD', 'TRANSPARENT']:
+                split = box.split()
+                split.prop(self, "use_alpha_blend", text="Use Alpha Blend")
+                split.prop(self, "use_backface_culling",
+                            text="Use Backface Culling")
+            if context.scene.view_settings.view_transform != 'Standard':
+                box.prop(self, "set_view_transform",
+                            text="Set View Transform to Standard")
 
 
 class PAINTSYSTEM_OT_DeleteGroup(Operator):
