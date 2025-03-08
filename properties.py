@@ -215,14 +215,20 @@ class PaintSystemGroup(BaseNestedListManager):
         special_inputs = ['Normal']
         # special_sockets: list[NodeSocket] = []
         for input_name in special_inputs:
-            socket = interface.items_tree.get(input_name)
+            print(interface.items_tree.keys())
+            interface_socket = interface.items_tree.get(input_name)
 
-            special_socket_type = [item.node_tree.interface.items_tree.get(input_name)
-                                   for item, _ in flattened if item.node_tree]
-            # special_sockets.extend(special_socket_type)
-            if any(special_socket_type) != bool(socket):
-                if socket:
-                    interface.remove(socket)
+            special_socket_type = []
+            for item, _ in flattened:
+                if item.node_tree:
+                    socket = item.node_tree.interface.items_tree.get(input_name)
+                    if socket:
+                        special_socket_type.append(socket)
+
+            print(special_socket_type, interface_socket)
+            if any(special_socket_type) != bool(interface_socket):
+                if interface_socket:
+                    interface.remove(interface_socket)
                 else:
                     new_socket = interface.new_socket(
                         name=input_name, in_out='INPUT', socket_type=special_socket_type[0].socket_type)
