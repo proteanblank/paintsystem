@@ -489,17 +489,19 @@ class PAINTSYSTEM_OT_ExportBakedImage(Operator):
             return {'CANCELLED'}
 
         image = active_group.bake_image
-        if not image:
-            self.report({'ERROR'}, "No baked image found.")
-            return {'CANCELLED'}
+        # if not image:
+        #     self.report({'ERROR'}, "No baked image found.")
+        #     return {'CANCELLED'}
 
-        image_editor_area = split_area(
-            context, direction='VERTICAL', factor=0.5)
-        image_editor_area.type = 'IMAGE_EDITOR'  # Set the new area to be Image Editor
-        with context.temp_override(area=image_editor_area):
-            context.space_data.image = image
+        # image_editor_area = split_area(
+        #     context, direction='VERTICAL', factor=0.5)
+        # image_editor_area.type = 'IMAGE_EDITOR'  # Set the new area to be Image Editor
+        # with context.temp_override(area=image_editor_area):
+        #     context.space_data.image = image
+        #     bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
+        #     bpy.ops.screen.area_close('INVOKE_DEFAULT')
+        with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
             bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
-            bpy.ops.screen.area_close('INVOKE_DEFAULT')
         return {'FINISHED'}
 
 
