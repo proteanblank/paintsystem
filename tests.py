@@ -2,7 +2,7 @@ import bpy
 from bpy.utils import register_classes_factory
 from unittest import TestLoader, TestResult, TextTestRunner
 from pathlib import Path
-from paint_system import PaintSystem
+from .paint_system import PaintSystem
 
 
 def run_tests():
