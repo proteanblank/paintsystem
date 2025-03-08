@@ -4,14 +4,16 @@ from bpy.props import (
     StringProperty,
     FloatVectorProperty,
     EnumProperty,
+    IntProperty,
 )
 import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
-from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
+from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM, TEMPLATE_ENUM
 from .common import redraw_panel, get_object_uv_maps
 import re
 import copy
+import numpy
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
@@ -72,7 +74,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         return f"New Group {number}"
 
     group_name: StringProperty(
-        name="Group Name",
+        name="Name",
         description="Name for the new group",
         default="New Group"
     )
@@ -85,13 +87,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
 
     material_template: EnumProperty(
         name="Template",
-        items=[
-            ('NONE', "Manual", "Just add node group to material"),
-            ('EXISTING', "Use Existing Setup", "Add to existing material setup"),
-            ('STANDARD', "Standard", "Start off with a standard setup"),
-            ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
-            ('NORMAL', "Normal", "Start off with a normal painting setup"),
-        ],
+        items=TEMPLATE_ENUM,
         default='STANDARD'
     )
 
@@ -866,6 +862,111 @@ class PAINTSYSTEM_OT_NewShaderLayer(Operator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_InvertColors(Operator):
+    bl_idname = "paint_system.invert_colors"
+    bl_label = "Invert Colors"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Invert the colors of the active image"
+    
+    invert_r: BoolProperty(default=True)
+    invert_g: BoolProperty(default=True)
+    invert_b: BoolProperty(default=True)
+    invert_a: BoolProperty(default=False)
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        return active_layer and active_layer.image
+    
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        image: bpy.types.Image = active_layer.image
+        with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
+            bpy.ops.image.invert('INVOKE_DEFAULT', invert_r=self.invert_r, invert_g=self.invert_g, invert_b=self.invert_b, invert_a=self.invert_a)
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "invert_r", text="Red")
+        layout.prop(self, "invert_g", text="Green")
+        layout.prop(self, "invert_b", text="Blue")
+        layout.prop(self, "invert_a", text="Alpha")
+
+class PAINTSYSTEM_OT_ExportLayer(Operator):
+    bl_idname = "paint_system.export_layer"
+    bl_label = "Save Image"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Save the active image"
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        image = active_layer.image
+        with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
+            bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
+        return {'FINISHED'}
+
+class PAINTSYSTEM_OT_ResizeImage(Operator):
+    bl_idname = "paint_system.resize_image"
+    bl_label = "Resize Image"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Resize the active image"
+
+    width: IntProperty(name="Width", default=1024)
+    height: IntProperty(name="Height", default=1024)
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        return active_layer and active_layer.image
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        image = active_layer.image
+        image.scale(self.width, self.height)
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        image = active_layer.image
+        self.width = image.size[0]
+        self.height = image.size[1]
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row()
+        row.prop(self, "width")
+        row.prop(self, "height")
+        
+class PAINTSYSTEM_OT_ClearImage(Operator):
+    bl_idname = "paint_system.clear_image"
+    bl_label = "Clear Image"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Clear the active image"
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        return active_layer and active_layer.image
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        image = active_layer.image
+        image.generated_color = (0, 0, 0, 0)
+        return {'FINISHED'}
+
+
 classes = (
     PAINTSYSTEM_OT_DuplicateGroupWarning,
     PAINTSYSTEM_OT_NewGroup,
@@ -882,6 +983,10 @@ classes = (
     PAINTSYSTEM_OT_NewFolder,
     PAINTSYSTEM_OT_NewAdjustmentLayer,
     PAINTSYSTEM_OT_NewShaderLayer,
+    PAINTSYSTEM_OT_ExportLayer,
+    PAINTSYSTEM_OT_InvertColors,
+    PAINTSYSTEM_OT_ResizeImage,
+    PAINTSYSTEM_OT_ClearImage,
 )
 
 register, unregister = register_classes_factory(classes)

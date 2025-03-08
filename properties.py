@@ -12,7 +12,7 @@ from bpy.types import (PropertyGroup, Context,
                        NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket, Node)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
-from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, update_paintsystem_data
+from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, update_paintsystem_data, TEMPLATE_ENUM
 from dataclasses import dataclass
 from typing import Dict
 
@@ -403,7 +403,7 @@ class PaintSystemGroups(PropertyGroup):
         name="Active Group",
         description="Select active group",
         items=get_all_group_names,
-        update=update_active_image
+        update=update_active_image,
     )
     use_paintsystem_uv: BoolProperty(
         name="Use Paint System UV",
@@ -422,6 +422,12 @@ class PaintSystemSettings(PropertyGroup):
         name="Allow Image Overwrite",
         description="Make Image in 3D Viewport the same as the active layer",
         default=True
+    )
+    
+    template: EnumProperty(
+        name="Template",
+        items=TEMPLATE_ENUM,
+        default='STANDARD',
     )
 
 

@@ -176,37 +176,88 @@ class MAT_PT_PaintSystemGroups(Panel):
         mat = ps.get_active_material()
 
         # layout.label(text="Selected Material:")
-
-        # col.template_ID(ob, "active_material", new="material.new")
+        # layout.template_ID(ob, "active_material", new="material.new")
+        
 
         # if not mat:
         #     layout.label(text="No active material")
         #     return
 
-        if mat:
-            row = layout.row(align=True)
-            # col.label(text="Material Settings:")
-            row.template_ID(ob, "active_material")
-            if not ps.preferences.use_compact_design:
-                row.scale_y = 1.2
-            # col.prop(mat, "surface_render_method", text="")
+        # if mat:
+        #     row = layout.row(align=True)
+        #     # col.label(text="Material Settings:")
+        #     row.template_ID(ob, "active_material")
+        #     if not ps.preferences.use_compact_design:
+        #         row.scale_y = 1.2
+        #     # col.prop(mat, "surface_render_method", text="")
 
-        if hasattr(mat, "paint_system") and len(mat.paint_system.groups) > 0:
-            row = layout.row(align=True)
+        if not hasattr(mat, "paint_system") or len(mat.paint_system.groups) == 0:
+            col = layout.column(align=True)
             if not ps.preferences.use_compact_design:
-                row.scale_y = 1.5
-                row.scale_x = 1.5
-            row.prop(mat.paint_system, "active_group", text="")
-            row.operator("paint_system.new_group",
-                         text="", icon='ADD')
-            col = row.column(align=True)
-            col.menu("MAT_MT_PaintSystemGroup", text="", icon='COLLAPSEMENU')
+                col.scale_y = 1.5
+            col.operator("paint_system.new_group",
+                         text="Add Paint System Material" if not mat else "Add Paint System", icon='ADD').material_template = ps.settings.template
+            col.prop(ps.settings, "template", text="")
+            # if ps.settings.template == 'EXISTING':
+            #     layout.prop(ob, "active_material", text="")
         else:
             row = layout.row(align=True)
             if not ps.preferences.use_compact_design:
                 row.scale_y = 1.5
-            row.operator("paint_system.new_group",
-                         text="Add Group", icon='ADD')
+                row.scale_x = 1.5
+            active_group = ps.get_active_group()
+            row.prop(active_group, "name", text="")
+            row.operator("paint_system.delete_group", text="", icon='TRASH')
+            # row.prop(mat.paint_system, "active_group", text="")
+            # row.operator("paint_system.new_group",
+            #              text="", icon='ADD')
+            # col = row.column(align=True)
+            # col.menu("MAT_MT_PaintSystemGroupMenu", text="", icon='COLLAPSEMENU')
+
+
+class MAT_PT_GroupAdvanced(Panel):
+    bl_idname = 'MAT_PT_Group_Advanced'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Advanced"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_PaintSystemGroups'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        return ps.get_active_group()
+    
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        mat = ps.get_active_material()
+        
+        box = layout.box()
+        box.label(text="Active Group:")
+        row = box.row(align=True)
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.5
+            row.scale_x = 1.5
+        row.prop(mat.paint_system, "active_group", text="")
+        row.operator("paint_system.new_group",
+                     text="", icon='ADD')
+        col = row.column(align=True)
+        col.menu("MAT_MT_PaintSystemGroupMenu", text="", icon='COLLAPSEMENU')
+        
+        
+        
+        ob = ps.active_object
+        box = layout.box()
+        box.label(text="Material Settings:")
+        box.template_ID(ob, "active_material", new="material.new")
+        box.prop(mat, "surface_render_method", text="")
+        
+        
+        
+        layout.prop(ps.settings, "allow_image_overwrite",
+                     text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
 
 
 class MAT_MT_PaintSystemMaterialMenu(Menu):
@@ -223,9 +274,9 @@ class MAT_MT_PaintSystemMaterialMenu(Menu):
                         text="Rename Group", icon='GREASEPENCIL')
 
 
-class MAT_MT_PaintSystemGroup(Menu):
+class MAT_MT_PaintSystemGroupMenu(Menu):
     bl_label = "Group Menu"
-    bl_idname = "MAT_MT_PaintSystemGroup"
+    bl_idname = "MAT_MT_PaintSystemGroupMenu"
 
     def draw(self, context):
         layout = self.layout
@@ -233,6 +284,20 @@ class MAT_MT_PaintSystemGroup(Menu):
                         text="Rename Group", icon='GREASEPENCIL')
         layout.operator("paint_system.delete_group",
                         text="Delete Group", icon='TRASH')
+        
+class MAT_MT_PaintSystemImageMenu(Menu):
+    bl_label = "Image Menu"
+    bl_idname = "MAT_MT_PaintSystemImageMenu"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("paint_system.export_layer", text="Export Layer", icon='EXPORT')
+        layout.separator()
+        layout.operator("paint_system.invert_colors", icon="MOD_MASK")
+        layout.operator("paint_system.resize_image", icon="CON_SIZELIMIT")
+        layout.operator("paint_system.clear_image", icon="X")
+
+
 # -------------------------------------------------------------------
 # Brush Settings Panels
 # -------------------------------------------------------------------
@@ -355,9 +420,8 @@ class MAT_PT_Brush(Panel):
                      "use_unified_size", icon="WORLD", text="Size", slider=True)
         prop_unified(col, context, "strength",
                      "use_unified_strength", icon="WORLD", text="Strength")
-        if obj and obj.mode == 'TEXTURE_PAINT':
-            box.prop(ps.settings, "allow_image_overwrite",
-                     text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
+        box.prop(ps.settings, "allow_image_overwrite",
+                    text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
         # row.label(text="Brush Shortcuts")
 
 
@@ -605,7 +669,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = col.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
-        # row.menu("MAT_MT_PaintSystemGroup", text="", icon='BRUSHES_ALL')
+        # row.menu("MAT_MT_PaintSystemGroupMenu", text="", icon='BRUSHES_ALL')
         if contains_mat_setup:
             row.operator("paint_system.toggle_paint_mode",
                          text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE')
@@ -674,10 +738,13 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         # Settings
         box = layout.box()
-        row = box.row()
-        row.label(text="Layer Settings:", icon='SETTINGS')
-        if ps.preferences.show_tooltips:
-            row.menu("MAT_MT_LayersSettingsTooltips", text='', icon='QUESTION')
+        row = box.row(align=True)
+        row.label(text="Layer Settings:")
+        if active_layer.image:
+            row.menu("MAT_MT_PaintSystemImageMenu", text="", icon='COLLAPSEMENU')
+        
+        # if ps.preferences.show_tooltips:
+        #     row.menu("MAT_MT_LayersSettingsTooltips", text='', icon='QUESTION')
 
         # Let user set opacity and blend mode:
         color_mix_node = ps.find_color_mix_node()
@@ -941,7 +1008,7 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
         col.separator()
         col.label(text="Merge:")
         col.operator("paint_system.merge_group",
-                     text="Merge as New Layer", icon="FILE").as_new_layer = True
+                     text="Merge All as New Layer", icon="FILE").as_new_layer = True
         col.operator("paint_system.merge_group",
                      text="Merge All Layers (Bake)").as_new_layer = False
         # TODO: Fix export merged image
@@ -986,8 +1053,10 @@ class MAT_PT_PaintSystemTest(Panel):
 classes = (
     PaintSystemPreferences,
     MAT_PT_PaintSystemGroups,
-    MAT_MT_PaintSystemGroup,
+    MAT_PT_GroupAdvanced,
+    MAT_MT_PaintSystemGroupMenu,
     MAT_PT_Brush,
+    # MAT_PT_BrushAdvanced,
     MAT_PT_BrushColor,
     MAT_PT_BrushColorPalette,
     # MAT_PT_BrushSettings,
@@ -999,6 +1068,7 @@ classes = (
     MAT_MT_BrushTooltips,
     MAT_MT_PaintSystemMergeAndExport,
     MAT_MT_PaintSystemMergeOptimize,
+    MAT_MT_PaintSystemImageMenu,
     # MAT_PT_PaintSystemTest,
 )
 

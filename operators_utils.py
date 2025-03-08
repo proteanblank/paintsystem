@@ -10,7 +10,7 @@ from bpy.props import (
 import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
-from .paint_system import PaintSystem, get_brushes_from_library
+from .paint_system import PaintSystem, get_brushes_from_library, TEMPLATE_ENUM
 from mathutils import Vector
 from .common import redraw_panel, NodeOrganizer, get_active_material_output
 from typing import List
@@ -159,13 +159,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
 
     template: EnumProperty(
         name="Template",
-        items=[
-            ('NONE', "Manual", "Just add node group to material"),
-            ('EXISTING', "Use Existing Setup", "Add to existing material setup"),
-            ('STANDARD', "Standard", "Start off with a standard setup"),
-            ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
-            ('NORMAL', "Normal", "Start off with a normal painting setup"),
-        ],
+        items=TEMPLATE_ENUM,
         default='STANDARD'
     )
 

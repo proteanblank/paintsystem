@@ -29,6 +29,13 @@ SHADER_ENUM = [
     ('_PS_Light', "Light (EEVEE)", "Light"),
     ('_PS_Ambient_Occlusion', "Ambient Occlusion", "Ambient Occlusion"),
 ]
+TEMPLATE_ENUM = [
+    ('NONE', "None", "Just add node group to material", "NONE", 0),
+    ('STANDARD', "Standard", "Start off with a standard setup", "PLUS", 1),
+    ('EXISTING', "Convert Existing Material", "Add to existing material setup", "FILE_REFRESH", 2),
+    # ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
+    ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 3),
+]
 
 
 def get_addon_filepath():
@@ -530,7 +537,7 @@ class PaintSystem:
 
     def get_active_group(self) -> Optional[PropertyGroup]:
         paint_system = self.get_material_settings()
-        if not paint_system:
+        if not paint_system or len(paint_system.groups) == 0:
             return None
         active_group_idx = int(paint_system.active_group)
         if active_group_idx >= len(paint_system.groups):
