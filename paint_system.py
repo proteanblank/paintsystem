@@ -23,6 +23,7 @@ LAYER_ENUM = [
     ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
     ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
     ('SHADER', "Shader", "Shader layer"),
+    ('NODE_GROUP', "Node Group", "Node Group layer"),
 ]
 SHADER_ENUM = [
     ('_PS_Toon_Shader', "Toon Shader (EEVEE)", "Toon Shader"),
@@ -154,15 +155,15 @@ def get_paint_system_images(is_dirty_only=True):
     return images
 
 
-def update_paintsystem_data(self, context):
-    ps = PaintSystem(context)
-    active_group = ps.get_active_group()
-    mat = ps.get_active_material()
-    for layer in active_group.items:
-        if layer.node_tree:
-            layer.node_tree.name = f"PS_{layer.type} {layer.name} (MAT: {mat.name})"
-        if layer.image:
-            layer.image.name = f"PS {mat.name} {active_group.name} {layer.name}"
+# def update_paintsystem_data(self, context):
+#     ps = PaintSystem(context)
+#     active_group = ps.get_active_group()
+#     mat = ps.get_active_material()
+#     for layer in active_group.items:
+#         if layer.node_tree:
+#             layer.node_tree.name = f"PS_{layer.type} {layer.name} (MAT: {mat.name})"
+#         if layer.image:
+#             layer.image.name = f"PS {mat.name} {active_group.name} {layer.name}"
 
 
 @dataclass
@@ -314,7 +315,7 @@ class PaintSystem:
         else:
             uv_map_node.uv_map = bpy.context.object.data.uv_layers[0].name
         image_texture_node.image = image
-        node_tree = self._create_layer_node_tree(name, image, uv_map_name)
+        # node_tree = self._create_layer_node_tree(name, image, uv_map_name)
 
         # Create the new item
         # new_id = active_group.add_item(
@@ -516,6 +517,13 @@ class PaintSystem:
             name, shader_type, 'SHADER', sub_type=shader_type, make_copy=True)
         active_group.update_node_tree()
         return new_layer
+    
+    def create_node_group_layer(self, name: str, node_tree_name: str) -> PropertyGroup:
+        active_group = self.get_active_group()
+        new_layer = self._add_layer(
+            name, node_tree_name, 'NODE_GROUP')
+        active_group.update_node_tree()
+        return new_layer
 
     def get_active_material(self) -> Optional[Material]:
         if not self.active_object or self.active_object.type != 'MESH':
@@ -613,6 +621,28 @@ class PaintSystem:
             if hasattr(node, 'node_tree') and node.node_tree and node.node_tree.name == node_tree.name:
                 return node
         return None
+    
+    def is_valid_ps_nodetree(self, node_tree: NodeTree):
+        # check if the node tree has both Color and Alpha inputs and outputs
+        has_color_input = False
+        has_alpha_input = False
+        has_color_output = False
+        has_alpha_output = False
+        for interface_item in node_tree.interface.items_tree:
+            if interface_item.item_type == "SOCKET":
+                # print(interface_item.name, interface_item.socket_type, interface_item.in_out)
+                if interface_item.name == "Color" and interface_item.socket_type == "NodeSocketColor":
+                    if interface_item.in_out == "INPUT":
+                        has_color_input = True
+                    else:
+                        has_color_output = True
+                elif interface_item.name == "Alpha" and interface_item.socket_type == "NodeSocketFloat":
+                    if interface_item.in_out == "INPUT":
+                        has_alpha_input = True
+                    else:
+                        has_alpha_output = True
+        return has_color_input and has_alpha_input and has_color_output and has_alpha_output
+            
 
     def _update_paintsystem_data(self):
         active_group = self.get_active_group()
@@ -621,10 +651,11 @@ class PaintSystem:
         if active_group.node_tree:
             active_group.node_tree.name = f"PS_GROUP {active_group.name} (MAT: {mat.name})"
         for layer in active_group.items:
-            if layer.node_tree:
-                layer.node_tree.name = f"PS_{layer.type} {active_group.name} {layer.name} (MAT: {mat.name})"
-            if layer.image:
-                layer.image.name = f"PS {active_group.name} {layer.name} (MAT: {mat.name})"
+            if not layer.type == 'NODE_GROUP':
+                if layer.node_tree:
+                    layer.node_tree.name = f"PS_{layer.type} {active_group.name} {layer.name} (MAT: {mat.name})"
+                if layer.image:
+                    layer.image.name = f"PS {active_group.name} {layer.name} (MAT: {mat.name})"
 
     def _add_layer(self, layer_name, tree_name: str, item_type: str, sub_type="", image=None, force_reload=False, make_copy=False) -> NodeTree:
         active_group = self.get_active_group()

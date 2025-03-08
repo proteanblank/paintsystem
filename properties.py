@@ -12,7 +12,7 @@ from bpy.types import (PropertyGroup, Context,
                        NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket, Node)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
-from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, update_paintsystem_data, TEMPLATE_ENUM
+from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, TEMPLATE_ENUM
 from dataclasses import dataclass
 from typing import Dict
 
@@ -215,7 +215,6 @@ class PaintSystemGroup(BaseNestedListManager):
         special_inputs = ['Normal']
         # special_sockets: list[NodeSocket] = []
         for input_name in special_inputs:
-            print(interface.items_tree.keys())
             interface_socket = interface.items_tree.get(input_name)
 
             special_socket_type = []
@@ -224,8 +223,6 @@ class PaintSystemGroup(BaseNestedListManager):
                     socket = item.node_tree.interface.items_tree.get(input_name)
                     if socket:
                         special_socket_type.append(socket)
-
-            print(special_socket_type, interface_socket)
             if any(special_socket_type) != bool(interface_socket):
                 if interface_socket:
                     interface.remove(interface_socket)

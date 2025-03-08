@@ -890,6 +890,63 @@ class PAINTSYSTEM_OT_NewShaderLayer(Operator):
         return {'FINISHED'}
 
 
+class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
+    bl_idname = "paint_system.new_node_group_layer"
+    bl_label = "Add Node Group Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add a new node group layer"
+    
+    def get_node_groups(self, context: Context):
+        ps = PaintSystem(context)
+        node_groups = []
+        for node_group in bpy.data.node_groups:
+            if node_group.bl_idname == 'ShaderNodeTree' and not node_group.name.startswith("_PS") and not node_group.name.startswith("PS_"):
+                node_groups.append((node_group.name, node_group.name, ""))
+        return node_groups
+    
+    layer_name: StringProperty(
+        name="Layer Name",
+        default="Custom Node Group"
+    )
+    
+    node_tree_name: EnumProperty(
+        name="Node Tree",
+        items=get_node_groups,
+    )
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        if not self.get_node_groups(context):
+            return {'CANCELLED'}
+        
+        node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        if not ps.is_valid_ps_nodetree(node_tree):
+            self.report({'ERROR'}, "Node Group not compatible")
+            return {'CANCELLED'}
+
+        ps.create_node_group_layer(self.layer_name, self.node_tree_name)
+
+        # Force the UI to update
+        redraw_panel(self, context)
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        if not self.get_node_groups(context):
+            layout.label(text="No node group found", icon='ERROR')
+            return
+        
+        layout.prop(self, "node_tree_name")
+        node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        if not ps.is_valid_ps_nodetree(node_tree):
+            layout.label(text="Node Group not compatible", icon='ERROR')
+            layout.label(text="Color & Alpha Input/Output Pair not Found")
+
+
 class PAINTSYSTEM_OT_InvertColors(Operator):
     bl_idname = "paint_system.invert_colors"
     bl_label = "Invert Colors"
@@ -1011,6 +1068,7 @@ classes = (
     PAINTSYSTEM_OT_NewFolder,
     PAINTSYSTEM_OT_NewAdjustmentLayer,
     PAINTSYSTEM_OT_NewShaderLayer,
+    PAITNSYSTEM_OT_NewNodeGroupLayer,
     PAINTSYSTEM_OT_ExportLayer,
     PAINTSYSTEM_OT_InvertColors,
     PAINTSYSTEM_OT_ResizeImage,

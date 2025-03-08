@@ -594,7 +594,15 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                     row.label(icon='SHADERFX')
                 case 'SHADER':
                     row.label(icon='SHADING_RENDERED')
+                case 'NODE_GROUP':
+                    row.label(icon='NODETREE')
+                case _:
+                    row.label(icon='BLANK')
             row.prop(display_item, "name", text="", emboss=False)
+            
+            if display_item.type == 'NODE_GROUP' and not ps.is_valid_ps_nodetree(display_item.node_tree):
+                row.label(icon='ERROR')
+                
             if display_item.clip:
                 row.label(icon="SELECT_INTERSECT")
             # if display_item.lock_alpha:
@@ -789,6 +797,29 @@ class MAT_PT_PaintSystemLayers(Panel):
                          text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
+            case 'NODE_GROUP':
+                row = box.row(align=True)
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                    row.scale_x = 1.5
+                row.prop(active_layer, "clip", text="Clip Layer",
+                         icon="SELECT_INTERSECT")
+                if not ps.is_valid_ps_nodetree(active_layer.node_tree):
+                    col = box.column(align=True)
+                    col.label(text="Invalid Node Tree!", icon='ERROR')
+                    col.label(text="Please check the input/output sockets.")
+                    return
+                node_group = ps.get_active_layer_node_group()
+                inputs = [i for i in node_group.inputs if not i.is_linked and i.name not in ('Color', 'Alpha')]
+                if not inputs:
+                    return
+                box.label(text="Node Group Settings:", icon='NODETREE')
+                node_group = ps.get_active_layer_node_group()
+                for socket in inputs:
+                    col = box.column()
+                    col.prop(socket, "default_value",
+                                text=socket.name)
+                
             case _:
                 row = box.row(align=True)
                 if not ps.preferences.use_compact_design:
@@ -975,6 +1006,8 @@ class MAT_MT_PaintSystemAddLayer(Menu):
         for idx, (node_type, name, description) in enumerate(SHADER_ENUM):
             col.operator("paint_system.new_shader_layer",
                          text=name, icon='SHADING_RENDERED' if idx == 0 else 'NONE').shader_type = node_type
+        col.operator("paint_system.new_node_group_layer",
+                     text="Custom Node Tree", icon='NODETREE')
 
         col = row.column()
         col.label(text="Adjustment Layer:")
