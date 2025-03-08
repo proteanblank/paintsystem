@@ -33,6 +33,8 @@ def update_active_image(self=None, context: Context = None):
     image_paint = context.tool_settings.image_paint
     mat = ps.get_active_material()
     active_group = ps.get_active_group()
+    if not mat or not active_group:
+        return
     active_layer = ps.get_active_layer()
     update_brush_settings(self, context)
     if not active_layer:
