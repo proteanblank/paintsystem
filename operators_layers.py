@@ -127,7 +127,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
             mat = bpy.data.materials.new(f"{self.group_name}")
             obj = ps.active_object
             mat.use_nodes = True
-            if not obj.material_slots[obj.active_material_index].material:
+            if obj.material_slots and not obj.material_slots[obj.active_material_index].material:
                 obj.material_slots[obj.active_material_index].material = mat
             else:
                 ps.active_object.data.materials.append(mat)
