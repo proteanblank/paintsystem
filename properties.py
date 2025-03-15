@@ -9,7 +9,7 @@ from bpy.props import (IntProperty,
                        CollectionProperty,
                        EnumProperty)
 from bpy.types import (PropertyGroup, Context,
-                       NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket, Node)
+                       NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket, Image)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
 from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, TEMPLATE_ENUM
@@ -92,7 +92,7 @@ class PaintSystemLayer(BaseNestedListItem):
     )
     image: PointerProperty(
         name="Image",
-        type=bpy.types.Image
+        type=Image
     )
     type: EnumProperty(
         items=LAYER_ENUM,
