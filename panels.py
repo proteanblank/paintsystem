@@ -251,7 +251,7 @@ class MAT_PT_GroupAdvanced(Panel):
             row.scale_x = 1.5
         row.prop(mat.paint_system, "active_group", text="")
         row.operator("paint_system.new_group",
-                     text="", icon='ADD')
+                     text="", icon='ADD').hide_template = False
         col = row.column(align=True)
         col.menu("MAT_MT_PaintSystemGroupMenu", text="", icon='COLLAPSEMENU')
         
@@ -332,7 +332,7 @@ def prop_unified(
     context,
     prop_name,
     unified_name=None,
-    icon='NONE',
+    icon='EMPTY',
     text=None,
     slider=False,
     header=False,
@@ -483,8 +483,14 @@ class MAT_PT_BrushColor(Panel):
 
     def draw_header_preset(self, context):
         layout = self.layout
-        layout.prop(get_unified_settings(context, "use_unified_color"), "color",
+        ups = context.tool_settings.unified_paint_settings
+        row = layout.row(align=True)
+        row.prop(get_unified_settings(context, "use_unified_color"), "color",
                     text="", icon='IMAGE_RGB_ALPHA')
+        row.prop(ups, "use_unified_color",
+                    text="", icon='BRUSHES_ALL')
+        # prop_unified(layout, context, "color", "use_unified_color",
+        #              icon="IMAGE_RGB_ALPHA", text="Color")
         # layout.label(text="", icon="INFO")
 
     def draw(self, context):
