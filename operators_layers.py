@@ -72,7 +72,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         number = get_highest_number_with_prefix(
             'New Group', [item.name for item in groups]) + 1
         return f"New Group {number}"
-    
+
     material_name: StringProperty(
         name="Material Name",
         default="New Material"
@@ -119,7 +119,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         description="Use the Paint System UV Map",
         default=True
     )
-    
+
     hide_template: BoolProperty(default=False)
 
     def execute(self, context):
@@ -136,8 +136,9 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
                 obj.material_slots[obj.active_material_index].material = mat
             else:
                 ps.active_object.data.materials.append(mat)
-                ps.active_object.active_material_index = len(obj.material_slots) - 1
-        
+                ps.active_object.active_material_index = len(
+                    obj.material_slots) - 1
+
         ps.get_material_settings().use_paintsystem_uv = self.use_paintsystem_uv
         # Check for duplicate names
         for group in mat.paint_system.groups:
@@ -175,7 +176,7 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
             self.material_template = "NONE"
         if ps.get_active_material():
             self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
-        ).use_paintsystem_uv else 'OPEN'
+            ).use_paintsystem_uv else 'OPEN'
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
@@ -203,7 +204,8 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
             row.prop(self, "material_template", text="Template")
         row = layout.row()
         row.scale_y = 1.2
-        row.prop(self, "use_paintsystem_uv", text="Use Paint System UV", icon='CHECKBOX_HLT' if self.use_paintsystem_uv else 'CHECKBOX_DEHLT')
+        row.prop(self, "use_paintsystem_uv", text="Use Paint System UV",
+                 icon='CHECKBOX_HLT' if self.use_paintsystem_uv else 'CHECKBOX_DEHLT')
         layout.separator()
         box = layout.box()
         row = box.row()
@@ -215,10 +217,10 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         if self.material_template in ['STANDARD', 'TRANSPARENT']:
             box.prop(self, "use_alpha_blend", text="Use Alpha Blend")
             box.prop(self, "use_backface_culling",
-                        text="Use Backface Culling")
+                     text="Use Backface Culling")
         if context.scene.view_settings.view_transform != 'Standard':
             box.prop(self, "set_view_transform",
-                        text="Set View Transform to Standard")
+                     text="Set View Transform to Standard")
 
 
 class PAINTSYSTEM_OT_DeleteGroup(Operator):
@@ -895,7 +897,7 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
     bl_label = "Add Node Group Layer"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Add a new node group layer"
-    
+
     def get_node_groups(self, context: Context):
         ps = PaintSystem(context)
         node_groups = []
@@ -903,12 +905,12 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
             if node_group.bl_idname == 'ShaderNodeTree' and not node_group.name.startswith("_PS") and not node_group.name.startswith("PS_"):
                 node_groups.append((node_group.name, node_group.name, ""))
         return node_groups
-    
+
     layer_name: StringProperty(
         name="Layer Name",
         default="Custom Node Group"
     )
-    
+
     node_tree_name: EnumProperty(
         name="Node Tree",
         items=get_node_groups,
@@ -918,7 +920,7 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
         ps = PaintSystem(context)
         if not self.get_node_groups(context):
             return {'CANCELLED'}
-        
+
         node_tree = bpy.data.node_groups.get(self.node_tree_name)
         if not ps.is_valid_ps_nodetree(node_tree):
             self.report({'ERROR'}, "Node Group not compatible")
@@ -929,17 +931,17 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
         # Force the UI to update
         redraw_panel(self, context)
         return {'FINISHED'}
-    
+
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
-    
+
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
         if not self.get_node_groups(context):
             layout.label(text="No node group found", icon='ERROR')
             return
-        
+
         layout.prop(self, "node_tree_name")
         node_tree = bpy.data.node_groups.get(self.node_tree_name)
         if not ps.is_valid_ps_nodetree(node_tree):
@@ -952,7 +954,7 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
     bl_label = "Invert Colors"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Invert the colors of the active image"
-    
+
     invert_r: BoolProperty(default=True)
     invert_g: BoolProperty(default=True)
     invert_b: BoolProperty(default=True)
@@ -963,24 +965,26 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
         ps = PaintSystem(context)
         active_layer = ps.get_active_layer()
         return active_layer and active_layer.image
-    
+
     def execute(self, context):
         ps = PaintSystem(context)
         active_layer = ps.get_active_layer()
         image: bpy.types.Image = active_layer.image
         with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
-            bpy.ops.image.invert('INVOKE_DEFAULT', invert_r=self.invert_r, invert_g=self.invert_g, invert_b=self.invert_b, invert_a=self.invert_a)
+            bpy.ops.image.invert('INVOKE_DEFAULT', invert_r=self.invert_r,
+                                 invert_g=self.invert_g, invert_b=self.invert_b, invert_a=self.invert_a)
         return {'FINISHED'}
-    
+
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
-    
+
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "invert_r", text="Red")
         layout.prop(self, "invert_g", text="Green")
         layout.prop(self, "invert_b", text="Blue")
         layout.prop(self, "invert_a", text="Alpha")
+
 
 class PAINTSYSTEM_OT_ExportLayer(Operator):
     bl_idname = "paint_system.export_layer"
@@ -995,6 +999,7 @@ class PAINTSYSTEM_OT_ExportLayer(Operator):
         with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
             bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
         return {'FINISHED'}
+
 
 class PAINTSYSTEM_OT_ResizeImage(Operator):
     bl_idname = "paint_system.resize_image"
@@ -1017,7 +1022,7 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
         image = active_layer.image
         image.scale(self.width, self.height)
         return {'FINISHED'}
-    
+
     def invoke(self, context, event):
         ps = PaintSystem(context)
         active_layer = ps.get_active_layer()
@@ -1025,13 +1030,14 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
         self.width = image.size[0]
         self.height = image.size[1]
         return context.window_manager.invoke_props_dialog(self)
-    
+
     def draw(self, context):
         layout = self.layout
         row = layout.row()
         row.prop(self, "width")
         row.prop(self, "height")
-        
+
+
 class PAINTSYSTEM_OT_ClearImage(Operator):
     bl_idname = "paint_system.clear_image"
     bl_label = "Clear Image"
@@ -1048,7 +1054,10 @@ class PAINTSYSTEM_OT_ClearImage(Operator):
         ps = PaintSystem(context)
         active_layer = ps.get_active_layer()
         image = active_layer.image
-        image.generated_color = (0, 0, 0, 0)
+        # Replace every pixel with a transparent pixel
+        pixels = [0.0] * len(image.pixels)
+        image.pixels = pixels
+        image.reload()
         return {'FINISHED'}
 
 
