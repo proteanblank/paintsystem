@@ -143,6 +143,68 @@ class PaintSystemPreferences(AddonPreferences):
 # -------------------------------------------------------------------
 # Group Panels
 # -------------------------------------------------------------------
+class MAT_PT_PaintSystemQuickTools(Panel):
+    bl_idname = 'MAT_PT_PaintSystemQuickTools'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Quick Tools"
+    bl_category = 'Paint System'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(icon="SOLO_ON")
+
+    def draw(self, context):
+        # Get available modes that can be set of the active object
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        layout = self.layout
+
+        box = layout.box()
+        row = box.row()
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.5
+            row.scale_x = 1.5
+        row.alignment = 'CENTER'
+        row.operator("mesh.primitive_plane_add",
+                     text="", icon='IMAGE_PLANE').align = 'VIEW'
+        row.operator("mesh.primitive_plane_add",
+                     text="", icon='MESH_PLANE')
+        row.operator("mesh.primitive_cube_add",
+                     text="", icon='MESH_CUBE')
+        row.operator("mesh.primitive_circle_add",
+                     text="", icon='MESH_CIRCLE')
+        row.operator("mesh.primitive_uv_sphere_add",
+                     text="", icon='MESH_UVSPHERE')
+
+        # if obj:
+        #     row = layout.row(align=True)
+        #     act_mode_item = bpy.types.Object.bl_rna.properties["mode"].enum_items[obj.mode]
+        #     row.operator_menu_enum(
+        #         "object.mode_set", "mode", text=act_mode_item.name, icon=act_mode_item.icon)
+        space = context.area.spaces[0]
+        overlay = space.overlay
+        row = box.row()
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.2
+            row.scale_x = 1.2
+        row.prop(overlay,
+                 "show_face_orientation", text="Check Normals", icon='NORMALS_FACE')
+        row.prop(overlay,
+                 "show_wireframes", text="Wireframe", icon='MOD_WIREFRAME')
+        row = box.row()
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.2
+            row.scale_x = 1.2
+        row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
+        row = row.row(align=True)
+        row.prop(space, "show_gizmo_object_translate",
+                 text="", icon='EMPTY_ARROWS')
+        row.prop(space, "show_gizmo_object_rotate",
+                 text="", icon='FILE_REFRESH')
+        row.prop(space, "show_gizmo_object_scale",
+                 text="", icon='MOD_MESHDEFORM')
 
 
 class MAT_PT_PaintSystemGroups(Panel):
@@ -679,7 +741,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         active_group = ps.get_active_group()
         mat = ps.get_active_material()
         contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
-                                 active_group.node_tree for node in mat.node_tree.nodes])
+                                  active_group.node_tree for node in mat.node_tree.nodes])
 
         flattened = active_group.flatten_hierarchy()
 
@@ -1100,6 +1162,7 @@ class MAT_PT_PaintSystemTest(Panel):
 
 classes = (
     PaintSystemPreferences,
+    MAT_PT_PaintSystemQuickTools,
     MAT_PT_PaintSystemGroups,
     MAT_PT_GroupAdvanced,
     MAT_MT_PaintSystemGroupMenu,
