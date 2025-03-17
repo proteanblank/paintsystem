@@ -1055,9 +1055,11 @@ class PAINTSYSTEM_OT_ClearImage(Operator):
         active_layer = ps.get_active_layer()
         image = active_layer.image
         # Replace every pixel with a transparent pixel
-        pixels = [0.0] * len(image.pixels)
-        image.pixels = pixels
-        image.reload()
+        pixels = numpy.empty(len(image.pixels), dtype=numpy.float32)
+        pixels[::4] = 0.0
+        image.pixels.foreach_set(pixels)
+        image.update()
+        image.update_tag()
         return {'FINISHED'}
 
 
