@@ -818,6 +818,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = box.row(align=True)
         row.label(text="Layer Settings:")
         if active_layer.image:
+            row.operator("paint_system.quick_edit", text="Edit Externally")
             row.menu("MAT_MT_PaintSystemImageMenu",
                      text="", icon='COLLAPSEMENU')
 

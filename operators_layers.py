@@ -15,6 +15,7 @@ import re
 import copy
 from .common_layers import UVLayerHandler
 import numpy 
+import pathlib
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
@@ -1095,6 +1096,32 @@ class PAINTSYSTEM_OT_ClearImage(Operator):
         image.update()
         image.update_tag()
         return {'FINISHED'}
+    
+
+class PAINTSYSTEM_OT_QuickEdit(Operator):
+    bl_idname = "paint_system.quick_edit"
+    bl_label = "Quick Edit"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Quickly edit the active image"
+
+    def execute(self, context):
+        bpy.ops.image.project_edit('INVOKE_DEFAULT')
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        current_image_editor = context.preferences.filepaths.image_editor
+        image_paint = context.scene.tool_settings.image_paint
+        if not current_image_editor:
+            layout.prop(context.preferences.filepaths, "image_editor")
+        else:
+            editor_path = pathlib.Path(current_image_editor)
+            app_name = editor_path.name
+            layout.label(text=app_name)
+        layout.prop(image_paint, "seam_bleed")
 
 
 classes = (
@@ -1119,6 +1146,7 @@ classes = (
     PAINTSYSTEM_OT_InvertColors,
     PAINTSYSTEM_OT_ResizeImage,
     PAINTSYSTEM_OT_ClearImage,
+    PAINTSYSTEM_OT_QuickEdit,
 )
 
 register, unregister = register_classes_factory(classes)
