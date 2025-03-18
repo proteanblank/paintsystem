@@ -15,6 +15,7 @@ from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
 from .common import is_online, is_newer_than, icon_parser, import_legacy_updater, find_keymap, get_event_icons
 from .operators_bake import is_bakeable
+from .custom_icons import get_icon
 # from .. import __package__ as base_package
 addon_updater_ops = import_legacy_updater()
 
@@ -187,18 +188,18 @@ class MAT_PT_PaintSystemQuickTools(Panel):
                  "show_face_orientation", text="Check Normals", icon='NORMALS_FACE')
         row.prop(overlay,
                  "show_wireframes", text="Wireframe", icon='MOD_WIREFRAME')
-        row = box.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.2
-            row.scale_x = 1.2
-        row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
-        row = row.row(align=True)
-        row.prop(space, "show_gizmo_object_translate",
-                 text="", icon='EMPTY_ARROWS')
-        row.prop(space, "show_gizmo_object_rotate",
-                 text="", icon='FILE_REFRESH')
-        row.prop(space, "show_gizmo_object_scale",
-                 text="", icon='MOD_MESHDEFORM')
+        # row = box.row()
+        # if not ps.preferences.use_compact_design:
+        #     row.scale_y = 1.2
+        #     row.scale_x = 1.2
+        # row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
+        # row = row.row(align=True)
+        # row.prop(space, "show_gizmo_object_translate",
+        #          text="", icon='EMPTY_ARROWS')
+        # row.prop(space, "show_gizmo_object_rotate",
+        #          text="", icon='FILE_REFRESH')
+        # row.prop(space, "show_gizmo_object_scale",
+        #          text="", icon='MOD_MESHDEFORM')
 
 
 class MAT_PT_PaintSystemGroups(Panel):
@@ -219,7 +220,7 @@ class MAT_PT_PaintSystemGroups(Panel):
     def draw_header(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        layout.label(icon="KEYTYPE_KEYFRAME_VEC")
+        layout.label(icon_value=get_icon("paint_system"))
 
     def draw(self, context):
         layout = self.layout
@@ -898,7 +899,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                     row.scale_y = 1.5
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
-                
+
         row = layout.row()
         row.label(text="Mask (Not Working):")
         row.operator("paint_system.new_mask_image", icon="IMAGE", text="")
@@ -1161,7 +1162,6 @@ class MAT_PT_PaintSystemTest(Panel):
 
 classes = (
     PaintSystemPreferences,
-    MAT_PT_PaintSystemQuickTools,
     MAT_PT_PaintSystemGroups,
     MAT_PT_GroupAdvanced,
     MAT_MT_PaintSystemGroupMenu,
@@ -1180,6 +1180,7 @@ classes = (
     MAT_MT_PaintSystemMergeOptimize,
     MAT_MT_PaintSystemImageMenu,
     # MAT_PT_PaintSystemTest,
+    MAT_PT_PaintSystemQuickTools,
 )
 
 register, unregister = register_classes_factory(classes)

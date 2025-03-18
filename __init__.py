@@ -17,6 +17,7 @@ from .properties import update_active_image
 from bpy.app.handlers import persistent
 from .paint_system import PaintSystem, get_paint_system_images
 from .common import import_legacy_updater
+from .custom_icons import load_custom_icons, unload_custom_icons
 from . import auto_load
 
 bl_info = {
@@ -84,6 +85,7 @@ _register, _unregister = register_submodule_factory(__name__, submodules)
 
 def register():
     _register()
+    load_custom_icons()
     if addon_updater_ops:
         addon_updater_ops.register(bl_info_copy)
     bpy.app.handlers.depsgraph_update_post.append(texture_paint_handler)
@@ -97,4 +99,5 @@ def unregister():
     bpy.app.handlers.depsgraph_update_post.remove(texture_paint_handler)
     if addon_updater_ops:
         addon_updater_ops.unregister()
+    unload_custom_icons()
     _unregister()
