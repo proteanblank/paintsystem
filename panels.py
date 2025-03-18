@@ -167,8 +167,8 @@ class MAT_PT_PaintSystemQuickTools(Panel):
             row.scale_y = 1.5
             row.scale_x = 1.5
         row.alignment = 'CENTER'
-        row.operator("mesh.primitive_plane_add",
-                     text="", icon='IMAGE_PLANE').align = 'VIEW'
+        row.operator("paint_system.add_camera_plane",
+                     text="", icon='IMAGE_PLANE')
         row.operator("mesh.primitive_plane_add",
                      text="", icon='MESH_PLANE')
         row.operator("mesh.primitive_cube_add",
@@ -177,12 +177,6 @@ class MAT_PT_PaintSystemQuickTools(Panel):
                      text="", icon='MESH_CIRCLE')
         row.operator("mesh.primitive_uv_sphere_add",
                      text="", icon='MESH_UVSPHERE')
-
-        # if obj:
-        #     row = layout.row(align=True)
-        #     act_mode_item = bpy.types.Object.bl_rna.properties["mode"].enum_items[obj.mode]
-        #     row.operator_menu_enum(
-        #         "object.mode_set", "mode", text=act_mode_item.name, icon=act_mode_item.icon)
         space = context.area.spaces[0]
         overlay = space.overlay
         row = box.row()

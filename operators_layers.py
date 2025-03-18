@@ -14,6 +14,7 @@ from .common import redraw_panel, get_object_uv_maps
 import re
 import copy
 from .common_layers import UVLayerHandler
+import numpy 
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
