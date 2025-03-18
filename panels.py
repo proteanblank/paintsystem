@@ -842,6 +842,10 @@ class MAT_PT_PaintSystemLayers(Panel):
                     row.scale_y = 1.5
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
+                
+        row = layout.row()
+        row.label(text="Mask (Not Working):")
+        row.operator("paint_system.new_mask_image", icon="IMAGE", text="")
 
         rgb_node = ps.find_rgb_node()
         col = box.column()

@@ -124,6 +124,15 @@ class PaintSystemLayer(BaseNestedListItem):
         name="Node Tree",
         type=NodeTree
     )
+    mask_image: PointerProperty(
+        name="Mask Image",
+        type=Image
+    )
+    enabled_mask: BoolProperty(
+        name="Enabled Mask",
+        description="Toggle mask visibility",
+        default=False
+    )
 
 
 @dataclass
@@ -356,7 +365,7 @@ class PaintSystemGroup(BaseNestedListManager):
     )
     bake_image: PointerProperty(
         name="Bake Image",
-        type=bpy.types.Image
+        type=Image
     )
     bake_uv_map: StringProperty(
         name="Bake Image UV Map",
