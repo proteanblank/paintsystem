@@ -13,7 +13,7 @@ from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM, TEMPLATE_EN
 from .common import redraw_panel, get_object_uv_maps
 import re
 import copy
-import numpy
+from .common_layers import UVLayerHandler
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
@@ -552,7 +552,7 @@ def ensure_uv_map(self, context):
         return {'CANCELLED'}
 
 
-class PAINTSYSTEM_OT_NewImage(Operator):
+class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
     bl_idname = "paint_system.new_image"
     bl_label = "New Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -580,22 +580,11 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         ],
         default='1024'
     )
-    uv_map_mode: EnumProperty(
-        name="UV Map",
-        items=[
-            ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
-            ('OPEN', "Use Existing", "Open an existing UV Map"),
-        ]
-    )
-    uv_map_name: EnumProperty(
-        name="UV Map",
-        items=get_object_uv_maps
-    )
     disable_popup: BoolProperty(default=False)
 
     def execute(self, context):
         ps = PaintSystem(context)
-        ps.get_material_settings().use_paintsystem_uv = self.uv_map_mode == "PAINT_SYSTEM"
+        self.save_uv_mode(context)
         active_group = ps.get_active_group()
         mat = ps.get_active_material()
         ensure_uv_map(self, context)
@@ -611,8 +600,7 @@ class PAINTSYSTEM_OT_NewImage(Operator):
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
-        ).use_paintsystem_uv else 'OPEN'
+        self.set_uv_mode(context)
         self.name = self.get_next_image_name(context)
         if self.disable_popup:
             return self.execute(context)
@@ -622,13 +610,11 @@ class PAINTSYSTEM_OT_NewImage(Operator):
         layout = self.layout
         layout.prop(self, "name")
         layout.prop(self, "image_resolution", expand=True)
-        layout.label(text="UV Map")
-        layout.prop(self, "uv_map_mode", expand=True)
-        if self.uv_map_mode == 'OPEN':
-            layout.prop(self, "uv_map_name")
+        box = layout.box()
+        self.select_uv_ui(box)
 
 
-class PAINTSYSTEM_OT_OpenImage(Operator):
+class PAINTSYSTEM_OT_OpenImage(UVLayerHandler):
     bl_idname = "paint_system.open_image"
     bl_label = "Open Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -643,22 +629,9 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
         options={'HIDDEN'}
     )
 
-    uv_map_mode: EnumProperty(
-        name="UV Map",
-        items=[
-            ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
-            ('OPEN', "Use Existing", "Open an existing UV Map"),
-        ]
-    )
-
-    uv_map_name: EnumProperty(
-        name="UV Map",
-        items=get_object_uv_maps
-    )
-
     def execute(self, context):
         ps = PaintSystem(context)
-        ps.get_material_settings().use_paintsystem_uv = self.uv_map_mode == "PAINT_SYSTEM"
+        self.save_uv_mode(context)
         image = bpy.data.images.load(self.filepath, check_existing=True)
         ensure_uv_map(self, context)
         ps.create_image_layer(image.name, image, self.uv_map_name)
@@ -666,8 +639,7 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
-        ).use_paintsystem_uv else 'OPEN'
+        self.set_uv_mode
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
@@ -678,7 +650,7 @@ class PAINTSYSTEM_OT_OpenImage(Operator):
             layout.prop(self, "uv_map_name")
 
 
-class PAINTSYSTEM_OT_OpenExistingImage(Operator):
+class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler):
     bl_idname = "paint_system.open_existing_image"
     bl_label = "Open Existing Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -686,22 +658,9 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
 
     image_name: StringProperty()
 
-    uv_map_mode: EnumProperty(
-        name="UV Map",
-        items=[
-            ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
-            ('OPEN', "Use Existing", "Open an existing UV Map"),
-        ]
-    )
-
-    uv_map_name: EnumProperty(
-        name="UV Map",
-        items=get_object_uv_maps
-    )
-
     def execute(self, context):
         ps = PaintSystem(context)
-        ps.get_material_settings().use_paintsystem_uv = self.uv_map_mode == "PAINT_SYSTEM"
+        self.save_uv_mode(context)
         active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
@@ -715,8 +674,7 @@ class PAINTSYSTEM_OT_OpenExistingImage(Operator):
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
-        ).use_paintsystem_uv else 'OPEN'
+        self.set_uv_mode(context)
         self.image_name = bpy.data.images[0].name
         return context.window_manager.invoke_props_dialog(self)
 
@@ -965,17 +923,17 @@ class PAINTSYSTEM_OT_NewMaskImage(Operator):
         ],
         default='1024'
     )
-    uv_map_mode: EnumProperty(
-        name="UV Map",
-        items=[
-            ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
-            ('OPEN', "Use Existing", "Open an existing UV Map"),
-        ]
-    )
-    uv_map_name: EnumProperty(
-        name="UV Map",
-        items=get_object_uv_maps
-    )
+    # uv_map_mode: EnumProperty(
+    #     name="UV Map",
+    #     items=[
+    #         ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
+    #         ('OPEN', "Use Existing", "Open an existing UV Map"),
+    #     ]
+    # )
+    # uv_map_name: EnumProperty(
+    #     name="UV Map",
+    #     items=get_object_uv_maps
+    # )
     initial_mask: EnumProperty(
         name="Initial Mask",
         items=[
@@ -1014,12 +972,12 @@ class PAINTSYSTEM_OT_NewMaskImage(Operator):
         layout.label(text="Initial Mask:")
         row = layout.row()
         row.prop(self, "initial_mask", expand=True)
-        box = layout.box()
-        box.label(text="UV Map:")
-        row = box.row()
-        row.prop(self, "uv_map_mode", expand=True)
-        if self.uv_map_mode == 'OPEN':
-            box.prop(self, "uv_map_name", text="")
+        # box = layout.box()
+        # box.label(text="UV Map:")
+        # row = box.row()
+        # row.prop(self, "uv_map_mode", expand=True)
+        # if self.uv_map_mode == 'OPEN':
+        #     box.prop(self, "uv_map_name", text="")
 
 
 class PAINTSYSTEM_OT_InvertColors(Operator):

@@ -13,6 +13,7 @@ from typing import List, Tuple
 from mathutils import Vector
 from .common import NodeOrganizer, get_object_uv_maps, get_connected_nodes, get_active_material_output
 import copy
+from .common_layers import UVLayerHandler
 
 IMPOSSIBLE_NODES = (
     "ShaderNodeShaderInfo"
@@ -251,7 +252,7 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
     #     return None
 
 
-class PAINTSYSTEM_OT_MergeGroup(Operator):
+class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
     bl_idname = "paint_system.merge_group"
     bl_label = "Merge Group"
     bl_description = "Merge the selected group Layers"
@@ -265,10 +266,6 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
             ('8192', "8192", "8192x8192"),
         ],
         default='1024',
-    )
-    uv_map_name: EnumProperty(
-        name="UV Map",
-        items=get_object_uv_maps
     )
     use_gpu: BoolProperty(
         name="Use GPU",
@@ -287,6 +284,7 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
     def execute(self, context):
         context.window.cursor_set('WAIT')
         ps = PaintSystem(context)
+        self.save_uv_mode(context)
         obj = ps.active_object
         if obj.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -378,16 +376,17 @@ class PAINTSYSTEM_OT_MergeGroup(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        self.set_uv_mode(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "use_gpu", text="Use GPU (Faster)")
         layout.prop(self, "image_resolution", expand=True)
-        layout.prop(self, "uv_map_name")
+        self.select_uv_ui(layout)
 
 
-class PAINTSYSTEM_OT_MergeAndExportGroup(Operator):
+class PAINTSYSTEM_OT_MergeAndExportGroup(UVLayerHandler):
     bl_idname = "paint_system.merge_and_export_group"
     bl_label = "Merge and Export Group"
     bl_description = "Merge the selected group Layers and export the baked image"
@@ -402,16 +401,14 @@ class PAINTSYSTEM_OT_MergeAndExportGroup(Operator):
         ],
         default='1024',
     )
-    uv_map_name: EnumProperty(
-        name="UV Map",
-        items=get_object_uv_maps
-    )
     use_gpu: BoolProperty(
         name="Use GPU",
         default=True
     )
 
     def execute(self, context):
+        ps = PaintSystem(context)
+        self.save_uv_mode(context)
         bpy.ops.paint_system.merge_group(
             image_resolution=self.image_resolution,
             uv_map_name=self.uv_map_name,
@@ -422,13 +419,15 @@ class PAINTSYSTEM_OT_MergeAndExportGroup(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        ps = PaintSystem(context)
+        self.set_uv_mode(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "use_gpu", text="Use GPU (Faster)")
         layout.prop(self, "image_resolution", expand=True)
-        layout.prop(self, "uv_map_name")
+        self.select_uv_ui(layout)
 
 
 class PAINTSYSTEM_OT_DeleteBakedImage(Operator):
