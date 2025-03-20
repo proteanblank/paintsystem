@@ -133,6 +133,10 @@ class PaintSystemLayer(BaseNestedListItem):
         description="Toggle mask visibility",
         default=False
     )
+    edit_external_image: PointerProperty(
+        name="Edit External Image",
+        type=Image
+    )
 
 
 @dataclass
@@ -229,7 +233,8 @@ class PaintSystemGroup(BaseNestedListManager):
             special_socket_type = []
             for item, _ in flattened:
                 if item.node_tree:
-                    socket = item.node_tree.interface.items_tree.get(input_name)
+                    socket = item.node_tree.interface.items_tree.get(
+                        input_name)
                     if socket:
                         special_socket_type.append(socket)
             if any(special_socket_type) != bool(interface_socket):
@@ -437,7 +442,7 @@ class PaintSystemSettings(PropertyGroup):
         description="Make Image in 3D Viewport the same as the active layer",
         default=True
     )
-    
+
     template: EnumProperty(
         name="Template",
         items=TEMPLATE_ENUM,

@@ -14,8 +14,9 @@ from .common import redraw_panel, get_object_uv_maps
 import re
 import copy
 from .common_layers import UVLayerHandler
-import numpy 
+import numpy
 import pathlib
+from bpy.app.translations import pgettext_rpt as rpt_
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
@@ -545,6 +546,8 @@ class PAINTSYSTEM_OT_CreateNewUVMap(Operator):
     # def draw(self, context):
     #     layout = self.layout
     #     layout.prop(self, "uv_map_name")
+
+
 def ensure_uv_map(self, context):
     if self.uv_map_mode == 'PAINT_SYSTEM':
         if 'PaintSystemUVMap' not in [uvmap[0] for uvmap in get_object_uv_maps(self, context)]:
@@ -941,7 +944,8 @@ class PAINTSYSTEM_OT_NewMaskImage(Operator):
     initial_mask: EnumProperty(
         name="Initial Mask",
         items=[
-            ('BLACK', "Black (Transparent)", "Start with a black (fully transparent) mask"),
+            ('BLACK', "Black (Transparent)",
+             "Start with a black (fully transparent) mask"),
             ('WHITE', "White (Opaque)", "Start with a white (fully opaque) mask"),
         ],
         default='WHITE'
@@ -957,10 +961,11 @@ class PAINTSYSTEM_OT_NewMaskImage(Operator):
         ensure_uv_map(self, context)
         image = bpy.data.images.new(
             name=f"PS_MASK {active_group.name} {active_layer.name}", width=int(self.image_resolution), height=int(self.image_resolution), alpha=True)
-        image.generated_color = (0, 0, 0, 0) if self.initial_mask == 'BLACK' else (1, 1, 1, 1)
+        image.generated_color = (
+            0, 0, 0, 0) if self.initial_mask == 'BLACK' else (1, 1, 1, 1)
         active_layer.mask_image = image
         return {'FINISHED'}
-    
+
     def invoke(self, context, event):
         ps = PaintSystem(context)
         self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
@@ -968,7 +973,7 @@ class PAINTSYSTEM_OT_NewMaskImage(Operator):
         if self.disable_popup:
             return self.execute(context)
         return context.window_manager.invoke_props_dialog(self)
-    
+
     def draw(self, context):
         layout = self.layout
         layout.label(text="Image Resolution:")
@@ -1096,7 +1101,240 @@ class PAINTSYSTEM_OT_ClearImage(Operator):
         image.update()
         image.update_tag()
         return {'FINISHED'}
-    
+
+
+# https://projects.blender.org/blender/blender/src/branch/main/scripts/startup/bl_operators/image.py#L54
+class PAINTSYSTEM_OT_ProjectEdit(Operator):
+    """Edit a snapshot of the 3D Viewport in an external image editor"""
+    bl_idname = "paint_system.project_edit"
+    bl_label = "Project Edit"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        import os
+
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        if not active_layer.image:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
+
+        EXT = "png"  # could be made an option but for now ok
+
+        for image in bpy.data.images:
+            image.tag = True
+
+        # opengl buffer may fail, we can't help this, but best report it.
+        try:
+            bpy.ops.paint.image_from_view()
+        except RuntimeError as ex:
+            self.report({'ERROR'}, str(ex))
+            return {'CANCELLED'}
+
+        image_new = None
+        for image in bpy.data.images:
+            if not image.tag:
+                image_new = image
+                break
+
+        if not image_new:
+            self.report({'ERROR'}, "Could not make new image")
+            return {'CANCELLED'}
+
+        filepath = os.path.basename(bpy.data.filepath)
+        filepath = os.path.splitext(filepath)[0]
+        # fixes <memory> rubbish, needs checking
+        # filepath = bpy.path.clean_name(filepath)
+
+        if bpy.data.is_saved:
+            filepath = "//" + filepath
+        else:
+            filepath = os.path.join(bpy.app.tempdir, "project_edit")
+
+        obj = context.object
+
+        if obj:
+            filepath += "_" + bpy.path.clean_name(obj.name)
+
+        filepath_final = filepath + "." + EXT
+        i = 0
+
+        while os.path.exists(bpy.path.abspath(filepath_final)):
+            filepath_final = filepath + "{:03d}.{:s}".format(i, EXT)
+            i += 1
+
+        image_new.name = bpy.path.basename(filepath_final)
+        active_layer.edit_external_image = image_new
+
+        image_new.filepath_raw = filepath_final  # TODO, filepath raw is crummy
+        image_new.file_format = 'PNG'
+        image_new.save()
+
+        filepath_final = bpy.path.abspath(filepath_final)
+
+        try:
+            bpy.ops.image.external_edit(filepath=filepath_final)
+        except RuntimeError as ex:
+            self.report({'ERROR'}, str(ex))
+
+        return {'FINISHED'}
+
+
+def convert_straight_to_premultiplied(image_name):
+    """
+    Converts an image in Blender from Straight Alpha to Premultiplied Alpha.
+
+    Args:
+        image_name (str): The name of the Blender image to process.
+    """
+    # Get the image
+    image = bpy.data.images.get(image_name)
+    if image.filepath:
+        image.reload()
+    if not image:
+        print(f"Image '{image_name}' not found.")
+        return
+
+    # Ensure the image has alpha channel
+    if image.channels < 4:
+        print(f"Image '{image_name}' does not have an alpha channel.")
+        return
+
+    # Get pixel data
+    pixels = list(image.pixels)  # Copy pixel data
+    num_pixels = len(pixels) // 4  # Each pixel has 4 channels (RGBA)
+
+    # Modify pixels
+    for i in range(num_pixels):
+        r, g, b, a = pixels[i * 4: i * 4 + 4]
+        r *= a
+        g *= a
+        b *= a
+        pixels[i * 4: i * 4 + 4] = [r, g, b, a]
+
+    # Apply modified pixel data back to the image
+    image.pixels[:] = pixels  # Assign all at once for better performance
+    image.update()
+
+    print(f"Image '{image_name}' converted to Premultiplied Alpha.")
+
+
+def convert_premultiplied_to_straight(image_name):
+    """
+    Converts an image in Blender from Premultiplied Alpha to Straight Alpha.
+
+    Args:
+        image_name (str): The name of the Blender image to process.
+    """
+    # Get the image
+    image = bpy.data.images.get(image_name)
+    if image.filepath:
+        image.reload()
+    print(image_name)
+    if not image:
+        print(f"Image '{image_name}' not found.")
+        return
+
+    # Ensure the image has alpha channel
+    if image.channels < 4:
+        print(f"Image '{image_name}' does not have an alpha channel.")
+        return
+
+    # Get pixel data
+    pixels = list(image.pixels)  # Copy pixel data
+    num_pixels = len(pixels) // 4  # Each pixel has 4 channels (RGBA)
+
+    # Modify pixels
+    for i in range(num_pixels):
+        r, g, b, a = pixels[i * 4: i * 4 + 4]
+
+        if a > 0:  # Avoid division by zero
+            r /= a
+            g /= a
+            b /= a
+
+        pixels[i * 4: i * 4 + 4] = [r, g, b, a]
+
+    # Apply modified pixel data back to the image
+    image.pixels = pixels  # Assign all at once for better performance
+    image.update()  # Update the image
+
+    print(f"Image '{image_name}' converted to Straight Alpha.")
+
+
+def format_image(image_name):
+    image = bpy.data.images.get(image_name)
+    if image.filepath:
+        image.reload()
+    print(image_name)
+    if not image:
+        print(f"Image '{image_name}' not found.")
+        return
+
+    # Ensure the image has alpha channel
+    if image.channels < 4:
+        print(f"Image '{image_name}' does not have an alpha channel.")
+        return
+
+    # Get pixel data
+    pixels = list(image.pixels)  # Copy pixel data
+    num_pixels = len(pixels) // 4  # Each pixel has 4 channels (RGBA)
+
+    # Modify pixels
+    for i in range(num_pixels):
+        r, g, b, a = pixels[i * 4: i * 4 + 4]
+
+        if a == 0:
+            r = 0
+            g = 0
+            b = 0
+
+        pixels[i * 4: i * 4 + 4] = [r, g, b, a]
+
+    # Apply modified pixel data back to the image
+    image.pixels = pixels  # Assign all at once for better performance
+    image.update()  # Update the image
+
+
+class PAINTSYSTEM_OT_ProjectApply(Operator):
+    """Project edited image back onto the object"""
+    bl_idname = "paint_system.project_apply"
+    bl_label = "Project Apply"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        return active_layer and active_layer.edit_external_image
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+
+        current_image_editor = context.preferences.filepaths.image_editor
+        editor_path = pathlib.Path(current_image_editor)
+        app_name = editor_path.name
+        external_image = active_layer.edit_external_image
+
+        external_image_name = external_image.name
+        image = bpy.data.images.get((external_image_name, None))
+
+        if app_name == "CLIPStudioPaint.exe":
+            format_image(external_image_name)
+
+        if image is None:
+            self.report({'ERROR'}, rpt_(
+                "Could not find image '{:s}'").format(external_image_name))
+            return {'CANCELLED'}
+
+        active_layer.edit_external_image = None
+
+        image.reload()
+        bpy.ops.paint.project_image(image=external_image_name)
+
+        return {'FINISHED'}
+
 
 class PAINTSYSTEM_OT_QuickEdit(Operator):
     bl_idname = "paint_system.quick_edit"
@@ -1105,12 +1343,12 @@ class PAINTSYSTEM_OT_QuickEdit(Operator):
     bl_description = "Quickly edit the active image"
 
     def execute(self, context):
-        bpy.ops.image.project_edit('INVOKE_DEFAULT')
+        bpy.ops.paint_system.project_edit('INVOKE_DEFAULT')
         return {'FINISHED'}
-    
+
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
-    
+
     def draw(self, context):
         layout = self.layout
         current_image_editor = context.preferences.filepaths.image_editor
@@ -1120,8 +1358,28 @@ class PAINTSYSTEM_OT_QuickEdit(Operator):
         else:
             editor_path = pathlib.Path(current_image_editor)
             app_name = editor_path.name
-            layout.label(text=app_name)
-        layout.prop(image_paint, "seam_bleed")
+            layout.label(text=f"Open {app_name}", icon="EXPORT")
+        box = layout.box()
+        row = box.row()
+        row.alignment = "CENTER"
+        row.label(text="External Settings:", icon="TOOL_SETTINGS")
+        row = box.row()
+        row.prop(image_paint, "seam_bleed", text="Bleed")
+        row.prop(image_paint, "dither", text="Dither")
+        split = box.split()
+        split.label(text="Screen Grab Size:")
+        split.prop(image_paint, "screen_grab_size", text="")
+
+
+class PAINTSYSTEM_OT_ApplyEdit(Operator):
+    bl_idname = "paint_system.apply_edit"
+    bl_label = "Apply Edit"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Apply the edit to the active image"
+
+    def execute(self, context):
+        bpy.ops.image.project_apply('INVOKE_DEFAULT')
+        return {'FINISHED'}
 
 
 classes = (
@@ -1146,6 +1404,8 @@ classes = (
     PAINTSYSTEM_OT_InvertColors,
     PAINTSYSTEM_OT_ResizeImage,
     PAINTSYSTEM_OT_ClearImage,
+    PAINTSYSTEM_OT_ProjectEdit,
+    PAINTSYSTEM_OT_ProjectApply,
     PAINTSYSTEM_OT_QuickEdit,
 )
 

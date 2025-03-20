@@ -819,7 +819,11 @@ class MAT_PT_PaintSystemLayers(Panel):
         row = box.row(align=True)
         row.label(text="Layer Settings:")
         if active_layer.image:
-            row.operator("paint_system.quick_edit", text="Edit Externally")
+            if not active_layer.edit_external_image:
+                row.operator("paint_system.quick_edit", text="Edit Externally")
+            else:
+                row.operator("paint_system.project_apply",
+                             text="Apply")
             row.menu("MAT_MT_PaintSystemImageMenu",
                      text="", icon='COLLAPSEMENU')
 
@@ -900,9 +904,9 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
 
-        row = layout.row()
-        row.label(text="Mask (Not Working):")
-        row.operator("paint_system.new_mask_image", icon="IMAGE", text="")
+        # row = layout.row()
+        # row.label(text="Mask (Not Working):")
+        # row.operator("paint_system.new_mask_image", icon="IMAGE", text="")
 
         rgb_node = ps.find_rgb_node()
         col = box.column()
