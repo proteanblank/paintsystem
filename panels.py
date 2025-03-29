@@ -152,10 +152,6 @@ class MAT_PT_PaintSystemQuickTools(Panel):
     bl_category = 'Paint System'
     bl_options = {'DEFAULT_CLOSED'}
 
-    def draw_header(self, context):
-        layout = self.layout
-        layout.label(icon="SOLO_ON")
-
     def draw(self, context):
         # Get available modes that can be set of the active object
         ps = PaintSystem(context)

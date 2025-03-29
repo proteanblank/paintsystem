@@ -1180,7 +1180,7 @@ class PAINTSYSTEM_OT_ProjectEdit(Operator):
         return {'FINISHED'}
 
 
-def convert_straight_to_premultiplied(image_name):
+def convert_straight_to_premultiplied(image: bpy.types.Image):
     """
     Converts an image in Blender from Straight Alpha to Premultiplied Alpha.
 
@@ -1188,7 +1188,7 @@ def convert_straight_to_premultiplied(image_name):
         image_name (str): The name of the Blender image to process.
     """
     # Get the image
-    image = bpy.data.images.get(image_name)
+    # image = bpy.data.images.get(image_name)
     if image.filepath:
         image.reload()
     if not image:
@@ -1197,7 +1197,7 @@ def convert_straight_to_premultiplied(image_name):
 
     # Ensure the image has alpha channel
     if image.channels < 4:
-        print(f"Image '{image_name}' does not have an alpha channel.")
+        print(f"Image '{image.name}' does not have an alpha channel.")
         return
 
     # Get pixel data
@@ -1216,7 +1216,7 @@ def convert_straight_to_premultiplied(image_name):
     image.pixels[:] = pixels  # Assign all at once for better performance
     image.update()
 
-    print(f"Image '{image_name}' converted to Premultiplied Alpha.")
+    print(f"Image '{image.name}' converted to Premultiplied Alpha.")
 
 
 def convert_premultiplied_to_straight(image_name):
@@ -1321,17 +1321,17 @@ class PAINTSYSTEM_OT_ProjectApply(Operator):
         image = bpy.data.images.get((external_image_name, None))
 
         if app_name == "CLIPStudioPaint.exe":
-            format_image(external_image_name)
+            convert_straight_to_premultiplied(external_image)
 
         if image is None:
             self.report({'ERROR'}, rpt_(
                 "Could not find image '{:s}'").format(external_image_name))
             return {'CANCELLED'}
 
-        active_layer.edit_external_image = None
-
         image.reload()
         bpy.ops.paint.project_image(image=external_image_name)
+
+        active_layer.edit_external_image = None
 
         return {'FINISHED'}
 
