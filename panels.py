@@ -1325,11 +1325,11 @@ class MAT_MT_PaintSystemMergeOptimize(Menu):
         layout = self.layout
         col = layout.column()
         col.operator("paint_system.merge_group",
-                     text="Update Merged Layer", icon="FILE_REFRESH").as_new_layer = False
-        col.operator("paint_system.delete_bake_image",
-                     text="Delete Merged Image", icon='TRASH')
+                     text="Update Bake", icon="FILE_REFRESH").as_new_layer = False
         col.operator("paint_system.export_baked_image",
-                     text="Export Merged Image", icon='EXPORT')
+                     text="Export Bake Image", icon='EXPORT')
+        col.operator("paint_system.delete_bake_image",
+                     text="Delete Bake Image", icon='TRASH')
 # -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
