@@ -74,7 +74,7 @@ class NodeOrganizer:
             path_attr = path
         setattr(prop, path_attr, value)
 
-    def create_node(self, node_type, attrs):
+    def create_node(self, node_type, attrs = {}):
         node = self.nodes.new(node_type)
         for attr in attrs:
             self.value_set(node, attr, attrs[attr])

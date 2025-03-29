@@ -149,7 +149,7 @@ class MAT_PT_PaintSystemQuickTools(Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_label = "Quick Tools"
-    bl_category = 'Paint System'
+    bl_category = 'Quick Tools'
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -347,15 +347,24 @@ class MAT_MT_PaintSystemGroupMenu(Menu):
 class MAT_MT_PaintSystemImageMenu(Menu):
     bl_label = "Image Menu"
     bl_idname = "MAT_MT_PaintSystemImageMenu"
+    
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        return active_layer and active_layer.image
 
     def draw(self, context):
         layout = self.layout
-        layout.operator("paint_system.export_layer",
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        image_name = active_layer.image.name
+        layout.operator("paint_system.export_active_layer",
                         text="Export Layer", icon='EXPORT')
         layout.separator()
-        layout.operator("paint_system.invert_colors", icon="MOD_MASK")
-        layout.operator("paint_system.resize_image", icon="CON_SIZELIMIT")
-        layout.operator("paint_system.clear_image", icon="X")
+        layout.operator("paint_system.invert_colors", icon="MOD_MASK").image_name = image_name
+        layout.operator("paint_system.resize_image", icon="CON_SIZELIMIT").image_name = image_name
+        layout.operator("paint_system.clear_image", icon="X").image_name = image_name
 
 
 # -------------------------------------------------------------------
@@ -656,6 +665,8 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                     row.label(icon='BLANK')
             row.prop(display_item, "name", text="", emboss=False)
 
+            if display_item.mask_image:
+                row.prop(display_item, "enable_mask", icon='MOD_MASK' if display_item.enable_mask else 'MATPLANE', text="", emboss=False)
             if display_item.type == 'NODE_GROUP' and not ps.is_valid_ps_nodetree(display_item.node_tree):
                 row.label(icon='ERROR')
 
@@ -720,6 +731,17 @@ class MAT_PT_PaintSystemLayers(Panel):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
         return active_group
+    
+    def draw_header_preset(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        flattened = active_group.flatten_hierarchy()
+        has_dirty_images = any(
+            [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
+        if has_dirty_images:
+            row = layout.row(align=True)
+            row.operator("wm.save_mainfile", text="Click to Save!", icon="FUND")
 
     def draw_header(self, context):
         layout = self.layout
@@ -730,6 +752,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         layout = self.layout
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
+        active_layer = ps.get_active_layer()
         mat = ps.get_active_material()
         contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
                                   active_group.node_tree for node in mat.node_tree.nodes])
@@ -761,22 +784,21 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         if not active_group.bake_image:
             row.menu("MAT_MT_PaintSystemMergeAndExport",
-                     icon='EXPORT', text="Merge and Export")
-        has_dirty_images = any(
-            [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
-        if has_dirty_images:
-            col.label(text="Don't forget to save!", icon="FUND")
+                    icon='EXPORT', text="Merge and Export")
+        # has_dirty_images = any(
+        #     [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
+        # if has_dirty_images:
+        #     col.label(text="Don't forget to save!", icon="FUND")
 
-        if not any([item.image for (item, _) in flattened]):
-            col.label(text="Add an image layer first!",
-                      icon="ERROR")
+        # if not any([item.image for (item, _) in flattened]):
+        #     col.label(text="Add an image layer first!",
+        #               icon="ERROR")
 
         if active_group.bake_image:
-            box = layout.box()
             row = box.row(align=True)
             if not ps.preferences.use_compact_design:
-                row.scale_x = 1.5
-                row.scale_y = 1.5
+                row.scale_x = 1.2
+                row.scale_y = 1.2
             row.prop(active_group, "use_bake_image",
                      text="Use Merged Image", icon='CHECKBOX_HLT' if active_group.use_bake_image else 'CHECKBOX_DEHLT')
             row.operator("paint_system.export_baked_image",
@@ -788,8 +810,15 @@ class MAT_PT_PaintSystemLayers(Panel):
                 box.label(
                     text="Merged Image Used. It's faster!", icon='SOLO_ON')
                 return
+        
+        # if active_layer.mask_image:
+        #     row = box.row(align=True)
+        #     if not ps.preferences.use_compact_design:
+        #         row.scale_x = 1.2
+        #         row.scale_y = 1.2
+        #     row.prop(active_layer, "edit_mask", text="Editing Mask" if active_layer.edit_mask else "Click to Edit Mask", icon='MOD_MASK')
 
-        row = layout.row()
+        row = box.row()
         if not ps.preferences.use_compact_design:
             row.scale_y = 1.5
         row.template_list(
@@ -810,10 +839,142 @@ class MAT_PT_PaintSystemLayers(Panel):
         if not active_layer:
             return
 
-        # Settings
+
+class MAT_PT_PaintSystemBakeSettings(Panel):
+    bl_idname = 'MAT_PT_PaintSystemBakeSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Bake"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_PaintSystemLayers'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        return active_group and active_group.bake_image
+    
+    def draw_header_preset(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        if not active_group.bake_image:
+            return
+        row = layout.row(align=True)
+        row.prop(active_group, "use_bake_image", text="Enable", icon='CHECKBOX_HLT' if active_group.use_bake_image else 'CHECKBOX_DEHLT')
+
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="IMAGE_PLANE")
+
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        if not active_group.bake_image:
+            return
         box = layout.box()
         row = box.row(align=True)
-        row.label(text="Layer Settings:")
+        row.scale_y = 1.5
+        row.scale_x = 1.5
+        row.operator("paint_system.merge_group", text="Update Bake", icon="FILE_REFRESH").as_new_layer = False
+        row.operator("paint_system.export_baked_image",
+                     text="", icon='EXPORT')
+        row.operator("paint_system.delete_bake_image",
+                     text="", icon='TRASH')
+        row = box.row(align=True)
+        row.prop(active_group, "bake_image", text="", icon='IMAGE_DATA')
+        # row.operator("paint_system.bake_image", text="Bake Image")
+
+
+class MAT_PT_PaintSystemMaskSettings(Panel):
+    bl_idname = 'MAT_PT_PaintSystemMaskSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Mask"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_PaintSystemLayers'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        active_layer = ps.get_active_layer()
+        return active_group and active_layer and not active_group.use_bake_image 
+    
+    def draw_header_preset(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        if not active_layer:
+            return
+        row = layout.row(align=True)
+        if not active_layer.mask_image:
+            row.operator("paint_system.new_mask_image", text="Create", icon='ADD')
+        else:
+            row.prop(active_layer, "edit_mask", text="Editing" if active_layer.edit_mask else "Edit Mask", icon='IMAGE_DATA')
+            # row.prop(active_layer, "enable_mask", text="", icon='HIDE_OFF' if active_layer.enable_mask else 'HIDE_ON')
+            
+        # row.prop(active_layer, "invert_mask", text="",
+        #          icon='MOD_MASK' if active_layer.invert_mask else 'IMAGE_RGB')
+
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="MOD_MASK")
+        
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        if not active_layer.mask_image:
+            layout.label(text="Create a Mask first!")
+            return
+        row = layout.row(align=True)
+        row.scale_y = 1.5
+        ops = row.operator("paint_system.invert_colors", text="Invert Mask", icon='MOD_MASK')
+        ops.image_name = active_layer.mask_image.name
+        ops.disable_popup = True
+        row.operator("paint_system.delete_mask_image", text="", icon='TRASH')
+        box = layout.box()
+        
+        box.label(text="UV Map:", icon="UV")
+        box.prop_search(active_layer, "mask_uv_map", 
+                        ps.active_object.data, "uv_layers", text="")
+
+class MAT_PT_PaintSystemLayersSettings(Panel):
+    bl_idname = 'MAT_PT_PaintSystemLayersSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Layer Settings"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_PaintSystemLayers'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        active_layer = ps.get_active_layer()
+        return active_group and active_layer and not active_group.use_bake_image
+
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="SETTINGS")
+    
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        if not active_layer:
+            return
+            # Settings
+        box = layout.box()
+        row = box.row(align=True)
         if active_layer.image:
             if not active_layer.edit_external_image:
                 row.operator("paint_system.quick_edit", text="Edit Externally")
@@ -830,10 +991,14 @@ class MAT_PT_PaintSystemLayers(Panel):
         color_mix_node = ps.find_color_mix_node()
         match active_layer.type:
             case 'IMAGE':
-                row = box.row(align=True)
+                col = box.column(align=True)
+                row = col.row(align=True)
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
                     row.scale_x = 1.5
+                else:
+                    row.scale_y = 1.2
+                    row.scale_x = 1.2
                 row.prop(active_layer, "clip", text="",
                          icon="SELECT_INTERSECT")
                 row.prop(active_layer, "lock_alpha",
@@ -841,10 +1006,11 @@ class MAT_PT_PaintSystemLayers(Panel):
                 row.prop(active_layer, "lock_layer",
                          text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(color_mix_node, "blend_type", text="")
-                row = box.row()
-                row.enabled = not active_layer.lock_layer
+                row = col.row()
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
+                else:
+                    row.scale_y = 1.2
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
 
@@ -853,6 +1019,9 @@ class MAT_PT_PaintSystemLayers(Panel):
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
                     row.scale_x = 1.5
+                else:
+                    row.scale_y = 1.2
+                    row.scale_x = 1.2
                 row.prop(active_layer, "clip", text="",
                          icon="SELECT_INTERSECT")
                 row.prop(active_layer, "lock_layer",
@@ -864,6 +1033,9 @@ class MAT_PT_PaintSystemLayers(Panel):
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
                     row.scale_x = 1.5
+                else:
+                    row.scale_y = 1.2
+                    row.scale_x = 1.2
                 row.prop(active_layer, "clip", text="Clip Layer",
                          icon="SELECT_INTERSECT")
                 if not ps.is_valid_ps_nodetree(active_layer.node_tree):
@@ -884,25 +1056,28 @@ class MAT_PT_PaintSystemLayers(Panel):
                              text=socket.name)
 
             case _:
-                row = box.row(align=True)
+                col = box.column(align=True)
+                row = col.row(align=True)
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
                     row.scale_x = 1.5
+                else:
+                    row.scale_y = 1.2
+                    row.scale_x = 1.2
                 row.prop(active_layer, "clip", text="",
                          icon="SELECT_INTERSECT")
                 row.prop(active_layer, "lock_layer",
                          text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(color_mix_node, "blend_type", text="")
-                row = box.row()
+                row = col.row()
                 row.enabled = not active_layer.lock_layer
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
+                else:
+                    row.scale_y = 1.2
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
 
-        # row = layout.row()
-        # row.label(text="Mask (Not Working):")
-        # row.operator("paint_system.new_mask_image", icon="IMAGE", text="")
 
         rgb_node = ps.find_rgb_node()
         col = box.column()
@@ -1000,16 +1175,13 @@ class MAT_PT_PaintSystemLayers(Panel):
                                         input.name, text=input.name)
 
 
-# class MAT_MT_PaintSystemLayerMenu(Menu):
-
-
 class MAT_PT_PaintSystemLayersAdvanced(Panel):
     bl_idname = 'MAT_PT_PaintSystemLayersAdvanced'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_label = "Advanced Settings"
     bl_category = 'Paint System'
-    bl_parent_id = 'MAT_PT_PaintSystemLayers'
+    bl_parent_id = 'MAT_PT_PaintSystemLayersSettings'
     bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
@@ -1051,13 +1223,14 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
 
 
 class MAT_MT_PaintSystemAddLayer(Menu):
-    bl_label = "Add Image"
+    bl_label = "Add Layer"
     bl_idname = "MAT_MT_PaintSystemAddLayer"
 
     def draw(self, context):
         layout = self.layout
         row = layout.row()
         col = row.column()
+        col.separator()
         col.label(text="Image Layer:")
         col.operator("paint_system.new_image",
                      text="New Image Layer", icon="FILE")
@@ -1065,22 +1238,27 @@ class MAT_MT_PaintSystemAddLayer(Menu):
                      text="Open External Image")
         col.operator("paint_system.open_existing_image",
                      text="Use Existing Image")
+        col.separator()
+        col.label(text="Solid Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
 
         col.separator()
-        col.label(text="Shader:")
+        col.label(text="Shader Layer:")
         for idx, (node_type, name, description) in enumerate(SHADER_ENUM):
             col.operator("paint_system.new_shader_layer",
                          text=name, icon='SHADING_RENDERED' if idx == 0 else 'NONE').shader_type = node_type
-        col.operator("paint_system.new_node_group_layer",
-                     text="Custom Node Tree", icon='NODETREE')
+        
 
         col = row.column()
         col.label(text="Adjustment Layer:")
         for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
             col.operator("paint_system.new_adjustment_layer",
                          text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
+        col.separator()
+        col.label(text="Custom Layer:")
+        col.operator("paint_system.new_node_group_layer",
+                     text="Custom Node Tree", icon='NODETREE')
         # col = row.column()
         # col.label(text="Folder:")
         # col.operator("paint_system.new_folder", text="Folder",
@@ -1095,6 +1273,7 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
         layout = self.layout
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
+        active_layer = ps.get_active_layer()
         bakeable, error_message, nodes = is_bakeable(context)
         if not bakeable:
             col = layout.column()
@@ -1113,14 +1292,18 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
             return
 
         col = layout.column()
-        col.label(text="This is Experimental!", icon='ERROR')
-        col.label(text="Be sure to save regularly!")
-        col.separator()
+        # col.label(text="This is Experimental!", icon='ERROR')
+        # col.label(text="Be sure to save regularly!")
+        # col.separator()
         col.label(text="Merge:")
         col.operator("paint_system.merge_group",
-                     text="Merge All as New Layer", icon="FILE").as_new_layer = True
+                     text="Merge All as New Layer", icon="RENDER_RESULT").as_new_layer = True
         col.operator("paint_system.merge_group",
                      text="Merge All Layers (Bake)").as_new_layer = False
+        col.operator("paint_system.bake_image_id_to_image_layer",
+                     text="Merge Single to New Layer", icon="IMAGE_DATA").layer_id = active_layer.id
+        col.separator()
+        col.label(text="UV:")
         # TODO: Fix export merged image
         # col.separator()
         # col.label(text="Export:")
@@ -1138,11 +1321,11 @@ class MAT_MT_PaintSystemMergeOptimize(Menu):
         layout = self.layout
         col = layout.column()
         col.operator("paint_system.merge_group",
-                     text="Update Merged Layer", icon="FILE_REFRESH").as_new_layer = False
-        col.operator("paint_system.delete_bake_image",
-                     text="Delete Merged Image", icon='TRASH')
+                     text="Update Bake", icon="FILE_REFRESH").as_new_layer = False
         col.operator("paint_system.export_baked_image",
-                     text="Export Merged Image", icon='EXPORT')
+                     text="Export Bake Image", icon='EXPORT')
+        col.operator("paint_system.delete_bake_image",
+                     text="Delete Bake Image", icon='TRASH')
 # -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
@@ -1173,6 +1356,9 @@ classes = (
     MAT_PT_UL_PaintSystemLayerList,
     MAT_MT_LayersSettingsTooltips,
     MAT_PT_PaintSystemLayers,
+    # MAT_PT_PaintSystemBakeSettings,
+    MAT_PT_PaintSystemLayersSettings,
+    MAT_PT_PaintSystemMaskSettings,
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddLayer,
     MAT_MT_BrushTooltips,

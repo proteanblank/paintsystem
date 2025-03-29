@@ -59,7 +59,7 @@ class PAINTSYSTEM_OT_DuplicateGroupWarning(Operator):
             text="Click OK to create anyway, or cancel to choose a different name")
 
 
-class PAINTSYSTEM_OT_NewGroup(Operator):
+class PAINTSYSTEM_OT_NewGroup(UVLayerHandler):
     """Add a new group"""
     bl_idname = "paint_system.new_group"
     bl_label = "Add Paint System"
@@ -117,10 +117,14 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         default=True
     )
 
+    def update_uv_mode(self, context: Context):
+        self.uv_map_mode = 'PAINT_SYSTEM' if self.use_paintsystem_uv else 'OPEN'
+
     use_paintsystem_uv: BoolProperty(
         name="Use Paint System UV",
         description="Use the Paint System UV Map",
-        default=True
+        default=True,
+        update=update_uv_mode
     )
 
     hide_template: BoolProperty(default=False)
@@ -160,7 +164,8 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
                 disable_popup=True,
                 use_alpha_blend=self.use_alpha_blend,
                 disable_show_backface=self.use_backface_culling,
-                use_paintsystem_uv=self.use_paintsystem_uv,
+                uv_map_mode=self.uv_map_mode,
+                uv_map_name=self.uv_map_name,
             )
 
         if self.set_view_transform:
@@ -211,6 +216,10 @@ class PAINTSYSTEM_OT_NewGroup(Operator):
         row.scale_y = 1.2
         row.prop(self, "use_paintsystem_uv", text="Use Paint System UV",
                  icon='CHECKBOX_HLT' if self.use_paintsystem_uv else 'CHECKBOX_DEHLT')
+        if not self.use_paintsystem_uv:
+            row = layout.row()
+            row.scale_y = 1.2
+            row.prop(self, "uv_map_name", text="")
         layout.separator()
         box = layout.box()
         row = box.row()
@@ -548,17 +557,6 @@ class PAINTSYSTEM_OT_CreateNewUVMap(Operator):
     #     layout.prop(self, "uv_map_name")
 
 
-def ensure_uv_map(self, context):
-    if self.uv_map_mode == 'PAINT_SYSTEM':
-        if 'PaintSystemUVMap' not in [uvmap[0] for uvmap in get_object_uv_maps(self, context)]:
-            bpy.ops.paint_system.create_new_uv_map(
-                'INVOKE_DEFAULT', uv_map_name="PaintSystemUVMap")
-        self.uv_map_name = "PaintSystemUVMap"
-    elif not self.uv_map_name:
-        self.report({'ERROR'}, "No UV Map selected")
-        return {'CANCELLED'}
-
-
 class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
     bl_idname = "paint_system.new_image"
     bl_label = "New Image"
@@ -584,21 +582,36 @@ class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
             ('2048', "2048", "2048x2048"),
             ('4096', "4096", "4096x4096"),
             ('8192', "8192", "8192x8192"),
+            ('CUSTOM', "Custom", "Custom Resolution"),
         ],
         default='1024'
+    )
+    image_width: IntProperty(
+        name="Width",
+        default=1024,
+        min=1,
+        description="Width of the image in pixels"
+    )
+    image_height: IntProperty(
+        name="Height",
+        default=1024,
+        min=1,
+        description="Height of the image in pixels"
     )
     disable_popup: BoolProperty(default=False)
 
     def execute(self, context):
         ps = PaintSystem(context)
-        self.save_uv_mode(context)
+        self.set_uv_mode(context)
         active_group = ps.get_active_group()
         mat = ps.get_active_material()
-        ensure_uv_map(self, context)
+
         image = bpy.data.images.new(
             name=f"PS {mat.name} {active_group.name} {self.name}",
-            width=int(self.image_resolution),
-            height=int(self.image_resolution),
+            width=int(
+                self.image_resolution) if self.image_resolution != 'CUSTOM' else self.image_width,
+            height=int(
+                self.image_resolution) if self.image_resolution != 'CUSTOM' else self.image_height,
             alpha=True,
         )
         image.generated_color = (0, 0, 0, 0)
@@ -607,7 +620,7 @@ class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        self.set_uv_mode(context)
+        self.get_uv_mode(context)
         self.name = self.get_next_image_name(context)
         if self.disable_popup:
             return self.execute(context)
@@ -616,7 +629,14 @@ class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "name")
-        layout.prop(self, "image_resolution", expand=True)
+        box = layout.box()
+        box.label(text="Image Resolution", icon='IMAGE_DATA')
+        row = box.row(align=True)
+        row.prop(self, "image_resolution", expand=True)
+        if self.image_resolution == 'CUSTOM':
+            row = box.row(align=True)
+            row.prop(self, "image_width", text="Width")
+            row.prop(self, "image_height", text="Height")
         box = layout.box()
         self.select_uv_ui(box)
 
@@ -638,23 +658,22 @@ class PAINTSYSTEM_OT_OpenImage(UVLayerHandler):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        self.save_uv_mode(context)
+        self.set_uv_mode(context)
         image = bpy.data.images.load(self.filepath, check_existing=True)
-        ensure_uv_map(self, context)
+
         ps.create_image_layer(image.name, image, self.uv_map_name)
         return {'FINISHED'}
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        self.set_uv_mode
+        self.get_uv_mode(context)
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "uv_map_mode", expand=True)
-        if self.uv_map_mode == 'OPEN':
-            layout.prop(self, "uv_map_name")
+        box = layout.box()
+        self.select_uv_ui(box)
 
 
 class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler):
@@ -667,7 +686,7 @@ class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        self.save_uv_mode(context)
+        self.set_uv_mode(context)
         active_group = ps.get_active_group()
         if not active_group:
             return {'CANCELLED'}
@@ -675,13 +694,13 @@ class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler):
         if not image:
             self.report({'ERROR'}, "Image not found")
             return {'CANCELLED'}
-        ensure_uv_map(self, context)
+
         ps.create_image_layer(self.image_name, image, self.uv_map_name)
         return {'FINISHED'}
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        self.set_uv_mode(context)
+        self.get_uv_mode(context)
         self.image_name = bpy.data.images[0].name
         return context.window_manager.invoke_props_dialog(self)
 
@@ -689,9 +708,8 @@ class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler):
         layout = self.layout
         layout.prop_search(self, "image_name", bpy.data,
                            "images", text="Image")
-        layout.prop(self, "uv_map_mode", expand=True)
-        if self.uv_map_mode == 'OPEN':
-            layout.prop(self, "uv_map_name")
+        box = layout.box()
+        self.select_uv_ui(box)
 
 
 class PAINTSYSTEM_OT_NewSolidColor(Operator):
@@ -902,7 +920,7 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
             layout.label(text="Color & Alpha Input/Output Pair not Found")
 
 
-class PAINTSYSTEM_OT_NewMaskImage(Operator):
+class PAINTSYSTEM_OT_NewMaskImage(UVLayerHandler):
     bl_idname = "paint_system.new_mask_image"
     bl_label = "New Mask Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -927,20 +945,22 @@ class PAINTSYSTEM_OT_NewMaskImage(Operator):
             ('2048', "2048", "2048x2048"),
             ('4096', "4096", "4096x4096"),
             ('8192', "8192", "8192x8192"),
+            ('CUSTOM', "Custom", "Custom Resolution"),
         ],
         default='1024'
     )
-    # uv_map_mode: EnumProperty(
-    #     name="UV Map",
-    #     items=[
-    #         ('PAINT_SYSTEM', "Paint System UV", "Use the Paint System UV Map"),
-    #         ('OPEN', "Use Existing", "Open an existing UV Map"),
-    #     ]
-    # )
-    # uv_map_name: EnumProperty(
-    #     name="UV Map",
-    #     items=get_object_uv_maps
-    # )
+    image_width: IntProperty(
+        name="Width",
+        default=1024,
+        min=1,
+        description="Width of the image in pixels"
+    )
+    image_height: IntProperty(
+        name="Height",
+        default=1024,
+        min=1,
+        description="Height of the image in pixels"
+    )
     initial_mask: EnumProperty(
         name="Initial Mask",
         items=[
@@ -954,20 +974,38 @@ class PAINTSYSTEM_OT_NewMaskImage(Operator):
 
     def execute(self, context):
         ps = PaintSystem(context)
+        self.set_uv_mode(context)
         ps.get_material_settings().use_paintsystem_uv = self.uv_map_mode == "PAINT_SYSTEM"
         active_group = ps.get_active_group()
         active_layer = ps.get_active_layer()
         mat = ps.get_active_material()
-        ensure_uv_map(self, context)
+
         image = bpy.data.images.new(
-            name=f"PS_MASK {active_group.name} {active_layer.name}", width=int(self.image_resolution), height=int(self.image_resolution), alpha=True)
+            name=f"PS_MASK {active_group.name} {active_layer.name}",
+            width=int(
+                self.image_resolution) if self.image_resolution != 'CUSTOM' else self.image_width,
+            height=int(
+                self.image_resolution) if self.image_resolution != 'CUSTOM' else self.image_height,
+        )
+        image.colorspace_settings.name = 'Non-Color'
         image.generated_color = (
             0, 0, 0, 0) if self.initial_mask == 'BLACK' else (1, 1, 1, 1)
         active_layer.mask_image = image
+        active_layer.enable_mask = True
+        active_layer.mask_uv_map = self.uv_map_name
         return {'FINISHED'}
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
+        self.get_uv_mode(context)
+        active_layer = ps.get_active_layer()
+        if active_layer.image:
+            if active_layer.image.size[0] == active_layer.image.size[1]:
+                self.image_resolution = str(active_layer.image.size[0])
+            else:
+                self.image_resolution = 'CUSTOM'
+                self.image_width = active_layer.image.size[0]
+                self.image_height = active_layer.image.size[1]
         self.uv_map_mode = 'PAINT_SYSTEM' if ps.get_material_settings(
         ).use_paintsystem_uv else 'OPEN'
         if self.disable_popup:
@@ -976,17 +1014,53 @@ class PAINTSYSTEM_OT_NewMaskImage(Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Image Resolution:")
-        layout.prop(self, "image_resolution", expand=True)
         layout.label(text="Initial Mask:")
         row = layout.row()
         row.prop(self, "initial_mask", expand=True)
-        # box = layout.box()
-        # box.label(text="UV Map:")
-        # row = box.row()
-        # row.prop(self, "uv_map_mode", expand=True)
-        # if self.uv_map_mode == 'OPEN':
-        #     box.prop(self, "uv_map_name", text="")
+        box = layout.box()
+        box.label(text="Image Resolution", icon='IMAGE_DATA')
+        row = box.row(align=True)
+        row.prop(self, "image_resolution", expand=True)
+        if self.image_resolution == 'CUSTOM':
+            row = box.row(align=True)
+            row.prop(self, "image_width", text="Width")
+            row.prop(self, "image_height", text="Height")
+        box = layout.box()
+        self.select_uv_ui(box)
+
+
+class PAINTSYSTEM_OT_DeleteMask(Operator):
+    bl_idname = "paint_system.delete_mask_image"
+    bl_label = "Delete Mask"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Delete the active mask"
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        return active_layer and active_layer.mask_image
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        if active_layer.mask_image:
+            bpy.data.images.remove(active_layer.mask_image)
+            active_layer.mask_image = None
+            active_layer.enable_mask = False
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        layout.label(
+            text=f"Delete {active_layer.name} Mask ?", icon='ERROR')
+        layout.label(
+            text="Click OK to delete, or cancel to keep the mask")
 
 
 class PAINTSYSTEM_OT_InvertColors(Operator):
@@ -1000,34 +1074,40 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
     invert_b: BoolProperty(default=True)
     invert_a: BoolProperty(default=False)
 
-    @classmethod
-    def poll(cls, context):
-        ps = PaintSystem(context)
-        active_layer = ps.get_active_layer()
-        return active_layer and active_layer.image
+    image_name: StringProperty()
+    disable_popup: BoolProperty(default=False)
 
     def execute(self, context):
-        ps = PaintSystem(context)
-        active_layer = ps.get_active_layer()
-        image: bpy.types.Image = active_layer.image
+        if not self.image_name:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
+        image: bpy.types.Image = bpy.data.images.get(self.image_name)
         with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
             bpy.ops.image.invert('INVOKE_DEFAULT', invert_r=self.invert_r,
                                  invert_g=self.invert_g, invert_b=self.invert_b, invert_a=self.invert_a)
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        if self.disable_popup:
+            return self.execute(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
+        # Check if image have alpha channel
+        image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        if not image:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
         layout.prop(self, "invert_r", text="Red")
         layout.prop(self, "invert_g", text="Green")
         layout.prop(self, "invert_b", text="Blue")
-        layout.prop(self, "invert_a", text="Alpha")
+        if image.alp:
+            layout.prop(self, "invert_a", text="Alpha")
 
 
-class PAINTSYSTEM_OT_ExportLayer(Operator):
-    bl_idname = "paint_system.export_layer"
+class PAINTSYSTEM_OT_ExportActiveLayer(Operator):
+    bl_idname = "paint_system.export_active_layer"
     bl_label = "Save Image"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Save the active image"
@@ -1050,23 +1130,21 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
     width: IntProperty(name="Width", default=1024)
     height: IntProperty(name="Height", default=1024)
 
-    @classmethod
-    def poll(cls, context):
-        ps = PaintSystem(context)
-        active_layer = ps.get_active_layer()
-        return active_layer and active_layer.image
+    image_name: StringProperty()
 
     def execute(self, context):
-        ps = PaintSystem(context)
-        active_layer = ps.get_active_layer()
-        image = active_layer.image
+        if not self.image_name:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
+        image: bpy.types.Image = bpy.data.images.get(self.image_name)
         image.scale(self.width, self.height)
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        ps = PaintSystem(context)
-        active_layer = ps.get_active_layer()
-        image = active_layer.image
+        if not self.image_name:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
+        image: bpy.types.Image = bpy.data.images.get(self.image_name)
         self.width = image.size[0]
         self.height = image.size[1]
         return context.window_manager.invoke_props_dialog(self)
@@ -1084,16 +1162,13 @@ class PAINTSYSTEM_OT_ClearImage(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Clear the active image"
 
-    @classmethod
-    def poll(cls, context):
-        ps = PaintSystem(context)
-        active_layer = ps.get_active_layer()
-        return active_layer and active_layer.image
+    image_name: StringProperty()
 
     def execute(self, context):
-        ps = PaintSystem(context)
-        active_layer = ps.get_active_layer()
-        image = active_layer.image
+        if not self.image_name:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
+        image: bpy.types.Image = bpy.data.images.get(self.image_name)
         # Replace every pixel with a transparent pixel
         pixels = numpy.empty(len(image.pixels), dtype=numpy.float32)
         pixels[::4] = 0.0
@@ -1284,6 +1359,8 @@ def format_image(image_name):
     for i in range(num_pixels):
         r, g, b, a = pixels[i * 4: i * 4 + 4]
 
+        print(r, g, b, a)
+
         if a == 0:
             r = 0
             g = 0
@@ -1317,7 +1394,8 @@ class PAINTSYSTEM_OT_ProjectApply(Operator):
         app_name = editor_path.name
         external_image = active_layer.edit_external_image
 
-        external_image_name = external_image.name
+        external_image_name = str(external_image.name)
+        print(external_image_name)
         image = bpy.data.images.get((external_image_name, None))
 
         if app_name == "CLIPStudioPaint.exe":
@@ -1400,7 +1478,8 @@ classes = (
     PAINTSYSTEM_OT_NewShaderLayer,
     PAITNSYSTEM_OT_NewNodeGroupLayer,
     PAINTSYSTEM_OT_NewMaskImage,
-    PAINTSYSTEM_OT_ExportLayer,
+    PAINTSYSTEM_OT_DeleteMask,
+    PAINTSYSTEM_OT_ExportActiveLayer,
     PAINTSYSTEM_OT_InvertColors,
     PAINTSYSTEM_OT_ResizeImage,
     PAINTSYSTEM_OT_ClearImage,
