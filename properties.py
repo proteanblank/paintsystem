@@ -1,7 +1,6 @@
 import bpy
 
 from bpy.props import (IntProperty,
-                       FloatProperty,
                        FloatVectorProperty,
                        BoolProperty,
                        StringProperty,
@@ -48,7 +47,7 @@ def update_active_image(self=None, context: Context = None):
     if image_paint.mode == 'IMAGE':
         image_paint.mode = 'MATERIAL'
     for i, image in enumerate(mat.texture_paint_images):
-        if image == active_layer.image:
+        if image == (active_layer.mask_image if active_layer.edit_mask else active_layer.image):
             mat.paint_active_slot = i
             # Get uv map name
             uv_map_node = ps.find_uv_map_node()
@@ -124,18 +123,30 @@ class PaintSystemLayer(BaseNestedListItem):
         name="Node Tree",
         type=NodeTree
     )
+    edit_mask: BoolProperty(
+        name="Edit Mask",
+        description="Edit mask",
+        default=False,
+    )
     mask_image: PointerProperty(
         name="Mask Image",
-        type=Image
+        type=Image,
+        update=update_node_tree
     )
-    enabled_mask: BoolProperty(
+    enable_mask: BoolProperty(
         name="Enabled Mask",
         description="Toggle mask visibility",
-        default=False
+        default=False,
+        update=update_node_tree
+    )
+    mask_uv_map: StringProperty(
+        name="Mask UV Map",
+        default="",
+        update=update_node_tree
     )
     edit_external_image: PointerProperty(
         name="Edit External Image",
-        type=Image
+        type=Image,
     )
 
 
@@ -144,9 +155,11 @@ class NodeEntry:
     color_input: NodeSocket
     alpha_input: NodeSocket
     location: Vector
-    is_clip: bool
-    clip_color_input: NodeSocket
-    clip_alpha_input: NodeSocket
+    is_clip: bool = False
+    clip_color_input: NodeSocket | None = None
+    clip_alpha_input: NodeSocket | None = None
+    mask_color_input: NodeSocket | None = None
+    mask_alpha_input: NodeSocket | None = None
 
 
 # class PaintSystemNodesStore:
@@ -261,7 +274,7 @@ class PaintSystemGroup(BaseNestedListManager):
         # depth_inputs[-1] = (ng_output.inputs['Color'],
         #                     ng_output.inputs['Alpha'], ng_output.location)
         ps_nodes_store[-1] = NodeEntry(
-            ng_output.inputs['Color'], ng_output.inputs['Alpha'], ng_output.location, False, None, None)
+            ng_output.inputs['Color'], ng_output.inputs['Alpha'], ng_output.location)
 
         for item, _ in flattened:
             is_clip = item.clip
@@ -292,6 +305,52 @@ class PaintSystemGroup(BaseNestedListManager):
             group_node.location = node_entry.location + \
                 Vector((-200, 0))
             group_node.mute = not item.enabled
+            
+            if node_entry.mask_color_input and node_entry.mask_alpha_input:
+                links.new(node_entry.mask_color_input,
+                          group_node.outputs['Color'])
+                links.new(node_entry.mask_alpha_input,
+                          group_node.outputs['Alpha'])
+                node_entry.mask_color_input = None
+                node_entry.mask_alpha_input = None
+            
+            if item.enable_mask:
+                mask_nt = get_nodetree_from_library(
+                    '_PS_Mask')
+                mask_node = nodes.new('ShaderNodeGroup')
+                mask_node.node_tree = mask_nt
+                mask_node.location = group_node.location
+                group_node.location += Vector((-200, 0))
+                
+                mask_image_node = nodes.new('ShaderNodeTexImage')
+                mask_image_node.image = item.mask_image
+                mask_image_node.location = mask_node.location + Vector((-200, -200))
+                mask_image_node.width = 140
+                mask_image_node.hide = True
+                
+                mask_uvmap_node = nodes.new('ShaderNodeUVMap')
+                mask_uvmap_node.uv_map = item.mask_uv_map
+                mask_uvmap_node.location = mask_image_node.location + Vector((0, -50))
+                mask_uvmap_node.hide = True
+                
+                if item.image:
+                    image_texture_node = item.node_tree.nodes['Image Texture']
+                    mask_image_node.interpolation = image_texture_node.interpolation
+                    mask_image_node.extension = image_texture_node.extension
+                
+                node_entry.location = mask_node.location
+                node_entry.mask_color_input = mask_node.inputs['Original Color']
+                node_entry.mask_alpha_input = mask_node.inputs['Original Alpha']
+                links.new(node_entry.color_input,
+                          mask_node.outputs['Color'])
+                links.new(node_entry.alpha_input,
+                          mask_node.outputs['Alpha'])
+                links.new(mask_image_node.outputs['Color'],
+                          mask_node.inputs['Mask Alpha'])
+                links.new(mask_uvmap_node.outputs['UV'],
+                            mask_image_node.inputs['Vector'])
+                node_entry.color_input = mask_node.inputs['Color']
+                node_entry.alpha_input = mask_node.inputs['Alpha']
 
             if is_clip or node_entry.is_clip:
                 links.new(node_entry.clip_color_input,
@@ -317,10 +376,7 @@ class PaintSystemGroup(BaseNestedListManager):
                 ps_nodes_store[item.id] = NodeEntry(
                     group_node.inputs['Over Color'],
                     group_node.inputs['Over Alpha'],
-                    group_node.location + Vector((0, -250)),
-                    False,
-                    None,
-                    None)
+                    group_node.location + Vector((0, -250)))
 
         node_entry = ps_nodes_store[-1]
         if self.bake_image and self.use_bake_image:
@@ -349,6 +405,13 @@ class PaintSystemGroup(BaseNestedListManager):
 
         links.new(node_entry.color_input, ng_input.outputs['Color'])
         links.new(node_entry.alpha_input, ng_input.outputs['Alpha'])
+        if node_entry.mask_color_input and node_entry.mask_alpha_input:
+            links.new(node_entry.mask_color_input,
+                        ng_input.outputs['Color'])
+            links.new(node_entry.mask_alpha_input,
+                        ng_input.outputs['Alpha'])
+            node_entry.mask_color_input = None
+            node_entry.mask_alpha_input = None
         ng_input.location = node_entry.location + Vector((-200, 0))
 
     # Define the collection property directly in the class

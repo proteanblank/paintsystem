@@ -27,7 +27,7 @@ LAYER_ENUM = [
 ]
 SHADER_ENUM = [
     ('_PS_Toon_Shader', "Toon Shader (EEVEE)", "Toon Shader"),
-    ('_PS_Light', "Light (EEVEE)", "Light"),
+    # ('_PS_Light', "Light (EEVEE)", "Light"),
     ('_PS_Ambient_Occlusion', "Ambient Occlusion", "Ambient Occlusion"),
 ]
 TEMPLATE_ENUM = [
@@ -257,6 +257,10 @@ class PaintSystem:
         item_id = active_group.get_id_from_flattened_index(
             active_group.active_index)
 
+        self.delete_item_id(item_id)
+    
+    def delete_item_id(self, item_id):
+        active_group = self.get_active_group()
         if item_id != -1 and active_group.remove_item_and_children(item_id, self._on_item_delete):
             # Update active_index
             flattened = active_group.flatten_hierarchy()

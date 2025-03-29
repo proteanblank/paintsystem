@@ -14,6 +14,7 @@ from .paint_system import PaintSystem, get_brushes_from_library, TEMPLATE_ENUM
 from mathutils import Vector
 from .common import redraw_panel, NodeOrganizer, get_active_material_output
 from typing import List
+from .common_layers import UVLayerHandler
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
@@ -41,14 +42,14 @@ class PAINTSYSTEM_OT_SaveFileAndImages(Operator):
         #         item.image.pack()
         bpy.ops.wm.save_mainfile()
         return {'FINISHED'}
-    
+
 
 class PAINTSYSTEM_OT_AddCameraPlane(Operator):
     bl_idname = "paint_system.add_camera_plane"
     bl_label = "Add Camera Plane"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Add a plane with a camera texture"
-    
+
     align_up: EnumProperty(
         name="Align Up",
         items=[
@@ -173,7 +174,7 @@ class PAINTSYSTEM_OT_PaintModeSettings(Operator):
 # -------------------------------------------------------------------
 # Template Material Creation
 # -------------------------------------------------------------------
-class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
+class PAINTSYSTEM_OT_CreateTemplateSetup(UVLayerHandler):
     bl_idname = "paint_system.create_template_setup"
     bl_label = "Create Template Setup"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
@@ -220,11 +221,14 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
         mat = ps.get_active_material()
         mat.use_nodes = True
 
+        self.set_uv_mode(context)
+
         if self.template in ('STANDARD', 'NONE'):
             bpy.ops.paint_system.new_solid_color(
                 'INVOKE_DEFAULT', disable_popup=True)
         bpy.ops.paint_system.new_image('INVOKE_DEFAULT', disable_popup=True,
-                                       uv_map_mode='PAINT_SYSTEM' if self.use_paintsystem_uv else 'OPEN')
+                                       uv_map_mode=self.uv_map_mode,
+                                       uv_map_name=self.uv_map_name)
 
         node_organizer = NodeOrganizer(mat)
         if self.template == 'NONE':
@@ -401,6 +405,7 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(Operator):
     def invoke(self, context, event):
         if self.disable_popup:
             return self.execute(context)
+        self.get_uv_mode(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):

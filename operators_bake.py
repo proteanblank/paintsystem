@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import bpy
 from bpy.types import Operator, Context, Node, NodeTree, Image
 from bpy.props import (
@@ -179,20 +180,19 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
     node_organizer = NodeOrganizer(material)
     socket_type = target_node.outputs[output_socket_name].type
     if socket_type != 'SHADER':
-        bake_nt = get_nodetree_from_library("_PS_Bake")
+        # bake_nt = get_nodetree_from_library("_PS_Bake")
         bake_node = node_organizer.create_node(
-            'ShaderNodeGroup', {'node_tree': bake_nt})
+            'ShaderNodeEmission')
         node_organizer.create_link(
             target_node.name, bake_node.name, output_socket_name, 'Color')
         node_organizer.create_link(
-            bake_node.name, material_output.name, 'Shader', 'Surface')
+            bake_node.name, material_output.name, 'Emission', 'Surface')
         # Check if target node has Alpha output
-        if alpha_socket_name:
-            node_organizer.create_link(
-                target_node.name, bake_node.name, alpha_socket_name, 'Alpha')
+        # if alpha_socket_name:
+        #     node_organizer.create_link(
+        #         target_node.name, bake_node.name, alpha_socket_name, 'Alpha')
         bake_params = {
-            "type": 'COMBINED',
-            "pass_filter": {'EMIT', 'DIRECT'},
+            "type": 'EMIT',
         }
         cycles.samples = 1
         cycles.use_denoising = False
@@ -207,15 +207,6 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
         cycles.use_denoising = True
         cycles.use_adaptive_sampling = True
 
-    # Create and set up the image texture node
-    bake_tex_node = node_organizer.create_node('ShaderNodeTexImage', {
-        "name": "temp_bake_node", "image": image, "location": target_node.location + Vector((0, 300))})
-
-    for node in nodes:
-        node.select = False
-    bake_tex_node.select = True
-    nodes.active = bake_tex_node
-
     # Change the only selected object to the active one
     # TODO: Allow baking multiple objects
     for obj in context.scene.objects:
@@ -224,8 +215,62 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
         else:
             obj.select_set(True)
 
-    # Perform bake
+    # Create and set up the image texture node
+    bake_color_tex_node = node_organizer.create_node('ShaderNodeTexImage', {
+        "name": "temp_bake_node", "image": image, "location": target_node.location + Vector((0, 300))})
+
+    image_alpha = image.copy()
+    image_alpha.name = f"{image.name}_alpha"
+
+    bake_alpha_tex_node = node_organizer.create_node('ShaderNodeTexImage', {
+        "name": "temp_bake_node", "image": image_alpha, "location": target_node.location + Vector((0, 600))})
+
+    for node in nodes:
+        node.select = False
+
+    bake_color_tex_node.select = True
+    nodes.active = bake_color_tex_node
+
+    # Perform bake Color
     bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
+
+    for node in nodes:
+        node.select = False
+
+    bake_alpha_tex_node.select = True
+    nodes.active = bake_alpha_tex_node
+
+    node_organizer.create_link(
+        target_node.name, bake_node.name, alpha_socket_name, 'Color')
+
+    # Perform bake Alpha
+    bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
+    
+    nodes.remove(bake_alpha_tex_node)
+    
+    # Apply the red channel of image_alpha to the alpha channel of image
+    if image and image_alpha:
+        # Get pixel data
+        width, height = image.size
+        image_pixels = image.pixels[:]
+        alpha_pixels = image_alpha.pixels[:]
+        
+        # Create a new pixel array
+        new_pixels = list(image_pixels)
+        
+        # Apply red channel of alpha image to alpha channel of main image
+        for i in range(0, len(image_pixels), 4):
+            # Get the red channel value from alpha image (every 4 values)
+            alpha_value = alpha_pixels[i]  # Red channel
+            # Set the alpha channel of the main image (index + 3)
+            new_pixels[i + 3] = alpha_value
+        
+        # Update the image with the new pixel data
+        image.pixels = new_pixels
+        image.update()
+        
+        # Clean up the alpha image as we don't need it anymore
+        bpy.data.images.remove(image_alpha)
 
     # Pack the image
     if not image.packed_file:
@@ -245,11 +290,113 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
     # Debug
     # print(f"Backed {target_node.name} to {image.name}")
 
-    return bake_tex_node
+    return bake_color_tex_node
 
     # except Exception as e:
     #     print(f"Baking failed: {str(e)}")
     #     return None
+
+
+# ...existing code...
+
+
+@dataclass
+class BakingStep:
+    node: Node
+    output_socket_name: str
+    alpha_socket_name: str
+    image: Image
+    uv_layer: str
+
+
+class PAINTSYSTEM_OT_BakeLayerIDToImageLayer(UVLayerHandler):
+    bl_idname = "paint_system.bake_image_id_to_image_layer"
+    bl_label = "Bake Active to Image Layer"
+    bl_description = "Bake the active node to the selected image layer"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    image_resolution: EnumProperty(
+        items=[
+            ('1024', "1024", "1024x1024"),
+            ('2048', "2048", "2048x2048"),
+            ('4096', "4096", "4096x4096"),
+            ('8192', "8192", "8192x8192"),
+        ],
+        default='1024',
+    )
+    use_gpu: BoolProperty(
+        name="Use GPU",
+        default=True
+    )
+    layer_name: StringProperty(
+        name="Layer Name",
+        default="Bake"
+    )
+    keep_original: BoolProperty(
+        name="Keep Original",
+        default=False
+    )
+    layer_id: IntProperty(
+        name="Layer ID",
+        default=0
+    )
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        # active_layer = ps.get_active_layer()
+        selected_layer = active_group.get_item_by_id(self.layer_id)
+        is_folder = selected_layer.type == 'FOLDER'
+        layer_id = self.layer_id
+        if not selected_layer:
+            self.report({'ERROR'}, "No active layer found.")
+            return {'CANCELLED'}
+        if selected_layer.clip:
+            self.report({'ERROR'}, "Cannot merge clipped layer.")
+            return {'CANCELLED'}
+        disabled_layer_ids = []
+        for layer in active_group.items:
+            if layer != selected_layer and layer.parent_id != layer_id and layer.enabled:
+                layer.enabled = False
+                disabled_layer_ids.append(layer.id)
+
+        self.set_uv_mode(context)
+        bakeable, error_message, nodes = is_bakeable(context)
+        if not bakeable:
+            self.report({'ERROR'}, error_message)
+
+        bpy.ops.paint_system.merge_group(
+            image_resolution=self.image_resolution,
+            uv_map_mode=self.uv_map_mode,
+            uv_map_name=self.uv_map_name,
+            use_gpu=self.use_gpu,
+            as_new_layer=True,
+            new_layer_name=f"{selected_layer.name} Bake"
+        )
+        if is_folder:
+            bpy.ops.paint_system.move_up(action="MOVE_OUT")
+        if not self.keep_original:
+            ps.delete_item_id(layer_id)
+        for layer_id in disabled_layer_ids:
+            active_group.get_item_by_id(layer_id).enabled = True
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        self.get_uv_mode(context)
+        if active_layer:
+            self.layer_name = f"{active_layer.name} Bake"
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "layer_name")
+        layout.prop(self, "use_gpu", text="Use GPU (Faster)")
+        layout.prop(self, "image_resolution", expand=True)
+        layout.prop(self, "keep_original")
+        box = layout.box()
+        self.select_uv_ui(box)
 
 
 class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
@@ -275,6 +422,9 @@ class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
         name="As New Layer",
         default=False
     )
+    new_layer_name: StringProperty(
+        name="New Layer Name",
+    )
 
     @classmethod
     def poll(cls, context):
@@ -284,7 +434,8 @@ class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
     def execute(self, context):
         context.window.cursor_set('WAIT')
         ps = PaintSystem(context)
-        self.save_uv_mode(context)
+        self.set_uv_mode(context)
+        print(f"UV Map: {self.uv_map_name}")
         obj = ps.active_object
         if obj.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -303,7 +454,7 @@ class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
 
         connected_node = get_connected_nodes(
             get_active_material_output(mat.node_tree))
-        baking_steps: List[Tuple[Node, str, str, Image, str]] = []
+        baking_steps: List[BakingStep] = []
         image_resolution = int(self.image_resolution)
         for node, depth in connected_node:
             # TODO: Allow Baking inside groups
@@ -322,8 +473,9 @@ class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
 
                 if node.bl_idname == "ShaderNodeShaderToRGB":
                     link = node.inputs[0].links[0]
-                    baking_steps.append(
-                        (link.from_node, link.from_socket.name, None, image, self.uv_map_name))
+                    baking_step = BakingStep(
+                        link.from_node, link.from_socket.name, None, image, self.uv_map_name)
+                    baking_steps.append(baking_step)
             if node.bl_idname == "ShaderNodeGroup" and node.node_tree == active_group.node_tree:
                 if self.as_new_layer:
                     image = bpy.data.images.new(
@@ -332,8 +484,7 @@ class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
                         height=image_resolution,
                         alpha=True,
                     )
-                    ps.create_image_layer(
-                        image.name, image, self.uv_map_name)
+                    
                 else:
                     image = active_group.bake_image
                     if not image:
@@ -345,21 +496,22 @@ class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
                             height=image_resolution,
                             alpha=True,
                         )
-                        image.colorspace_settings.name = 'sRGB'
+                        image.colorspace_settings.name = 'Non-Color'
                         active_group.bake_image = image
-                baking_steps.append(
-                    (node, "Color", "Alpha", image, self.uv_map_name))
+                baking_step = BakingStep(
+                    node, "Color", "Alpha", image, self.uv_map_name)
+                baking_steps.append(baking_step)
 
         baking_steps.reverse()
-
-        for idx, (node, output_socket_name, alpha_socket_name, image, uv_layer) in enumerate(baking_steps):
+        # (node, output_socket_name, alpha_socket_name, image, uv_layer)
+        for idx, baking_step in enumerate(baking_steps):
             tex_node = bake_node(
                 context,
-                target_node=node,
+                target_node=baking_step.node,
                 image=image,
-                uv_layer=uv_layer,
-                output_socket_name=output_socket_name,
-                alpha_socket_name=alpha_socket_name,
+                uv_layer=baking_step.uv_layer,
+                output_socket_name=baking_step.output_socket_name,
+                alpha_socket_name=baking_step.alpha_socket_name,
                 gpu=self.use_gpu
             )
             # TODO: Handle nodes that require intermediate steps
@@ -372,18 +524,22 @@ class PAINTSYSTEM_OT_MergeGroup(UVLayerHandler):
         if not self.as_new_layer:
             active_group.use_bake_image = True
             active_group.bake_uv_map = self.uv_map_name
+        else:
+            ps.create_image_layer(
+                image.name if not self.new_layer_name else self.new_layer_name, image, self.uv_map_name)
 
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        self.set_uv_mode(context)
+        self.get_uv_mode(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "use_gpu", text="Use GPU (Faster)")
         layout.prop(self, "image_resolution", expand=True)
-        self.select_uv_ui(layout)
+        box = layout.box()
+        self.select_uv_ui(box)
 
 
 class PAINTSYSTEM_OT_MergeAndExportGroup(UVLayerHandler):
@@ -408,7 +564,7 @@ class PAINTSYSTEM_OT_MergeAndExportGroup(UVLayerHandler):
 
     def execute(self, context):
         ps = PaintSystem(context)
-        self.save_uv_mode(context)
+        self.set_uv_mode(context)
         bpy.ops.paint_system.merge_group(
             image_resolution=self.image_resolution,
             uv_map_name=self.uv_map_name,
@@ -420,14 +576,15 @@ class PAINTSYSTEM_OT_MergeAndExportGroup(UVLayerHandler):
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
-        self.set_uv_mode(context)
+        self.get_uv_mode(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "use_gpu", text="Use GPU (Faster)")
         layout.prop(self, "image_resolution", expand=True)
-        self.select_uv_ui(layout)
+        box = layout.box()
+        self.select_uv_ui(box)
 
 
 class PAINTSYSTEM_OT_DeleteBakedImage(Operator):
@@ -541,6 +698,7 @@ class PAINTSYSTEM_OT_FocusNode(Operator):
 
 
 classes = (
+    PAINTSYSTEM_OT_BakeLayerIDToImageLayer,
     PAINTSYSTEM_OT_MergeGroup,
     PAINTSYSTEM_OT_MergeAndExportGroup,
     PAINTSYSTEM_OT_DeleteBakedImage,
