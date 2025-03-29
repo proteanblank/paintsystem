@@ -17,6 +17,7 @@ from .common_layers import UVLayerHandler
 import numpy
 import pathlib
 from bpy.app.translations import pgettext_rpt as rpt_
+import numpy as np
 
 # bpy.types.Image.pack
 # -------------------------------------------------------------------
@@ -1239,7 +1240,7 @@ class PAINTSYSTEM_OT_ProjectEdit(Operator):
             i += 1
 
         image_new.name = bpy.path.basename(filepath_final)
-        active_layer.edit_external_image = image_new
+        active_layer.external_image = image_new
 
         image_new.filepath_raw = filepath_final  # TODO, filepath raw is crummy
         image_new.file_format = 'PNG'
@@ -1257,41 +1258,91 @@ class PAINTSYSTEM_OT_ProjectEdit(Operator):
 
 def convert_straight_to_premultiplied(image: bpy.types.Image):
     """
-    Converts an image in Blender from Straight Alpha to Premultiplied Alpha.
+    Converts the pixels of a Blender Image object from straight alpha
+    to premultiplied alpha in place.
 
     Args:
-        image_name (str): The name of the Blender image to process.
+        image (bpy.types.Image): The Blender Image object to convert.
+
+    Raises:
+        TypeError: If the input is not a bpy.types.Image.
+        ValueError: If the image has no data, is not RGBA, or is not float.
     """
-    # Get the image
-    # image = bpy.data.images.get(image_name)
-    if image.filepath:
-        image.reload()
-    if not image:
-        print(f"Image '{image_name}' not found.")
-        return
+    # --- Input Validation ---
+    if not isinstance(image, bpy.types.Image):
+        raise TypeError(f"Expected bpy.types.Image, got {type(image)}")
 
-    # Ensure the image has alpha channel
-    if image.channels < 4:
-        print(f"Image '{image.name}' does not have an alpha channel.")
-        return
+    if not image.has_data:
+        raise ValueError(f"Image '{image.name}' has no pixel data loaded.")
 
-    # Get pixel data
-    pixels = list(image.pixels)  # Copy pixel data
-    num_pixels = len(pixels) // 4  # Each pixel has 4 channels (RGBA)
+    if image.channels != 4:
+        raise ValueError(f"Image '{image.name}' must be RGBA (4 channels), "
+                         f"but it has {image.channels} channels.")
 
-    # Modify pixels
-    for i in range(num_pixels):
-        r, g, b, a = pixels[i * 4: i * 4 + 4]
-        r *= a
-        g *= a
-        b *= a
-        pixels[i * 4: i * 4 + 4] = [r, g, b, a]
+    # While the operation works mathematically on integers,
+    # image.pixels always provides floats [0, 1].
+    # We can optionally check image.is_float if needed, but the
+    # access method handles the conversion for us.
+    # if not image.is_float:
+    #     print(f"Warning: Image '{image.name}' is not stored as float."
+    #           " Pixel access converts it, but precision might differ.")
 
-    # Apply modified pixel data back to the image
-    image.pixels[:] = pixels  # Assign all at once for better performance
+
+    # --- Get Pixel Data ---
+    # Accessing image.pixels creates a *copy* of the pixel data as a flat list
+    # of floats [R1, G1, B1, A1, R2, G2, B2, A2, ...].
+    # For large images, this can be memory intensive.
+    pixels = list(image.pixels) # Get a mutable list copy
+    num_pixels = len(pixels) // image.channels
+    width = image.size[0]
+    height = image.size[1]
+
+    if len(pixels) != width * height * 4:
+         # This should ideally not happen if previous checks passed
+         raise ValueError(f"Pixel data length mismatch for image '{image.name}'. "
+                          f"Expected {width * height * 4}, got {len(pixels)}")
+
+    print(f"Processing image '{image.name}' ({width}x{height})...")
+    
+    # try:
+    #     # Convert the flat list to a NumPy array
+    #     pixels_np = np.array(pixels, dtype=np.float32) # Use float32 for typical image data
+
+    #     # Reshape to (height, width, channels) - Note: Blender's flat list is width-major
+    #     # However, processing often easier if viewed as sequence of pixels
+    #     # Reshaping to (num_pixels, channels) might be simpler here
+    #     pixels_np = pixels_np.reshape((num_pixels, 4))
+
+    #     # Extract Alpha channel
+    #     alpha = pixels_np[:, 3] # Get alpha for all pixels
+
+    #     # Premultiply RGB channels using broadcasting
+    #     # alpha[:, np.newaxis] reshapes alpha from (N,) to (N, 1) to allow broadcasting
+    #     # across the 3 RGB channels
+    #     pixels_np[:, :3] *= alpha[:, np.newaxis]
+
+    #     # Flatten the array back to the required format for image.pixels
+    #     pixels = pixels_np.ravel().tolist()
+
+    # except ImportError:
+    # print("NumPy not available. Falling back to slower Python loop.")
+    # Fallback to Python loop if NumPy fails (shouldn't happen with standard Blender)
+    for i in range(0, len(pixels), 4):
+        alpha = pixels[i + 3]
+        pixels[i]     *= alpha
+        pixels[i + 1] *= alpha
+        pixels[i + 2] *= alpha
+
+
+    # --- Write Modified Pixels Back ---
+    # Assign the entire modified list back to image.pixels
+    image.pixels = pixels
+
+    # --- Update Blender ---
+    # Signal Blender that the image data has changed
     image.update()
 
-    print(f"Image '{image.name}' converted to Premultiplied Alpha.")
+    print(f"Image '{image.name}' converted to premultiplied alpha.")
 
 
 def convert_premultiplied_to_straight(image_name):
@@ -1337,40 +1388,95 @@ def convert_premultiplied_to_straight(image_name):
     print(f"Image '{image_name}' converted to Straight Alpha.")
 
 
-def format_image(image_name):
-    image = bpy.data.images.get(image_name)
-    if image.filepath:
-        image.reload()
-    print(image_name)
+def set_rgb_to_zero_if_alpha_zero(image):
+    """
+    Checks each pixel in the input Blender Image. If a pixel's alpha
+    channel is 0.0, it sets the Red, Green, and Blue channels of that
+    pixel to 0.0 as well.
+
+    Args:
+        image (bpy.types.Image): The Blender Image data-block to process.
+
+    Returns:
+        bool: True if the operation was successful, False otherwise.
+    """
     if not image:
-        print(f"Image '{image_name}' not found.")
-        return
+        print("Error: No image provided.")
+        return False
 
-    # Ensure the image has alpha channel
-    if image.channels < 4:
-        print(f"Image '{image_name}' does not have an alpha channel.")
-        return
+    if not isinstance(image, bpy.types.Image):
+        print(f"Error: Input '{image.name}' is not a bpy.types.Image.")
+        return False
 
-    # Get pixel data
-    pixels = list(image.pixels)  # Copy pixel data
-    num_pixels = len(pixels) // 4  # Each pixel has 4 channels (RGBA)
+    # if not image.has_data:
+    #     print(f"Error: Image '{image.name}' has no pixel data loaded.")
+    #     # You might want to pack the image or ensure the file path is correct
+    #     # before calling this function if this happens.
+    #     return False
 
-    # Modify pixels
-    for i in range(num_pixels):
-        r, g, b, a = pixels[i * 4: i * 4 + 4]
+    print(f"Processing image: '{image.name}' ({image.size[0]}x{image.size[1]})")
 
-        print(r, g, b, a)
+    # --- Method 1: Using Numpy (Generally Faster for large images) ---
+    width = image.size[0]
+    height = image.size[1]
+    channels = image.channels # Usually 4 (RGBA)
 
-        if a == 0:
-            r = 0
-            g = 0
-            b = 0
+    if channels != 4:
+        print(f"Error: Image '{image.name}' does not have 4 channels (RGBA). Found {channels}.")
+        # Or handle images with 3 channels differently if needed
+        return False
 
-        pixels[i * 4: i * 4 + 4] = [r, g, b, a]
+    # Copy pixel data to a numpy array for easier manipulation
+    # The `.pixels` attribute is a flat list [R1, G1, B1, A1, R2, G2, B2, A2, ...]
+    # Reshape it into a (height, width, channels) array
+    # Note: Blender's pixel storage order might seem inverted height-wise
+    # when directly reshaping. Accessing pixels[:] gets the flat list correctly.
+    pixel_data = np.array(image.pixels[:]) # Make a copy
+    pixel_data = pixel_data.reshape((height, width, channels))
 
-    # Apply modified pixel data back to the image
-    image.pixels = pixels  # Assign all at once for better performance
-    image.update()  # Update the image
+    # Find pixels where alpha (channel index 3) is 0.0
+    # alpha_zero_mask will be a boolean array of shape (height, width)
+    alpha_zero_mask = (pixel_data[:, :, 3] == 0.0)
+
+    # Set RGB channels (indices 0, 1, 2) to 0.0 where the mask is True
+    pixel_data[alpha_zero_mask, 0:3] = 0.0
+
+    # Flatten the array back and update the image pixels
+    image.pixels[:] = pixel_data.ravel() # Update with modified data
+
+    # --- Method 2: Direct Pixel Iteration (Simpler, potentially slower) ---
+    # Uncomment this section and comment out Method 1 if you prefer
+    # or if numpy is unavailable (though it ships with Blender).
+    #
+    # if image.channels != 4:
+    #     print(f"Error: Image '{image.name}' does not have 4 channels (RGBA). Found {image.channels}.")
+    #     return False
+    #
+    # pixels = image.pixels # Get a reference (can be modified directly)
+    # num_pixels = len(pixels) // 4 # Calculate total number of pixels
+    #
+    # modified = False
+    # for i in range(num_pixels):
+    #     idx_alpha = i * 4 + 3
+    #
+    #     if pixels[idx_alpha] == 0.0:
+    #         idx_r = i * 4
+    #         idx_g = i * 4 + 1
+    #         idx_b = i * 4 + 2
+    #
+    #         # Check if modification is needed (avoids unnecessary writes)
+    #         if pixels[idx_r] != 0.0 or pixels[idx_g] != 0.0 or pixels[idx_b] != 0.0:
+    #             pixels[idx_r] = 0.0
+    #             pixels[idx_g] = 0.0
+    #             pixels[idx_b] = 0.0
+    #             modified = True
+
+
+    # --- Final Step ---
+    # Mark the image as updated so Blender recognizes the changes
+    image.update()
+    print(f"Finished processing '{image.name}'. Image updated.")
+    return True
 
 
 class PAINTSYSTEM_OT_ProjectApply(Operator):
@@ -1383,7 +1489,7 @@ class PAINTSYSTEM_OT_ProjectApply(Operator):
     def poll(cls, context):
         ps = PaintSystem(context)
         active_layer = ps.get_active_layer()
-        return active_layer and active_layer.edit_external_image
+        return active_layer and active_layer.external_image
 
     def execute(self, context):
         ps = PaintSystem(context)
@@ -1392,24 +1498,29 @@ class PAINTSYSTEM_OT_ProjectApply(Operator):
         current_image_editor = context.preferences.filepaths.image_editor
         editor_path = pathlib.Path(current_image_editor)
         app_name = editor_path.name
-        external_image = active_layer.edit_external_image
+        external_image = active_layer.external_image
+        external_image_name = str(active_layer.external_image.name)
 
-        external_image_name = str(external_image.name)
-        print(external_image_name)
-        image = bpy.data.images.get((external_image_name, None))
-
+        # external_image_name = str(external_image.name)
+        # print(external_image_name)
+        
+        print(external_image)
+        
+        external_image.reload()
         if app_name == "CLIPStudioPaint.exe":
-            convert_straight_to_premultiplied(external_image)
+            set_rgb_to_zero_if_alpha_zero(external_image)
+            external_image.update_tag()
 
-        if image is None:
-            self.report({'ERROR'}, rpt_(
-                "Could not find image '{:s}'").format(external_image_name))
-            return {'CANCELLED'}
+        # if image is None:
+        #     self.report({'ERROR'}, rpt_(
+        #         "Could not find image '{:s}'").format(external_image_name))
+        #     return {'CANCELLED'}
 
-        image.reload()
-        bpy.ops.paint.project_image(image=external_image_name)
+        
+        with bpy.context.temp_override(**{'mode': 'IMAGE_PAINT'}):
+            bpy.ops.paint.project_image(image=external_image_name)
 
-        active_layer.edit_external_image = None
+        active_layer.external_image = None
 
         return {'FINISHED'}
 

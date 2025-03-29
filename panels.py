@@ -952,7 +952,6 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
     bl_label = "Layer Settings"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_PaintSystemLayers'
-    bl_options = {'DEFAULT_CLOSED'}
     
     @classmethod
     def poll(cls, context):
@@ -976,7 +975,7 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
         box = layout.box()
         row = box.row(align=True)
         if active_layer.image:
-            if not active_layer.edit_external_image:
+            if not active_layer.external_image:
                 row.operator("paint_system.quick_edit", text="Edit Externally")
             else:
                 row.operator("paint_system.project_apply",

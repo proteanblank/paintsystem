@@ -144,7 +144,7 @@ class PaintSystemLayer(BaseNestedListItem):
         default="",
         update=update_node_tree
     )
-    edit_external_image: PointerProperty(
+    external_image: PointerProperty(
         name="Edit External Image",
         type=Image,
     )
