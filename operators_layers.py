@@ -1532,6 +1532,10 @@ class PAINTSYSTEM_OT_QuickEdit(Operator):
     bl_description = "Quickly edit the active image"
 
     def execute(self, context):
+        current_image_editor = context.preferences.filepaths.image_editor
+        if not current_image_editor:
+            self.report({'ERROR'}, "No image editor set")
+            return {'CANCELLED'}
         bpy.ops.paint_system.project_edit('INVOKE_DEFAULT')
         return {'FINISHED'}
 
