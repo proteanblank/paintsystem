@@ -152,6 +152,9 @@ def get_paint_system_images(is_dirty_only=True):
             image = item.image
             if image and (image.is_dirty or not is_dirty_only):
                 images.append(image)
+            mask_image = item.mask_image
+            if mask_image and (mask_image.is_dirty or not is_dirty_only):
+                images.append(mask_image)
     return images
 
 

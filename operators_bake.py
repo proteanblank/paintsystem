@@ -607,7 +607,7 @@ class PAINTSYSTEM_OT_DeleteBakedImage(Operator):
         bpy.data.images.remove(image)
         active_group.bake_image = None
         active_group.use_bake_image = False
-        active_group.bake_uv_map = None
+        active_group.bake_uv_map = ""
 
         return {'FINISHED'}
 
