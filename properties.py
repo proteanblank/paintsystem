@@ -38,16 +38,18 @@ def update_active_image(self=None, context: Context = None):
     update_brush_settings(self, context)
     if not active_layer:
         return
-    if active_layer.type != 'IMAGE' or active_layer.lock_layer or active_group.use_bake_image:
-        if image_paint.mode == 'MATERIAL':
-            image_paint.mode = 'IMAGE'
-        image_paint.canvas = None
-        # Unable to paint
-        return
+
     if image_paint.mode == 'IMAGE':
         image_paint.mode = 'MATERIAL'
+    selected_image = active_layer.mask_image if active_layer.edit_mask else active_layer.image
     for i, image in enumerate(mat.texture_paint_images):
-        if image == (active_layer.mask_image if active_layer.edit_mask else active_layer.image):
+        if not selected_image or active_layer.lock_layer or active_group.use_bake_image:
+            if image_paint.mode == 'MATERIAL':
+                image_paint.mode = 'IMAGE'
+            image_paint.canvas = None
+            # Unable to paint
+            return
+        if image == selected_image:
             mat.paint_active_slot = i
             # Get uv map name
             uv_map_node = ps.find_uv_map_node()
@@ -162,28 +164,6 @@ class NodeEntry:
     mask_alpha_input: NodeSocket | None = None
 
 
-# class PaintSystemNodesStore:
-#     def __init__(self):
-#         self.data: Dict[int, NodeEntry] = {}
-
-#     def add_entry(self, entry_id: int, entry: NodeEntry):
-#         """Add a new entry to the datastore."""
-#         self.data[entry_id] = entry
-
-#     def get_entry(self, entry_id: int) -> NodeEntry:
-#         """Retrieve an entry by its ID."""
-#         return self.data.get(entry_id, None)
-
-#     def remove_entry(self, entry_id: int):
-#         """Remove an entry by its ID."""
-#         if entry_id in self.data:
-#             del self.data[entry_id]
-
-#     def list_ids(self):
-#         """List all entry IDs."""
-#         return list(self.data.keys())
-
-
 class PaintSystemGroup(BaseNestedListManager):
 
     def update_node_tree(self, context=bpy.context):
@@ -193,12 +173,19 @@ class PaintSystemGroup(BaseNestedListManager):
         nodes: Nodes = self.node_tree.nodes
         links: NodeLinks = self.node_tree.links
 
-        # Delete every node
-        # for node in self.node_tree.nodes:
-        #     self.node_tree.nodes.remove(node)
+        def find_node(self, node_details):
+            for node in nodes:
+                match = True
+                for key, value in node_details.items():
+                    if getattr(node, key) != value:
+                        match = False
+                        break
+                if match:
+                    return node
+            return None
 
         # Create new node group
-        def ensure_node_group(item):
+        def ensure_nodes(item):
             node_group = None
             for node in nodes:
                 if node.type == 'GROUP' and node.node_tree == item.node_tree:
@@ -257,15 +244,7 @@ class PaintSystemGroup(BaseNestedListManager):
                     new_socket = interface.new_socket(
                         name=input_name, in_out='INPUT', socket_type=special_socket_type[0].socket_type)
                     new_socket.hide_value = special_socket_type[0].hide_value
-
-        # use_normal = any([item.node_tree.inputs['Normal']
-        #                  if item.node_tree else False for item, _ in flattened])
-        # if use_normal:
-        #     print("Use Normal")
-
-        # Contains the inputs for each depth level and position in the hierarchy
-        # depth_inputs = {}
-        # temp_clip_inputs = []
+                    
         ps_nodes_store: Dict[int, NodeEntry] = {}
 
         # Add group input and output nodes
@@ -297,11 +276,8 @@ class PaintSystemGroup(BaseNestedListManager):
                 node_entry.clip_alpha_input = group_node.inputs['Over Alpha']
 
             # Connect layer node group
-            group_node = ensure_node_group(item)
-            # group_node = reset_node_properties(group_node)
+            group_node = ensure_nodes(item)
             group_node.inputs['Alpha'].default_value = 0.0
-            # group_node = nodes.new('ShaderNodeGroup')
-            # group_node.node_tree = item.node_tree
             group_node.location = node_entry.location + \
                 Vector((-200, 0))
             group_node.mute = not item.enabled
