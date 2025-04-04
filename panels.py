@@ -150,7 +150,7 @@ class MAT_PT_PaintSystemQuickTools(Panel):
     bl_region_type = "UI"
     bl_label = "Quick Tools"
     bl_category = 'Quick Tools'
-    bl_options = {'DEFAULT_CLOSED'}
+    # bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         # Get available modes that can be set of the active object
@@ -184,18 +184,18 @@ class MAT_PT_PaintSystemQuickTools(Panel):
                  "show_face_orientation", text="Check Normals", icon='NORMALS_FACE')
         row.prop(overlay,
                  "show_wireframes", text="Wireframe", icon='MOD_WIREFRAME')
-        # row = box.row()
-        # if not ps.preferences.use_compact_design:
-        #     row.scale_y = 1.2
-        #     row.scale_x = 1.2
-        # row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
-        # row = row.row(align=True)
-        # row.prop(space, "show_gizmo_object_translate",
-        #          text="", icon='EMPTY_ARROWS')
-        # row.prop(space, "show_gizmo_object_rotate",
-        #          text="", icon='FILE_REFRESH')
-        # row.prop(space, "show_gizmo_object_scale",
-        #          text="", icon='MOD_MESHDEFORM')
+        row = box.row()
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.2
+            row.scale_x = 1.2
+        row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
+        row = row.row(align=True)
+        row.prop(space, "show_gizmo_object_translate",
+                 text="", icon='EMPTY_ARROWS')
+        row.prop(space, "show_gizmo_object_rotate",
+                 text="", icon='FILE_REFRESH')
+        row.prop(space, "show_gizmo_object_scale",
+                 text="", icon='MOD_MESHDEFORM')
 
 
 class MAT_PT_PaintSystemGroups(Panel):
@@ -347,7 +347,7 @@ class MAT_MT_PaintSystemGroupMenu(Menu):
 class MAT_MT_PaintSystemImageMenu(Menu):
     bl_label = "Image Menu"
     bl_idname = "MAT_MT_PaintSystemImageMenu"
-    
+
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
@@ -362,9 +362,12 @@ class MAT_MT_PaintSystemImageMenu(Menu):
         layout.operator("paint_system.export_active_layer",
                         text="Export Layer", icon='EXPORT')
         layout.separator()
-        layout.operator("paint_system.invert_colors", icon="MOD_MASK").image_name = image_name
-        layout.operator("paint_system.resize_image", icon="CON_SIZELIMIT").image_name = image_name
-        layout.operator("paint_system.clear_image", icon="X").image_name = image_name
+        layout.operator("paint_system.invert_colors",
+                        icon="MOD_MASK").image_name = image_name
+        layout.operator("paint_system.resize_image",
+                        icon="CON_SIZELIMIT").image_name = image_name
+        layout.operator("paint_system.clear_image",
+                        icon="X").image_name = image_name
 
 
 # -------------------------------------------------------------------
@@ -666,7 +669,8 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
             row.prop(display_item, "name", text="", emboss=False)
 
             if display_item.mask_image:
-                row.prop(display_item, "enable_mask", icon='MOD_MASK' if display_item.enable_mask else 'MATPLANE', text="", emboss=False)
+                row.prop(display_item, "enable_mask",
+                         icon='MOD_MASK' if display_item.enable_mask else 'MATPLANE', text="", emboss=False)
             if display_item.type == 'NODE_GROUP' and not ps.is_valid_ps_nodetree(display_item.node_tree):
                 row.label(icon='ERROR')
 
@@ -731,7 +735,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
         return active_group
-    
+
     def draw_header_preset(self, context):
         layout = self.layout
         ps = PaintSystem(context)
@@ -741,7 +745,8 @@ class MAT_PT_PaintSystemLayers(Panel):
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         if has_dirty_images:
             row = layout.row(align=True)
-            row.operator("wm.save_mainfile", text="Click to Save!", icon="FUND")
+            row.operator("wm.save_mainfile",
+                         text="Click to Save!", icon="FUND")
 
     def draw_header(self, context):
         layout = self.layout
@@ -784,7 +789,7 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         if not active_group.bake_image:
             row.menu("MAT_MT_PaintSystemMergeAndExport",
-                    icon='EXPORT', text="Merge and Export")
+                     icon='EXPORT', text="Merge and Export")
         # has_dirty_images = any(
         #     [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         # if has_dirty_images:
@@ -810,7 +815,7 @@ class MAT_PT_PaintSystemLayers(Panel):
                 box.label(
                     text="Merged Image Used. It's faster!", icon='SOLO_ON')
                 return
-        
+
         # if active_layer.mask_image:
         #     row = box.row(align=True)
         #     if not ps.preferences.use_compact_design:
@@ -854,7 +859,7 @@ class MAT_PT_PaintSystemBakeSettings(Panel):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
         return active_group and active_group.bake_image
-    
+
     def draw_header_preset(self, context):
         layout = self.layout
         ps = PaintSystem(context)
@@ -862,7 +867,8 @@ class MAT_PT_PaintSystemBakeSettings(Panel):
         if not active_group.bake_image:
             return
         row = layout.row(align=True)
-        row.prop(active_group, "use_bake_image", text="Enable", icon='CHECKBOX_HLT' if active_group.use_bake_image else 'CHECKBOX_DEHLT')
+        row.prop(active_group, "use_bake_image", text="Enable",
+                 icon='CHECKBOX_HLT' if active_group.use_bake_image else 'CHECKBOX_DEHLT')
 
     def draw_header(self, context):
         layout = self.layout
@@ -879,7 +885,8 @@ class MAT_PT_PaintSystemBakeSettings(Panel):
         row = box.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
-        row.operator("paint_system.merge_group", text="Update Bake", icon="FILE_REFRESH").as_new_layer = False
+        row.operator("paint_system.merge_group", text="Update Bake",
+                     icon="FILE_REFRESH").as_new_layer = False
         row.operator("paint_system.export_baked_image",
                      text="", icon='EXPORT')
         row.operator("paint_system.delete_bake_image",
@@ -903,8 +910,8 @@ class MAT_PT_PaintSystemMaskSettings(Panel):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
         active_layer = ps.get_active_layer()
-        return active_group and active_layer and not active_group.use_bake_image 
-    
+        return active_group and active_layer and not active_group.use_bake_image
+
     def draw_header_preset(self, context):
         layout = self.layout
         ps = PaintSystem(context)
@@ -913,11 +920,13 @@ class MAT_PT_PaintSystemMaskSettings(Panel):
             return
         row = layout.row(align=True)
         if not active_layer.mask_image:
-            row.operator("paint_system.new_mask_image", text="Create", icon='ADD')
+            row.operator("paint_system.new_mask_image",
+                         text="Create", icon='ADD')
         else:
-            row.prop(active_layer, "edit_mask", text="Editing" if active_layer.edit_mask else "Edit Mask", icon='IMAGE_DATA')
+            row.prop(active_layer, "edit_mask",
+                     text="Editing" if active_layer.edit_mask else "Edit Mask", icon='IMAGE_DATA')
             # row.prop(active_layer, "enable_mask", text="", icon='HIDE_OFF' if active_layer.enable_mask else 'HIDE_ON')
-            
+
         # row.prop(active_layer, "invert_mask", text="",
         #          icon='MOD_MASK' if active_layer.invert_mask else 'IMAGE_RGB')
 
@@ -925,7 +934,7 @@ class MAT_PT_PaintSystemMaskSettings(Panel):
         layout = self.layout
         ps = PaintSystem(context)
         layout.label(icon="MOD_MASK")
-        
+
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
@@ -935,15 +944,17 @@ class MAT_PT_PaintSystemMaskSettings(Panel):
             return
         row = layout.row(align=True)
         row.scale_y = 1.5
-        ops = row.operator("paint_system.invert_colors", text="Invert Mask", icon='MOD_MASK')
+        ops = row.operator("paint_system.invert_colors",
+                           text="Invert Mask", icon='MOD_MASK')
         ops.image_name = active_layer.mask_image.name
         ops.disable_popup = True
         row.operator("paint_system.delete_mask_image", text="", icon='TRASH')
         box = layout.box()
-        
+
         box.label(text="UV Map:", icon="UV")
-        box.prop_search(active_layer, "mask_uv_map", 
+        box.prop_search(active_layer, "mask_uv_map",
                         ps.active_object.data, "uv_layers", text="")
+
 
 class MAT_PT_PaintSystemLayersSettings(Panel):
     bl_idname = 'MAT_PT_PaintSystemLayersSettings'
@@ -952,7 +963,7 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
     bl_label = "Layer Settings"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_PaintSystemLayers'
-    
+
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
@@ -964,7 +975,7 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
         layout = self.layout
         ps = PaintSystem(context)
         layout.label(icon="SETTINGS")
-    
+
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
@@ -1076,7 +1087,6 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
                     row.scale_y = 1.2
                 row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
                          text="Opacity", slider=True)
-
 
         rgb_node = ps.find_rgb_node()
         col = box.column()
@@ -1247,7 +1257,6 @@ class MAT_MT_PaintSystemAddLayer(Menu):
         for idx, (node_type, name, description) in enumerate(SHADER_ENUM):
             col.operator("paint_system.new_shader_layer",
                          text=name, icon='SHADING_RENDERED' if idx == 0 else 'NONE').shader_type = node_type
-        
 
         col = row.column()
         col.label(text="Adjustment Layer:")
