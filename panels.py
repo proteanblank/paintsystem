@@ -157,8 +157,37 @@ class MAT_PT_PaintSystemQuickTools(Panel):
         ps = PaintSystem(context)
         obj = ps.active_object
         layout = self.layout
+        space = context.area.spaces[0]
+        overlay = space.overlay
+        
+        box = layout.box()
+        row = box.row()
+        row.alignment = 'CENTER'
+        row.label(text="View:", icon="VIEW3D")
+        row = box.row()
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.2
+            row.scale_x = 1.2
+        row.prop(overlay,
+                 "show_wireframes", text="Wireframe", icon='MOD_WIREFRAME')
+        row = box.row()
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.2
+            row.scale_x = 1.2
+        row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
+        row = row.row(align=True)
+        row.prop(space, "show_gizmo_object_translate",
+                 text="", icon='EMPTY_ARROWS')
+        row.prop(space, "show_gizmo_object_rotate",
+                 text="", icon='FILE_REFRESH')
+        row.prop(space, "show_gizmo_object_scale",
+                 text="", icon='MOD_MESHDEFORM')
+        
 
         box = layout.box()
+        row = box.row()
+        row.alignment = 'CENTER'
+        row.label(text="Mesh:", icon="MESH_CUBE")
         row = box.row()
         if not ps.preferences.use_compact_design:
             row.scale_y = 1.5
@@ -174,28 +203,15 @@ class MAT_PT_PaintSystemQuickTools(Panel):
                      text="", icon='MESH_CIRCLE')
         row.operator("mesh.primitive_uv_sphere_add",
                      text="", icon='MESH_UVSPHERE')
-        space = context.area.spaces[0]
-        overlay = space.overlay
         row = box.row()
         if not ps.preferences.use_compact_design:
             row.scale_y = 1.2
             row.scale_x = 1.2
         row.prop(overlay,
-                 "show_face_orientation", text="Check Normals", icon='NORMALS_FACE')
-        row.prop(overlay,
-                 "show_wireframes", text="Wireframe", icon='MOD_WIREFRAME')
+                 "show_face_orientation", text="Check Normals", icon='HIDE_OFF' if overlay.show_face_orientation else 'HIDE_ON')
         row = box.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.2
-            row.scale_x = 1.2
-        row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
-        row = row.row(align=True)
-        row.prop(space, "show_gizmo_object_translate",
-                 text="", icon='EMPTY_ARROWS')
-        row.prop(space, "show_gizmo_object_rotate",
-                 text="", icon='FILE_REFRESH')
-        row.prop(space, "show_gizmo_object_scale",
-                 text="", icon='MOD_MESHDEFORM')
+        row.operator('paint_system.recalculate_normals', text="Recalculate", icon='FILE_REFRESH')
+        row.operator('paint_system.flip_normals', text="Flip", icon='DECORATE_OVERRIDE')
 
 
 class MAT_PT_PaintSystemGroups(Panel):
