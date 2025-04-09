@@ -558,6 +558,82 @@ class PAINTSYSTEM_OT_CreateNewUVMap(Operator):
     #     layout.prop(self, "uv_map_name")
 
 
+class PAINTSYSTEM_OT_DuplicateLayer(Operator):
+    """Duplicate the active layer"""
+    bl_idname = "paint_system.duplicate_layer"
+    bl_label = "Duplicate Layer"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Duplicate the active layer"
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        return ps.get_active_layer() and ps.get_active_group()
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        if ps.duplicate_active_layer():
+            return {'FINISHED'}
+        return {'CANCELLED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        layout.label(
+            text=f"Duplicate '{active_layer.name}' ?", icon='ERROR')
+        layout.label(
+            text="Click OK to duplicate, or cancel to keep the layer")
+
+class PAINTSYSTEM_OT_NewAttributeLayer(Operator):
+    """Add a new attribute layer"""
+    bl_idname = "paint_system.new_attribute_layer"
+    bl_label = "Add Attribute Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add a new attribute layer"
+    
+    def get_next_layer_name(self, context: Context) -> str:
+        ps = PaintSystem(context)
+        flattened = ps.get_active_group().flatten_hierarchy()
+        number = get_highest_number_with_prefix(
+            'Attribute', [item[0].name for item in flattened]) + 1
+        return f"Attribute {number}"
+
+    attribute_name: StringProperty(
+        name="Name"
+    )
+    attribute_type: EnumProperty(
+        name="Attribute Type",
+        items=[
+            ('GEOMETRY', "Geometry", "Geometry"),
+            ('OBJECT', "Object", "Object"),
+            ('INSTANCER', "Instancer", "Instancer"),
+            ('VIEW_LAYER', "View Layer", "View Layer"),],
+    )
+    disable_popup: BoolProperty(default=False)
+
+    def execute(self, context):
+        if not self.attribute_name:
+            self.report({'ERROR'}, "Attribute name cannot be empty")
+            return {'CANCELLED'}
+        ps = PaintSystem(context)
+        ps.create_attribute_layer(f"{self.attribute_name} Attribute", self.attribute_name, self.attribute_type)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        if self.disable_popup:
+            return self.execute(context)
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "attribute_name")
+        layout.prop(self, "attribute_type", text="Type")
+
+
 class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
     bl_idname = "paint_system.new_image"
     bl_label = "New Image"
@@ -894,11 +970,15 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
             return {'CANCELLED'}
 
         node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        if not node_tree:
+            self.report({'ERROR'}, "Node Group not found")
+            return {'CANCELLED'}
+        
         if not ps.is_valid_ps_nodetree(node_tree):
             self.report({'ERROR'}, "Node Group not compatible")
             return {'CANCELLED'}
 
-        ps.create_node_group_layer(self.layer_name, self.node_tree_name)
+        ps.create_node_group_layer(self.node_tree_name, self.node_tree_name)
 
         # Force the UI to update
         redraw_panel(self, context)
@@ -1592,6 +1672,7 @@ classes = (
     PAINTSYSTEM_OT_NewAdjustmentLayer,
     PAINTSYSTEM_OT_NewShaderLayer,
     PAITNSYSTEM_OT_NewNodeGroupLayer,
+    PAINTSYSTEM_OT_NewAttributeLayer,
     PAINTSYSTEM_OT_NewMaskImage,
     PAINTSYSTEM_OT_DeleteMask,
     PAINTSYSTEM_OT_ExportActiveLayer,

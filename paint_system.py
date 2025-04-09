@@ -21,6 +21,7 @@ LAYER_ENUM = [
     ('FOLDER', "Folder", "Folder layer"),
     ('IMAGE', "Image", "Image layer"),
     ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
+    ('ATTRIBUTE', "Attribute", "Attribute layer"),
     ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
     ('SHADER', "Shader", "Shader layer"),
     ('NODE_GROUP', "Node Group", "Node Group layer"),
@@ -33,9 +34,9 @@ SHADER_ENUM = [
 TEMPLATE_ENUM = [
     ('STANDARD', "Standard", "Replace the existing material and start off with a basic setup", "IMAGE", 0),
     ('EXISTING', "Convert Existing Material", "Add to existing material setup", "FILE_REFRESH", 1),
-    # ('TRANSPARENT', "Transparent", "Start off with a transparent setup"),
     ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 2),
-    ('NONE', "None", "Just add node group to material", "NONE", 3),
+    # ('TRANSPARENT', "Blank", "Start off with a blank setup" , "FILE", 3),
+    ('NONE', "Manual", "Just add node group to material", "NONE", 3),
 ]
 
 
@@ -344,6 +345,24 @@ class PaintSystem:
 
         active_group.update_node_tree()
 
+        return new_layer
+    
+    def create_attribute_layer(self, name: str, attribute_name: str, attribute_type: str = "") -> PropertyGroup:
+        """Creates a new attribute layer in the active group.
+
+        Args:
+            name (str): The name of the new attribute layer.
+            attribute_name (str): The name of the attribute to be used.
+
+        Returns:
+            PropertyGroup: The newly created attribute layer.
+        """
+        active_group = self.get_active_group()
+        new_layer = self._add_layer(
+            name, '_PS_Attribute_Template', 'ATTRIBUTE', make_copy=True)
+        attr_node = new_layer.node_tree.nodes['Attribute']
+        attr_node.attribute_name = attribute_name
+        active_group.update_node_tree()
         return new_layer
 
     def create_solid_color_layer(self, name: str, color: Tuple[float, float, float, float]) -> PropertyGroup:

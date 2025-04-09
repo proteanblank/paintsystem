@@ -680,8 +680,10 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                     row.label(icon='SHADING_RENDERED')
                 case 'NODE_GROUP':
                     row.label(icon='NODETREE')
+                case 'ATTRIBUTE':
+                    row.label(icon='MESH_DATA')
                 case _:
-                    row.label(icon='BLANK')
+                    row.label(icon='BLANK1')
             row.prop(display_item, "name", text="", emboss=False)
 
             if display_item.mask_image:
@@ -1264,9 +1266,10 @@ class MAT_MT_PaintSystemAddLayer(Menu):
         col.operator("paint_system.open_existing_image",
                      text="Use Existing Image")
         col.separator()
-        col.label(text="Solid Color:")
+        col.label(text="Color:")
         col.operator("paint_system.new_solid_color", text="Solid Color",
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
+        col.operator("paint_system.new_attribute_layer", text="Attribute Color", icon='MESH_DATA')
 
         col.separator()
         col.label(text="Shader Layer:")
@@ -1321,13 +1324,13 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
         # col.separator()
         col.label(text="Merge:")
         col.operator("paint_system.merge_group",
-                     text="Merge All as New Layer", icon="RENDER_RESULT").as_new_layer = True
+                     text="Merge Visible as New Layer", icon="RENDER_RESULT").as_new_layer = True
         col.operator("paint_system.merge_group",
                      text="Merge All Layers (Bake)").as_new_layer = False
         col.operator("paint_system.bake_image_id_to_image_layer",
                      text="Merge Single to New Layer", icon="IMAGE_DATA").layer_id = active_layer.id
-        col.separator()
-        col.label(text="UV:")
+        # col.separator()
+        # col.label(text="UV:")
         # TODO: Fix export merged image
         # col.separator()
         # col.label(text="Export:")
