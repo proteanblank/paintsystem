@@ -503,6 +503,52 @@ class PAINTSYSTEM_OT_DisableTooltips(Operator):
         layout = self.layout
         layout.label(text="Disable Tool Tips?")
         layout.label(text="You can enable them again in the preferences")
+        
+# -------------------------------------------------------------------
+# Mesh
+# -------------------------------------------------------------------
+
+class PAINTSYSTEM_OT_FlipNormals(Operator):
+    """Flip normals of the selected mesh"""
+    bl_idname = "paint_system.flip_normals"
+    bl_label = "Flip Normals"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Flip normals of the selected mesh"
+    
+    @classmethod
+    def poll(cls, context):
+        return context.active_object and context.active_object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.active_object
+        orig_mode = str(obj.mode)
+        if obj.type == 'MESH':
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.flip_normals()
+            bpy.ops.object.mode_set(mode=orig_mode)
+        return {'FINISHED'}
+
+class PAINTSYSTEM_OT_RecalculateNormals(Operator):
+    """Recalculate normals of the selected mesh"""
+    bl_idname = "paint_system.recalculate_normals"
+    bl_label = "Recalculate Normals"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Recalculate normals of the selected mesh"
+    
+    @classmethod
+    def poll(cls, context):
+        return context.active_object and context.active_object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.active_object
+        orig_mode = str(obj.mode)
+        if obj.type == 'MESH':
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.normals_make_consistent(inside=False)
+            bpy.ops.object.mode_set(mode=orig_mode)
+        return {'FINISHED'}
 
 # -------------------------------------------------------------------
 # For testing
@@ -538,6 +584,8 @@ classes = (
     PAINTSYSTEM_OT_ColorSampler,
     PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
     PAINTSYSTEM_OT_DisableTooltips,
+    PAINTSYSTEM_OT_FlipNormals,
+    PAINTSYSTEM_OT_RecalculateNormals,
     # PAINTSYSTEM_OT_Test,
 )
 
