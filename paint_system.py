@@ -648,6 +648,11 @@ class PaintSystem:
                 return node
         return None
     
+    def find_attribute_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'type': 'ATTRIBUTE'}
+        return self.find_node(layer_node_tree, node_details)
+    
     def is_valid_ps_nodetree(self, node_tree: NodeTree):
         # check if the node tree has both Color and Alpha inputs and outputs
         has_color_input = False

@@ -1158,6 +1158,32 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
                     col = box.column()
                     col.prop(socket, "default_value",
                              text=socket.name)
+                    
+            case 'ATTRIBUTE':
+                col = box.column(align=True)
+                row = col.row(align=True)
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                    row.scale_x = 1.5
+                else:
+                    row.scale_y = 1.2
+                    row.scale_x = 1.2
+                row.prop(active_layer, "clip", text="",
+                         icon="SELECT_INTERSECT")
+                row.prop(active_layer, "lock_layer",
+                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
+                row.prop(color_mix_node, "blend_type", text="")
+                row = col.row()
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                else:
+                    row.scale_y = 1.2
+                row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
+                         text="Opacity", slider=True)
+                attribute_node = ps.find_attribute_node()
+                if attribute_node:
+                    box.label(text="Attribute Settings:", icon='MESH_DATA')
+                    box.template_node_inputs(attribute_node)
 
             case _:
                 col = box.column(align=True)
