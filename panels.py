@@ -508,8 +508,10 @@ class MAT_PT_Brush(Panel):
                      "use_unified_size", icon="WORLD", text="Size", slider=True)
         prop_unified(col, context, "strength",
                      "use_unified_strength", icon="WORLD", text="Strength")
-        # box.prop(ps.settings, "allow_image_overwrite",
-        #             text="Auto Image Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
+        row = box.row(align=True)
+        row.alignment = 'CENTER'
+        row.prop(ps.settings, "allow_image_overwrite",
+                 text="Auto Image Select", icon='FILE_IMAGE')
         # row.label(text="Brush Shortcuts")
 
 
