@@ -9,7 +9,8 @@ from bpy.props import (IntProperty,
 from bpy.types import (Panel,
                        Menu,
                        AddonPreferences,
-                       Context)
+                       Context,
+                       UIList)
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
@@ -284,6 +285,32 @@ class MAT_PT_PaintSystemQuickToolsMesh(Panel):
             "object.origin_set", text="Set Origin", property="type", icon="EMPTY_AXIS")
 
 
+class MATERIAL_UL_PaintSystemMatSlots(UIList):
+
+    def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
+        # assert(isinstance(item, bpy.types.MaterialSlot)
+        # ob = data
+        slot = item
+        ma = slot.material
+        has_ps = ma and hasattr(ma, "paint_system") and ma.paint_system.groups
+
+        layout.context_pointer_set("id", ma)
+        layout.context_pointer_set("material_slot", slot)
+        
+        row = layout.row(align=True)
+
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            if ma:
+                row.prop(ma, "name", text="", emboss=False, icon_value=icon)
+            else:
+                row.label(text="", icon_value=icon)
+        elif self.layout_type == 'GRID':
+            row.alignment = 'CENTER'
+            row.label(text="", icon_value=icon)
+        if has_ps:
+            row.label(text="", icon='CHECKMARK')
+
+
 class MAT_PT_PaintSystemGroups(Panel):
     bl_idname = 'MAT_PT_PaintSystemGroups'
     bl_space_type = "VIEW_3D"
@@ -330,19 +357,38 @@ class MAT_PT_PaintSystemGroups(Panel):
         #     # col.prop(mat, "surface_render_method", text="")
 
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
-            layout.label(text="Selected Material:")
-            row = layout.row(align=True)
-            if not ps.preferences.use_compact_design:
-                row.scale_x = 1.5
-                row.scale_y = 1.5
-            row.template_ID(ob, "active_material")
+            col = layout.column(align=True)
+            if len(ob.material_slots) > 1:
+                row = col.row()
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.2
+                row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
+                
+                col = row.column(align=True)
+                col.operator("object.material_slot_add", icon='ADD', text="")
+                col.operator("object.material_slot_remove", icon='REMOVE', text="")
+                if ob.mode == 'EDIT':
+                    row = layout.row(align=True)
+                    row.operator("object.material_slot_assign", text="Assign")
+                    row.operator("object.material_slot_select", text="Select")
+                    row.operator("object.material_slot_deselect", text="Deselect")
+            else:
+                row = col.row()
+                row.label(text="Material:")
+                row.operator("object.material_slot_add", icon='ADD', text="")
+                row = layout.row()
+                row = layout.row(align=True)
+                if not ps.preferences.use_compact_design:
+                    row.scale_x = 1.5
+                    row.scale_y = 1.5
+                row.template_ID(ob, "active_material")
 
         if not hasattr(mat, "paint_system") or len(mat.paint_system.groups) == 0:
             col = layout.column(align=True)
             if not ps.preferences.use_compact_design:
                 col.scale_y = 1.5
             ops = col.operator("paint_system.new_group",
-                               text="Add Paint System Material" if not mat else "Add Paint System", icon='MATERIAL' if not mat else "ADD")
+                               text="Add Paint System", icon="ADD")
             ops.material_template = ps.settings.template
             ops.hide_template = True
             col.prop(ps.settings, "template", text="")
@@ -1475,6 +1521,7 @@ class MAT_PT_PaintSystemTest(Panel):
 
 classes = (
     PaintSystemPreferences,
+    MATERIAL_UL_PaintSystemMatSlots,
     MAT_PT_PaintSystemGroups,
     MAT_PT_GroupAdvanced,
     MAT_MT_PaintSystemGroupMenu,
