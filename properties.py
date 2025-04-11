@@ -8,7 +8,7 @@ from bpy.props import (IntProperty,
                        CollectionProperty,
                        EnumProperty)
 from bpy.types import (PropertyGroup, Context,
-                       NodeTreeInterface, Nodes, NodeTree, NodeLinks, NodeSocket, Image)
+                       NodeTreeInterface, Nodes, Node, NodeTree, NodeLinks, NodeSocket, Image)
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
 from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, TEMPLATE_ENUM
@@ -195,6 +195,15 @@ class PaintSystemGroup(BaseNestedListManager):
                 node_group = nodes.new('ShaderNodeGroup')
                 node_group.node_tree = item.node_tree
             return node_group
+        
+        def connect_mask_nodes(node_entry: NodeEntry, node: Node):
+            if node_entry.mask_color_input and node_entry.mask_alpha_input:
+                links.new(node_entry.mask_color_input,
+                          node.outputs['Color'])
+                links.new(node_entry.mask_alpha_input,
+                          node.outputs['Alpha'])
+                node_entry.mask_color_input = None
+                node_entry.mask_alpha_input = None
 
         # Remode every links
         links.clear()
@@ -261,19 +270,20 @@ class PaintSystemGroup(BaseNestedListManager):
             if is_clip and not node_entry.is_clip:
                 alpha_over_nt = get_nodetree_from_library(
                     '_PS_Alpha_Over')
-                group_node = nodes.new('ShaderNodeGroup')
-                group_node.node_tree = alpha_over_nt
-                group_node.location = node_entry.location + \
+                alpha_over_node = nodes.new('ShaderNodeGroup')
+                alpha_over_node.node_tree = alpha_over_nt
+                alpha_over_node.location = node_entry.location + \
                     Vector((-200, 0))
                 links.new(node_entry.color_input,
-                          group_node.outputs['Color'])
+                          alpha_over_node.outputs['Color'])
                 links.new(node_entry.alpha_input,
-                          group_node.outputs['Alpha'])
-                node_entry.color_input = group_node.inputs['Under Color']
-                node_entry.alpha_input = group_node.inputs['Under Alpha']
-                node_entry.location = group_node.location
-                node_entry.clip_color_input = group_node.inputs['Over Color']
-                node_entry.clip_alpha_input = group_node.inputs['Over Alpha']
+                          alpha_over_node.outputs['Alpha'])
+                node_entry.color_input = alpha_over_node.inputs['Under Color']
+                node_entry.alpha_input = alpha_over_node.inputs['Under Alpha']
+                node_entry.location = alpha_over_node.location
+                node_entry.clip_color_input = alpha_over_node.inputs['Over Color']
+                node_entry.clip_alpha_input = alpha_over_node.inputs['Over Alpha']
+                connect_mask_nodes(node_entry, alpha_over_node)
 
             # Connect layer node group
             group_node = ensure_nodes(item)
@@ -282,13 +292,7 @@ class PaintSystemGroup(BaseNestedListManager):
                 Vector((-200, 0))
             group_node.mute = not item.enabled
             
-            if node_entry.mask_color_input and node_entry.mask_alpha_input:
-                links.new(node_entry.mask_color_input,
-                          group_node.outputs['Color'])
-                links.new(node_entry.mask_alpha_input,
-                          group_node.outputs['Alpha'])
-                node_entry.mask_color_input = None
-                node_entry.mask_alpha_input = None
+            connect_mask_nodes(node_entry, group_node)
             
             if item.enable_mask:
                 mask_nt = get_nodetree_from_library(
@@ -381,13 +385,7 @@ class PaintSystemGroup(BaseNestedListManager):
 
         links.new(node_entry.color_input, ng_input.outputs['Color'])
         links.new(node_entry.alpha_input, ng_input.outputs['Alpha'])
-        if node_entry.mask_color_input and node_entry.mask_alpha_input:
-            links.new(node_entry.mask_color_input,
-                        ng_input.outputs['Color'])
-            links.new(node_entry.mask_alpha_input,
-                        ng_input.outputs['Alpha'])
-            node_entry.mask_color_input = None
-            node_entry.mask_alpha_input = None
+        connect_mask_nodes(node_entry, ng_input)
         ng_input.location = node_entry.location + Vector((-200, 0))
 
     # Define the collection property directly in the class
