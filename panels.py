@@ -160,20 +160,42 @@ class MAT_PT_PaintSystemQuickTools(Panel):
         space = context.area.spaces[0]
         overlay = space.overlay
         
+
+
+
+class MAT_PT_PaintSystemQuickToolsView(Panel):
+    bl_idname = 'MAT_PT_PaintSystemQuickToolsView'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "View"
+    bl_category = 'Quick Tools'
+    bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
+    
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="HIDE_OFF")
+    
+    def draw(self, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        layout = self.layout
+        space = context.area.spaces[0]
+        overlay = space.overlay
+        
         box = layout.box()
         row = box.row()
         row.alignment = 'CENTER'
-        row.label(text="View:", icon="VIEW3D")
         row = box.row()
         if not ps.preferences.use_compact_design:
-            row.scale_y = 1.2
-            row.scale_x = 1.2
+            row.scale_y = 1.5
+            row.scale_x = 1.5
         row.prop(overlay,
-                 "show_wireframes", text="Wireframe", icon='MOD_WIREFRAME')
+                 "show_wireframes", text="Toggle Wireframe", icon='MOD_WIREFRAME')
         row = box.row()
         if not ps.preferences.use_compact_design:
-            row.scale_y = 1.2
-            row.scale_x = 1.2
+            row.scale_y = 1
+            row.scale_x = 1
         row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
         row = row.row(align=True)
         row.prop(space, "show_gizmo_object_translate",
@@ -184,10 +206,29 @@ class MAT_PT_PaintSystemQuickTools(Panel):
                  text="", icon='MOD_MESHDEFORM')
         
 
+class MAT_PT_PaintSystemQuickToolsMesh(Panel):
+    bl_idname = 'MAT_PT_PaintSystemQuickToolsMesh'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Mesh"
+    bl_category = 'Quick Tools'
+    bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
+    
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="MESH_CUBE")
+    
+    def draw(self, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        layout = self.layout
+        space = context.area.spaces[0]
+        overlay = space.overlay
+    
         box = layout.box()
         row = box.row()
         row.alignment = 'CENTER'
-        row.label(text="Mesh:", icon="MESH_CUBE")
         row = box.row()
         if not ps.preferences.use_compact_design:
             row.scale_y = 1.5
@@ -212,6 +253,7 @@ class MAT_PT_PaintSystemQuickTools(Panel):
         row = box.row()
         row.operator('paint_system.recalculate_normals', text="Recalculate", icon='FILE_REFRESH')
         row.operator('paint_system.flip_normals', text="Flip", icon='DECORATE_OVERRIDE')
+        box.menu("VIEW3D_MT_object_apply", text="Apply Transform", icon='COLLAPSEMENU')
 
 
 class MAT_PT_PaintSystemGroups(Panel):
@@ -953,7 +995,11 @@ class MAT_PT_PaintSystemMaskSettings(Panel):
     def draw_header(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        layout.label(icon="MOD_MASK")
+        active_layer = ps.get_active_layer()
+        if active_layer and active_layer.mask_image:
+            layout.prop(active_layer, "enable_mask", text="")
+        else:
+            layout.label(icon="MOD_MASK")
 
     def draw(self, context):
         layout = self.layout
@@ -1396,6 +1442,8 @@ classes = (
     MAT_MT_PaintSystemImageMenu,
     # MAT_PT_PaintSystemTest,
     MAT_PT_PaintSystemQuickTools,
+    MAT_PT_PaintSystemQuickToolsView,
+    MAT_PT_PaintSystemQuickToolsMesh,
 )
 
 register, unregister = register_classes_factory(classes)
