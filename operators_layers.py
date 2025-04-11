@@ -588,13 +588,14 @@ class PAINTSYSTEM_OT_DuplicateLayer(Operator):
         layout.label(
             text="Click OK to duplicate, or cancel to keep the layer")
 
+
 class PAINTSYSTEM_OT_NewAttributeLayer(Operator):
     """Add a new attribute layer"""
     bl_idname = "paint_system.new_attribute_layer"
     bl_label = "Add Attribute Layer"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Add a new attribute layer"
-    
+
     def get_next_layer_name(self, context: Context) -> str:
         ps = PaintSystem(context)
         flattened = ps.get_active_group().flatten_hierarchy()
@@ -620,7 +621,8 @@ class PAINTSYSTEM_OT_NewAttributeLayer(Operator):
             self.report({'ERROR'}, "Attribute name cannot be empty")
             return {'CANCELLED'}
         ps = PaintSystem(context)
-        ps.create_attribute_layer(f"{self.attribute_name} Attribute", self.attribute_name, self.attribute_type)
+        ps.create_attribute_layer(
+            f"{self.attribute_name} Attribute", self.attribute_name, self.attribute_type)
         return {'FINISHED'}
 
     def invoke(self, context, event):
@@ -973,7 +975,7 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
         if not node_tree:
             self.report({'ERROR'}, "Node Group not found")
             return {'CANCELLED'}
-        
+
         if not ps.is_valid_ps_nodetree(node_tree):
             self.report({'ERROR'}, "Node Group not compatible")
             return {'CANCELLED'}
@@ -1208,16 +1210,40 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Resize the active image"
 
+    def update_width_height(self, context):
+        relative_width = self.width / self.base_width
+        relative_height = self.height / self.base_height
+        if self.relative_scale != 'CUSTOM' and (relative_width != relative_height or relative_width != self.relative_scale or relative_height != self.relative_scale):
+            scale = float(self.relative_scale)
+            self.width = int(scale * self.base_width)
+            self.height = int(scale * self.base_height)
+
     width: IntProperty(name="Width", default=1024)
     height: IntProperty(name="Height", default=1024)
-
+    relative_scale: EnumProperty(
+        name="Relative Scale",
+        description="Scale the image by a factor",
+        items=[
+            ('0.5', "0.5x", "Half the size"),
+            ('1.0', "1x", "Original size"),
+            ('2.0', "2x", "Double the size"),
+            ('3.0', "3x", "Triple the size"),
+            ('4.0', "4x", "Quadruple the size"),
+            ('CUSTOM', "Custom", "Custom Size"),
+        ],
+        default='1.0',
+        update=update_width_height,
+    )
     image_name: StringProperty()
+    base_width: IntProperty()
+    base_height: IntProperty()
+    image: bpy.types.Image
 
     def execute(self, context):
         if not self.image_name:
             self.report({'ERROR'}, "Layer Does not have an image")
             return {'CANCELLED'}
-        image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        image = bpy.data.images.get(self.image_name)
         image.scale(self.width, self.height)
         return {'FINISHED'}
 
@@ -1225,16 +1251,24 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
         if not self.image_name:
             self.report({'ERROR'}, "Layer Does not have an image")
             return {'CANCELLED'}
-        image: bpy.types.Image = bpy.data.images.get(self.image_name)
-        self.width = image.size[0]
-        self.height = image.size[1]
+        self.image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        if not self.image:
+            self.report({'ERROR'}, "Image not found")
+            return {'CANCELLED'}
+        self.base_width, self.base_height = self.image.size
+        self.relative_scale = '1.0'
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
-        row = layout.row()
-        row.prop(self, "width")
-        row.prop(self, "height")
+        box = layout.box()
+        box.label(text="Scale", icon='IMAGE_DATA')
+        row = box.row()
+        row.prop(self, "relative_scale", expand=True)
+        if self.relative_scale == 'CUSTOM':
+            col = box.column(align=True)
+            col.prop(self, "width")
+            col.prop(self, "height")
 
 
 class PAINTSYSTEM_OT_ClearImage(Operator):
@@ -1367,23 +1401,22 @@ def convert_straight_to_premultiplied(image: bpy.types.Image):
     #     print(f"Warning: Image '{image.name}' is not stored as float."
     #           " Pixel access converts it, but precision might differ.")
 
-
     # --- Get Pixel Data ---
     # Accessing image.pixels creates a *copy* of the pixel data as a flat list
     # of floats [R1, G1, B1, A1, R2, G2, B2, A2, ...].
     # For large images, this can be memory intensive.
-    pixels = list(image.pixels) # Get a mutable list copy
+    pixels = list(image.pixels)  # Get a mutable list copy
     num_pixels = len(pixels) // image.channels
     width = image.size[0]
     height = image.size[1]
 
     if len(pixels) != width * height * 4:
-         # This should ideally not happen if previous checks passed
-         raise ValueError(f"Pixel data length mismatch for image '{image.name}'. "
-                          f"Expected {width * height * 4}, got {len(pixels)}")
+        # This should ideally not happen if previous checks passed
+        raise ValueError(f"Pixel data length mismatch for image '{image.name}'. "
+                         f"Expected {width * height * 4}, got {len(pixels)}")
 
     print(f"Processing image '{image.name}' ({width}x{height})...")
-    
+
     # try:
     #     # Convert the flat list to a NumPy array
     #     pixels_np = np.array(pixels, dtype=np.float32) # Use float32 for typical image data
@@ -1409,10 +1442,9 @@ def convert_straight_to_premultiplied(image: bpy.types.Image):
     # Fallback to Python loop if NumPy fails (shouldn't happen with standard Blender)
     for i in range(0, len(pixels), 4):
         alpha = pixels[i + 3]
-        pixels[i]     *= alpha
+        pixels[i] *= alpha
         pixels[i + 1] *= alpha
         pixels[i + 2] *= alpha
-
 
     # --- Write Modified Pixels Back ---
     # Assign the entire modified list back to image.pixels
@@ -1494,15 +1526,17 @@ def set_rgb_to_zero_if_alpha_zero(image):
     #     # before calling this function if this happens.
     #     return False
 
-    print(f"Processing image: '{image.name}' ({image.size[0]}x{image.size[1]})")
+    print(
+        f"Processing image: '{image.name}' ({image.size[0]}x{image.size[1]})")
 
     # --- Method 1: Using Numpy (Generally Faster for large images) ---
     width = image.size[0]
     height = image.size[1]
-    channels = image.channels # Usually 4 (RGBA)
+    channels = image.channels  # Usually 4 (RGBA)
 
     if channels != 4:
-        print(f"Error: Image '{image.name}' does not have 4 channels (RGBA). Found {channels}.")
+        print(
+            f"Error: Image '{image.name}' does not have 4 channels (RGBA). Found {channels}.")
         # Or handle images with 3 channels differently if needed
         return False
 
@@ -1511,7 +1545,7 @@ def set_rgb_to_zero_if_alpha_zero(image):
     # Reshape it into a (height, width, channels) array
     # Note: Blender's pixel storage order might seem inverted height-wise
     # when directly reshaping. Accessing pixels[:] gets the flat list correctly.
-    pixel_data = np.array(image.pixels[:]) # Make a copy
+    pixel_data = np.array(image.pixels[:])  # Make a copy
     pixel_data = pixel_data.reshape((height, width, channels))
 
     # Find pixels where alpha (channel index 3) is 0.0
@@ -1522,7 +1556,7 @@ def set_rgb_to_zero_if_alpha_zero(image):
     pixel_data[alpha_zero_mask, 0:3] = 0.0
 
     # Flatten the array back and update the image pixels
-    image.pixels[:] = pixel_data.ravel() # Update with modified data
+    image.pixels[:] = pixel_data.ravel()  # Update with modified data
 
     # --- Method 2: Direct Pixel Iteration (Simpler, potentially slower) ---
     # Uncomment this section and comment out Method 1 if you prefer
@@ -1550,7 +1584,6 @@ def set_rgb_to_zero_if_alpha_zero(image):
     #             pixels[idx_g] = 0.0
     #             pixels[idx_b] = 0.0
     #             modified = True
-
 
     # --- Final Step ---
     # Mark the image as updated so Blender recognizes the changes
@@ -1583,9 +1616,9 @@ class PAINTSYSTEM_OT_ProjectApply(Operator):
 
         # external_image_name = str(external_image.name)
         # print(external_image_name)
-        
+
         print(external_image)
-        
+
         external_image.reload()
         if app_name == "CLIPStudioPaint.exe":
             set_rgb_to_zero_if_alpha_zero(external_image)
@@ -1596,7 +1629,6 @@ class PAINTSYSTEM_OT_ProjectApply(Operator):
         #         "Could not find image '{:s}'").format(external_image_name))
         #     return {'CANCELLED'}
 
-        
         with bpy.context.temp_override(**{'mode': 'IMAGE_PAINT'}):
             bpy.ops.paint.project_image(image=external_image_name)
 
