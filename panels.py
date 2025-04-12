@@ -329,7 +329,7 @@ class MAT_PT_PaintSystemGroups(Panel):
     def draw_header(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        layout.label(icon_value=get_icon("paint_system"))
+        layout.label(icon_value=get_icon("sunflower"))
 
     def draw(self, context):
         layout = self.layout
@@ -358,30 +358,29 @@ class MAT_PT_PaintSystemGroups(Panel):
 
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
             col = layout.column(align=True)
-            if len(ob.material_slots) > 1:
-                row = col.row()
-                if not ps.preferences.use_compact_design:
-                    row.scale_y = 1.2
-                row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
-                
-                col = row.column(align=True)
-                col.operator("object.material_slot_add", icon='ADD', text="")
-                col.operator("object.material_slot_remove", icon='REMOVE', text="")
-                if ob.mode == 'EDIT':
-                    row = layout.row(align=True)
-                    row.operator("object.material_slot_assign", text="Assign")
-                    row.operator("object.material_slot_select", text="Select")
-                    row.operator("object.material_slot_deselect", text="Deselect")
-            else:
-                row = col.row()
-                row.label(text="Material:")
-                row.operator("object.material_slot_add", icon='ADD', text="")
-                row = layout.row()
+            row = col.row()
+            row.label(text="Material:")
+            row = col.row()
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.2
+            row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
+            
+            col = row.column(align=True)
+            col.operator("object.material_slot_add", icon='ADD', text="")
+            col.operator("object.material_slot_remove", icon='REMOVE', text="")
+            if ob.mode == 'EDIT':
                 row = layout.row(align=True)
-                if not ps.preferences.use_compact_design:
-                    row.scale_x = 1.5
-                    row.scale_y = 1.5
-                row.template_ID(ob, "active_material")
+                row.operator("object.material_slot_assign", text="Assign")
+                row.operator("object.material_slot_select", text="Select")
+                row.operator("object.material_slot_deselect", text="Deselect")
+            # else:
+            #     row.operator("object.material_slot_add", icon='ADD', text="")
+            #     row = layout.row()
+            #     row = layout.row(align=True)
+            #     if not ps.preferences.use_compact_design:
+            #         row.scale_x = 1.5
+            #         row.scale_y = 1.5
+            #     row.template_ID(ob, "active_material")
 
         if not hasattr(mat, "paint_system") or len(mat.paint_system.groups) == 0:
             col = layout.column(align=True)
