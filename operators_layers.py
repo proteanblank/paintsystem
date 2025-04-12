@@ -643,7 +643,8 @@ class PAINTSYSTEM_OT_NewAttributeLayer(MultiMaterialOperator):
 
     def draw(self, context):
         layout = self.layout
-        self.multiple_objects_ui(layout)
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop(self, "attribute_name")
         layout.prop(self, "attribute_type", text="Type")
 
@@ -719,7 +720,8 @@ class PAINTSYSTEM_OT_NewImage(UVLayerHandler, MultiMaterialOperator):
 
     def draw(self, context):
         layout = self.layout
-        self.multiple_objects_ui(layout)
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop(self, "name")
         box = layout.box()
         box.label(text="Image Resolution", icon='IMAGE_DATA')
@@ -764,7 +766,8 @@ class PAINTSYSTEM_OT_OpenImage(UVLayerHandler, MultiMaterialOperator):
 
     def draw(self, context):
         layout = self.layout
-        self.multiple_objects_ui(layout)
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         box = layout.box()
         self.select_uv_ui(box)
 
@@ -799,7 +802,8 @@ class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler, MultiMaterialOperator):
 
     def draw(self, context):
         layout = self.layout
-        self.multiple_objects_ui(layout)
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop_search(self, "image_name", bpy.data,
                            "images", text="Image")
         box = layout.box()
@@ -847,7 +851,8 @@ class PAINTSYSTEM_OT_NewSolidColor(MultiMaterialOperator):
 
     def draw(self, context):
         layout = self.layout
-        self.multiple_objects_ui(layout)
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop(self, "name")
         layout.prop(self, "color")
 
@@ -894,7 +899,8 @@ class PAINTSYSTEM_OT_NewFolder(MultiMaterialOperator):
 
     def draw(self, context):
         layout = self.layout
-        self.multiple_objects_ui(layout)
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop(self, "folder_name")
 
 
@@ -1008,7 +1014,8 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(MultiMaterialOperator):
 
     def draw(self, context):
         layout = self.layout
-        self.multiple_objects_ui(layout)
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         ps = PaintSystem(context)
         if not self.get_node_groups(context):
             layout.label(text="No node group found", icon='ERROR')
@@ -1115,7 +1122,8 @@ class PAINTSYSTEM_OT_NewMaskImage(UVLayerHandler, MultiMaterialOperator):
 
     def draw(self, context):
         layout = self.layout
-        self.multiple_objects_ui(layout)
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.label(text="Initial Mask:")
         row = layout.row()
         row.prop(self, "initial_mask", expand=True)
