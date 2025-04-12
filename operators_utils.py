@@ -226,9 +226,10 @@ class PAINTSYSTEM_OT_CreateTemplateSetup(UVLayerHandler):
         if self.template in ('STANDARD', 'NONE'):
             bpy.ops.paint_system.new_solid_color(
                 'INVOKE_DEFAULT', disable_popup=True)
-        bpy.ops.paint_system.new_image('INVOKE_DEFAULT', disable_popup=True,
-                                       uv_map_mode=self.uv_map_mode,
-                                       uv_map_name=self.uv_map_name)
+        if self.template != "TRANSPARENT":
+            bpy.ops.paint_system.new_image('INVOKE_DEFAULT', disable_popup=True,
+                                        uv_map_mode=self.uv_map_mode,
+                                        uv_map_name=self.uv_map_name)
 
         node_organizer = NodeOrganizer(mat)
         if self.template == 'NONE':
