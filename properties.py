@@ -12,7 +12,7 @@ from bpy.types import (PropertyGroup, Context,
 from .nested_list_manager import BaseNestedListItem, BaseNestedListManager
 from mathutils import Vector
 from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, TEMPLATE_ENUM
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict
 
 
@@ -154,12 +154,13 @@ class PaintSystemLayer(BaseNestedListItem):
 
 @dataclass
 class NodeEntry:
-    color_input: NodeSocket
-    alpha_input: NodeSocket
+    # color_input: NodeSocket
+    # alpha_input: NodeSocket
     location: Vector
-    is_clip: bool = False
-    clip_color_input: NodeSocket | None = None
-    clip_alpha_input: NodeSocket | None = None
+    inputs: Dict[str, NodeSocket] = field(default_factory=dict)
+    outputs: Dict[str, NodeSocket] = field(default_factory=dict)
+    previous_node: Node | None = None
+    current_node: Node | None = None
     mask_color_input: NodeSocket | None = None
     mask_alpha_input: NodeSocket | None = None
 
@@ -195,7 +196,7 @@ class PaintSystemGroup(BaseNestedListManager):
                 node_group = nodes.new('ShaderNodeGroup')
                 node_group.node_tree = item.node_tree
             return node_group
-        
+
         def connect_mask_nodes(node_entry: NodeEntry, node: Node):
             if node_entry.mask_color_input and node_entry.mask_alpha_input:
                 links.new(node_entry.mask_color_input,
@@ -253,112 +254,173 @@ class PaintSystemGroup(BaseNestedListManager):
                     new_socket = interface.new_socket(
                         name=input_name, in_out='INPUT', socket_type=special_socket_type[0].socket_type)
                     new_socket.hide_value = special_socket_type[0].hide_value
-                    
+
         ps_nodes_store: Dict[int, NodeEntry] = {}
 
         # Add group input and output nodes
         ng_input = nodes.new('NodeGroupInput')
         ng_output = nodes.new('NodeGroupOutput')
-        # depth_inputs[-1] = (ng_output.inputs['Color'],
-        #                     ng_output.inputs['Alpha'], ng_output.location)
         ps_nodes_store[-1] = NodeEntry(
-            ng_output.inputs['Color'], ng_output.inputs['Alpha'], ng_output.location)
+            inputs={'Color': ng_output.inputs['Color'],
+                    'Alpha': ng_output.inputs['Alpha'],
+                    },
+            location=ng_output.location)
 
+        # lookup_socket_names = ['Color', 'Alpha']
+        # lookup_socket_names.extend(special_inputs)
+        is_previous_clipped = False
         for item, _ in flattened:
-            is_clip = item.clip
-            node_entry = ps_nodes_store[item.parent_id]
-            if is_clip and not node_entry.is_clip:
+            is_clipped = item.clip
+            node_entry = ps_nodes_store.get(item.parent_id)
+
+            group_node = ensure_nodes(item)
+            group_node.inputs['Alpha'].default_value = 0.0
+            group_node.location = node_entry.location + \
+                Vector((-200, 0))
+            group_node.mute = not item.enabled
+            node_entry.outputs['Color'] = group_node.outputs['Color']
+            node_entry.outputs['Alpha'] = group_node.outputs['Alpha']
+            if item.type == 'FOLDER':
+                ps_nodes_store[item.id] = NodeEntry(
+                    inputs={'Color': group_node.inputs['Over Color'],
+                            'Alpha': group_node.inputs['Over Alpha']},
+                    location=group_node.location + Vector((0, -250))
+                )
+            
+            # MASKING
+            # Connect the mask color and alpha inputs if they exist
+            if node_entry.inputs.get('Mask Color') and node_entry.inputs.get('Mask Alpha'):
+                links.new(node_entry.inputs['Mask Color'],
+                          group_node.outputs['Color'])
+                links.new(node_entry.inputs['Mask Alpha'],
+                          group_node.outputs['Alpha'])
+                node_entry.inputs['Mask Color'] = None
+                node_entry.inputs['Mask Alpha'] = None
+
+            if item.enable_mask and item.mask_image:
+                mask_nt = get_nodetree_from_library(
+                    '_PS_Mask')
+                mask_node = nodes.new('ShaderNodeGroup')
+                mask_node.node_tree = mask_nt
+                mask_node.mute = not item.enabled
+                mask_node.location = group_node.location
+                group_node.location += Vector((-200, 0))
+
+                mask_image_node = nodes.new('ShaderNodeTexImage')
+                mask_image_node.image = item.mask_image
+                mask_image_node.location = mask_node.location + Vector((-200, -200))
+                mask_image_node.width = 140
+                mask_image_node.hide = True
+
+                mask_uvmap_node = nodes.new('ShaderNodeUVMap')
+                mask_uvmap_node.uv_map = item.mask_uv_map
+                mask_uvmap_node.location = mask_image_node.location + Vector((0, -50))
+                mask_uvmap_node.hide = True
+
+                if item.image:
+                    image_texture_node = item.node_tree.nodes['Image Texture']
+                    mask_image_node.interpolation = image_texture_node.interpolation
+                    mask_image_node.extension = image_texture_node.extension
+
+                node_entry.location = mask_node.location
+                links.new(mask_image_node.outputs['Color'],
+                          mask_node.inputs['Mask Alpha'])
+                links.new(mask_uvmap_node.outputs['UV'],
+                            mask_image_node.inputs['Vector'])
+                links.new(group_node.outputs['Color'],
+                          mask_node.inputs['Color'])
+                links.new(group_node.outputs['Alpha'],
+                            mask_node.inputs['Alpha'])
+                node_entry.outputs['Color'] = mask_node.outputs['Color']
+                node_entry.outputs['Alpha'] = mask_node.outputs['Alpha']
+                node_entry.inputs['Mask Color'] = mask_node.inputs['Original Color']
+                node_entry.inputs['Mask Alpha'] = mask_node.inputs['Original Alpha']
+            
+            
+            # CLIPPING
+            if is_previous_clipped and not is_clipped:
+                for node in nodes:
+                    node.select = False
+                group_node.select = True
+                is_previous_clipped = False
+                ps_nodes_store[item.parent_id] = NodeEntry(
+                    inputs={
+                        "Color": node_entry.inputs['Clip Color'],
+                        "Alpha": node_entry.inputs['Clip Alpha']
+                        },
+                    location=group_node.location,
+                )
+                # links.new(node_entry.inputs['Clip Color'],
+                #             node_entry.outputs['Color'])
+                links.new(node_entry.inputs['Clip Mask Alpha'],
+                            node_entry.outputs['Alpha'])
+            
+            # CLIPPING
+            if is_clipped and not is_previous_clipped:
                 alpha_over_nt = get_nodetree_from_library(
                     '_PS_Alpha_Over')
                 alpha_over_node = nodes.new('ShaderNodeGroup')
                 alpha_over_node.node_tree = alpha_over_nt
                 alpha_over_node.location = node_entry.location + \
                     Vector((-200, 0))
-                links.new(node_entry.color_input,
-                          alpha_over_node.outputs['Color'])
-                links.new(node_entry.alpha_input,
-                          alpha_over_node.outputs['Alpha'])
-                node_entry.color_input = alpha_over_node.inputs['Under Color']
-                node_entry.alpha_input = alpha_over_node.inputs['Under Alpha']
-                node_entry.location = alpha_over_node.location
-                node_entry.clip_color_input = alpha_over_node.inputs['Over Color']
-                node_entry.clip_alpha_input = alpha_over_node.inputs['Over Alpha']
-                connect_mask_nodes(node_entry, alpha_over_node)
-
-            # Connect layer node group
-            group_node = ensure_nodes(item)
-            group_node.inputs['Alpha'].default_value = 0.0
-            group_node.location = node_entry.location + \
-                Vector((-200, 0))
-            group_node.mute = not item.enabled
-            
-            connect_mask_nodes(node_entry, group_node)
-            
-            if item.enable_mask:
-                mask_nt = get_nodetree_from_library(
-                    '_PS_Mask')
-                mask_node = nodes.new('ShaderNodeGroup')
-                mask_node.node_tree = mask_nt
-                mask_node.location = group_node.location
                 group_node.location += Vector((-200, 0))
-                
-                mask_image_node = nodes.new('ShaderNodeTexImage')
-                mask_image_node.image = item.mask_image
-                mask_image_node.location = mask_node.location + Vector((-200, -200))
-                mask_image_node.width = 140
-                mask_image_node.hide = True
-                
-                mask_uvmap_node = nodes.new('ShaderNodeUVMap')
-                mask_uvmap_node.uv_map = item.mask_uv_map
-                mask_uvmap_node.location = mask_image_node.location + Vector((0, -50))
-                mask_uvmap_node.hide = True
-                
-                if item.image:
-                    image_texture_node = item.node_tree.nodes['Image Texture']
-                    mask_image_node.interpolation = image_texture_node.interpolation
-                    mask_image_node.extension = image_texture_node.extension
-                
-                node_entry.location = mask_node.location
-                node_entry.mask_color_input = mask_node.inputs['Original Color']
-                node_entry.mask_alpha_input = mask_node.inputs['Original Alpha']
-                links.new(node_entry.color_input,
-                          mask_node.outputs['Color'])
-                links.new(node_entry.alpha_input,
-                          mask_node.outputs['Alpha'])
-                links.new(mask_image_node.outputs['Color'],
-                          mask_node.inputs['Mask Alpha'])
-                links.new(mask_uvmap_node.outputs['UV'],
-                            mask_image_node.inputs['Vector'])
-                node_entry.color_input = mask_node.inputs['Color']
-                node_entry.alpha_input = mask_node.inputs['Alpha']
+                links.new(alpha_over_node.inputs['Over Color'],
+                            node_entry.outputs['Color'])
+                links.new(alpha_over_node.inputs['Over Alpha'],
+                            node_entry.outputs['Alpha'])
+                node_entry.outputs['Alpha'].default_value = 1.0
+                node_entry.outputs['Color'] = alpha_over_node.outputs['Color']
+                node_entry.outputs['Alpha'] = alpha_over_node.outputs['Alpha']
+                node_entry.inputs['Clip Color'] = alpha_over_node.inputs['Under Color']
+                node_entry.inputs['Clip Alpha'] = alpha_over_node.inputs['Under Alpha']
+                node_entry.inputs['Clip Mask Alpha'] = alpha_over_node.inputs['Over Alpha']
+            
+                # links.new(node_entry.inputs['Color'],
+                #           alpha_over_node.outputs['Color'])
+                # links.new(node_entry.inputs['Alpha'],
+                #           alpha_over_node.outputs['Alpha'])
+            #     node_entry.color_input = alpha_over_node.inputs['Under Color']
+            #     node_entry.alpha_input = alpha_over_node.inputs['Under Alpha']
+            #     node_entry.location = alpha_over_node.location
+            #     node_entry.clip_color_input = alpha_over_node.inputs['Over Color']
+            #     node_entry.clip_alpha_input = alpha_over_node.inputs['Over Alpha']
+            #     connect_mask_nodes(node_entry, alpha_over_node)
+                # node_entry.outputs['Color'] = alpha_over_node.outputs['Color']
+                # node_entry.outputs['Alpha'] = alpha_over_node.outputs['Alpha']
+                # node_entry.inputs['Clip Color'] = alpha_over_node.inputs['Over Color']
+                # node_entry.inputs['Clip Alpha'] = alpha_over_node.inputs['Over Alpha']
+            
+            
+            links.new(node_entry.inputs['Color'], node_entry.outputs['Color'])
+            links.new(node_entry.inputs['Alpha'], node_entry.outputs['Alpha'])
+            node_entry.inputs['Color'] = group_node.inputs['Color']
+            node_entry.inputs['Alpha'] = group_node.inputs['Alpha']
 
-            if is_clip or node_entry.is_clip:
-                links.new(node_entry.clip_color_input,
-                          group_node.outputs['Color'])
-                node_entry.clip_color_input = group_node.inputs['Color']
-                if not is_clip:
-                    links.new(node_entry.clip_alpha_input,
-                              group_node.outputs['Alpha'])
-                    node_entry.clip_alpha_input = group_node.inputs['Alpha']
-                else:
-                    group_node.inputs['Alpha'].default_value = 1.0
-            else:
-                links.new(node_entry.color_input,
-                          group_node.outputs['Color'])
-                links.new(node_entry.alpha_input,
-                          group_node.outputs['Alpha'])
-                node_entry.color_input = group_node.inputs['Color']
-                node_entry.alpha_input = group_node.inputs['Alpha']
+            # if is_clip or node_entry.is_clip:
+            #     links.new(node_entry.clip_color_input,
+            #               group_node.outputs['Color'])
+            #     node_entry.clip_color_input = group_node.inputs['Color']
+            #     if not is_clip:
+            #         links.new(node_entry.clip_alpha_input,
+            #                   group_node.outputs['Alpha'])
+            #         node_entry.clip_alpha_input = group_node.inputs['Alpha']
+            #     else:
+            #         group_node.inputs['Alpha'].default_value = 1.0
+            # else:
+            
+                
+            # links.new(node_entry.color_input,
+            #             group_node.outputs['Color'])
+            # links.new(node_entry.alpha_input,
+            #             group_node.outputs['Alpha'])
+            # node_entry.color_input = group_node.inputs['Color']
+            # node_entry.alpha_input = group_node.inputs['Alpha']
+
             node_entry.location = group_node.location
-            node_entry.is_clip = is_clip
+            is_previous_clipped = is_clipped
+            
 
-            if item.type == 'FOLDER':
-                ps_nodes_store[item.id] = NodeEntry(
-                    group_node.inputs['Over Color'],
-                    group_node.inputs['Over Alpha'],
-                    group_node.location + Vector((0, -250)))
-
-        node_entry = ps_nodes_store[-1]
+        
         if self.bake_image and self.use_bake_image:
             bake_image_node = nodes.new('ShaderNodeTexImage')
             bake_image_node.image = self.bake_image
@@ -383,10 +445,13 @@ class PaintSystemGroup(BaseNestedListManager):
                     if socket:
                         links.new(socket, ng_input.outputs[socket.name])
 
-        links.new(node_entry.color_input, ng_input.outputs['Color'])
-        links.new(node_entry.alpha_input, ng_input.outputs['Alpha'])
-        connect_mask_nodes(node_entry, ng_input)
+        node_entry = ps_nodes_store[-1]
+        links.new(node_entry.inputs['Color'], ng_input.outputs['Color'])
+        links.new(node_entry.inputs['Alpha'], ng_input.outputs['Alpha'])
+        # connect_mask_nodes(node_entry, ng_input)
         ng_input.location = node_entry.location + Vector((-200, 0))
+        
+        print("Updated node tree")
 
     # Define the collection property directly in the class
     items: CollectionProperty(type=PaintSystemLayer)
