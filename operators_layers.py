@@ -1200,7 +1200,7 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
     def invoke(self, context, event):
         if self.disable_popup:
             return self.execute(context)
-        return context.window_manager.invoke_props_dialog(self)
+        return context.window_manager.invoke_props_dialog(self, width=200)
 
     def draw(self, context):
         layout = self.layout
@@ -1212,8 +1212,7 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
         layout.prop(self, "invert_r", text="Red")
         layout.prop(self, "invert_g", text="Green")
         layout.prop(self, "invert_b", text="Blue")
-        if image.alp:
-            layout.prop(self, "invert_a", text="Alpha")
+        layout.prop(self, "invert_a", text="Alpha")
 
 
 class PAINTSYSTEM_OT_ExportActiveLayer(Operator):
