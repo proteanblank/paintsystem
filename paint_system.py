@@ -184,8 +184,7 @@ class PaintSystem:
         self.settings = context.scene.paint_system_settings if hasattr(
             context, "scene") else None
         self.context = context
-        self.active_object = context.active_object if hasattr(
-            context, "active_object") and context.selected_objects else None
+        self.active_object = context.active_object
         # self.settings = self.get_settings()
         # mat = self.get_active_material()
         # self.groups = self.get_groups()
