@@ -295,3 +295,13 @@ def get_active_material_output(node_tree: NodeTree) -> Node:
         if node.bl_idname == "ShaderNodeOutputMaterial" and node.is_active_output:
             return node
     return None
+
+
+def get_unified_settings(context: Context, unified_name=None):
+    ups = context.tool_settings.unified_paint_settings
+    tool_settings = context.tool_settings.image_paint
+    brush = tool_settings.brush
+    prop_owner = brush
+    if unified_name and getattr(ups, unified_name):
+        prop_owner = ups
+    return prop_owner
