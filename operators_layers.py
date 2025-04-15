@@ -10,7 +10,7 @@ import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM, TEMPLATE_ENUM
-from .common import redraw_panel, get_object_uv_maps
+from .common import redraw_panel, get_unified_settings
 import re
 import copy
 from .common_layers import UVLayerHandler, MultiMaterialOperator
@@ -1320,6 +1320,35 @@ class PAINTSYSTEM_OT_ClearImage(Operator):
         image.update()
         image.update_tag()
         return {'FINISHED'}
+    
+class PAINTSYSTEM_OT_FillImage(Operator):
+    bl_idname = "paint_system.fill_image"
+    bl_label = "Fill Image"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Fill the active image with current color"
+
+    image_name: StringProperty()
+
+    def execute(self, context):
+        if not self.image_name:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
+        image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        # Replace every pixel with a transparent pixel
+        pixels = numpy.empty(len(image.pixels), dtype=numpy.float32)
+        prop_owner = get_unified_settings(context, "use_unified_color")
+        color = prop_owner.color
+        
+        # Fill the image with the current brush color
+        pixels[::4] = color[0]  # R
+        pixels[1::4] = color[1]  # G
+        pixels[2::4] = color[2]  # B
+        pixels[3::4] = 1.0  # A - full opacity
+        
+        image.pixels.foreach_set(pixels)
+        image.update()
+        image.update_tag()
+        return {'FINISHED'}
 
 
 # https://projects.blender.org/blender/blender/src/branch/main/scripts/startup/bl_operators/image.py#L54
@@ -1740,6 +1769,7 @@ classes = (
     PAINTSYSTEM_OT_InvertColors,
     PAINTSYSTEM_OT_ResizeImage,
     PAINTSYSTEM_OT_ClearImage,
+    PAINTSYSTEM_OT_FillImage,
     PAINTSYSTEM_OT_ProjectEdit,
     PAINTSYSTEM_OT_ProjectApply,
     PAINTSYSTEM_OT_QuickEdit,

@@ -523,6 +523,8 @@ class MAT_MT_PaintSystemImageMenu(Menu):
         layout.operator("paint_system.export_active_layer",
                         text="Export Layer", icon='EXPORT')
         layout.separator()
+        layout.operator("paint_system.fill_image", 
+                        text="Fill Image", icon='SNAP_FACE').image_name = image_name
         layout.operator("paint_system.invert_colors",
                         icon="MOD_MASK").image_name = image_name
         layout.operator("paint_system.resize_image",
@@ -644,13 +646,21 @@ class MAT_PT_Brush(Panel):
         prop_unified(col, context, "strength",
                      "use_unified_strength", icon="WORLD", text="Strength")
         # row.label(text="Brush Shortcuts")
+        
+        brush = tool_settings.brush
+        if brush:
+            row = box.row()
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.5
+                row.scale_x = 1.5
+            row.operator("paint_system.toggle_brush_erase_alpha", text="Toggle Erase Alpha", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
 
 
 class MAT_PT_BrushAdvanced(Panel):
     bl_idname = 'MAT_PT_BrushAdvanced'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_label = "View Settings"
+    bl_label = "Advacnced Settings"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_Brush'
     bl_options = {'DEFAULT_CLOSED'}
@@ -658,6 +668,15 @@ class MAT_PT_BrushAdvanced(Panel):
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
+        image_paint = context.tool_settings.image_paint
+        layout.prop(image_paint, "use_occlude", text="Occlude Faces")
+        layout.prop(image_paint, "use_backface_culling", text="Backface Culling")
+        
+        layout.prop(image_paint, "use_normal_falloff", text="Normal Falloff")
+        col = layout.column(align=True)
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(image_paint, "normal_angle", text="Angle")
         layout.prop(ps.settings, "allow_image_overwrite",
                  text="Auto Image Select", icon='FILE_IMAGE')
 
@@ -1090,12 +1109,12 @@ class MAT_MT_PaintSystemMaskMenu(Menu):
         ps = PaintSystem(context)
         active_layer = ps.get_active_layer()
         image_name = active_layer.mask_image.name
+        layout.operator("paint_system.fill_image", text="Fill Mask",
+                        icon="SNAP_FACE").image_name = image_name
         layout.operator("paint_system.invert_colors", text="Invert Mask",
                         icon="MOD_MASK").image_name = image_name
         layout.operator("paint_system.resize_image", text="Resize Mask",
                         icon="CON_SIZELIMIT").image_name = image_name
-        layout.operator("paint_system.clear_image", text="Clear Mask",
-                        icon="X").image_name = image_name
         layout.operator("paint_system.delete_mask_image",
                         icon="TRASH").image_name = image_name
 
