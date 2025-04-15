@@ -1101,6 +1101,7 @@ class PAINTSYSTEM_OT_NewMaskImage(UVLayerHandler, MultiMaterialOperator):
         active_layer.mask_image = image
         active_layer.enable_mask = True
         active_layer.mask_uv_map = self.uv_map_name
+        active_layer.edit_mask = True
         return 0
 
     def invoke(self, context, event):
@@ -1295,6 +1296,8 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
             col = box.column(align=True)
             col.prop(self, "width")
             col.prop(self, "height")
+        else:
+            box.label(text=f"{self.width} x {self.height}")
 
 
 class PAINTSYSTEM_OT_ClearImage(Operator):
