@@ -436,6 +436,19 @@ class MAT_PT_PaintSystemGroups(Panel):
             #              text="", icon='ADD')
             # col = row.column(align=True)
             # col.menu("MAT_MT_PaintSystemGroupMenu", text="", icon='COLLAPSEMENU')
+        
+        # Warning about avtive modifiers
+        if ob.modifiers:
+            box = layout.box()
+            box.alert = True
+            col = box.column(align=True)
+            row = col.row()
+            row.alignment = "CENTER"
+            row.label(text="Modifiers Detected!", icon="ERROR")
+            row = col.row()
+            row.alignment = "CENTER"
+            row.label(text="Please apply all modifiers")
+        
 
 
 class MAT_PT_GroupAdvanced(Panel):
