@@ -281,6 +281,7 @@ class PaintSystem:
         active_group = self.get_active_group()
         item = active_group.get_item_by_id(item_id)
         order = int(item.order)
+        parent_id = int(item.parent_id)
         # In case Item type is GRADIENT
         if item.type == 'GRADIENT':
             empty_object = None
@@ -294,7 +295,7 @@ class PaintSystem:
             active_group.normalize_orders()
             flattened = active_group.flatten_hierarchy()
             for i, item in enumerate(active_group.items):
-                if item.order == order:
+                if item.order == order and item.parent_id == parent_id:
                     active_group.active_index = i
                     break
 
