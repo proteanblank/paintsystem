@@ -150,6 +150,12 @@ class PaintSystemLayer(BaseNestedListItem):
         name="Edit External Image",
         type=Image,
     )
+    expanded: BoolProperty(
+        name="Expanded",
+        description="Expand the layer",
+        default=True,
+        update=update_node_tree
+    )
 
 
 @dataclass

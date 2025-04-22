@@ -582,14 +582,8 @@ class PaintSystem:
         active_group = self.get_active_group()
         if not active_group:
             return None
-        flattened = active_group.flatten_hierarchy()
-        if not flattened:
-            return None
 
-        if active_group.active_index >= len(flattened):
-            return None  # handle cases where active index is invalid
-
-        return flattened[active_group.active_index][0]
+        return active_group.items[active_group.active_index]
 
     def get_layer_node_tree(self) -> Optional[NodeTree]:
         active_layer = self.get_active_layer()
@@ -712,7 +706,7 @@ class PaintSystem:
         # Update active index
         if new_id != -1:
             flattened = active_group.flatten_hierarchy()
-            for i, (item, _) in enumerate(flattened):
+            for i, item in enumerate(active_group.items):
                 if item.id == new_id:
                     active_group.active_index = i
                     break

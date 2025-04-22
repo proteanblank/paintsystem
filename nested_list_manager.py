@@ -30,10 +30,13 @@ class BaseNestedListManager(PropertyGroup):
 
     def get_active_item(self):
         """Get currently active item based on active_index"""
-        active_id = self.get_id_from_flattened_index(self.active_index)
-        if active_id != -1:
-            return self.get_item_by_id(active_id)
-        return None
+        # active_id = self.get_id_from_flattened_index(self.active_index)
+        # if active_id != -1:
+        #     return self.get_item_by_id(active_id)
+        # return None
+        if not self.active_index:
+            return None
+        return self.items[self.active_index]
 
     def adjust_sibling_orders(self, parent_id, insert_order):
         """Increase order of all items at or above the insert_order under the same parent"""
@@ -130,12 +133,17 @@ class BaseNestedListManager(PropertyGroup):
         return -1
 
     def get_id_from_flattened_index(self, flattened_index):
-        flattened = self.flatten_hierarchy()
+        flattened = self.items
         if 0 <= flattened_index < len(flattened):
-            return flattened[flattened_index][0].id
+            return flattened[flattened_index].id
         return -1
 
     def flatten_hierarchy(self):
+        children = self.items
+        # print("Children:", [(i.id, i.parent_id, i.order) for i in children])
+        # flattened = sorted(
+        #     children, key=lambda i: (i.order, i.parent_id))
+        # return [(item, self.get_item_level_from_id(item.id)) for item in flattened]
         def collect_items(parent_id, level):
             collected = []
             children = sorted(
@@ -147,8 +155,23 @@ class BaseNestedListManager(PropertyGroup):
                 if item.type == 'FOLDER':
                     collected.extend(collect_items(item.id, level + 1))
             return collected
+        test = collect_items(-1, 0)
+        # print("Flattened hierarchy:", [v[0].id for v in test])
+        # print("Expected flattened:", [v.id for v in flattened])
+        return test
+    
+    def get_item_level_from_id(self, item_id):
+        """Get the level of an item in the hierarchy"""
+        item = self.get_item_by_id(item_id)
+        if not item:
+            return -1
 
-        return collect_items(-1, 0)
+        level = 0
+        while item.parent_id != -1:
+            item = self.get_item_by_id(item.parent_id)
+            level += 1
+
+        return level
 
     def normalize_orders(self):
         """Normalize orders to be sequential starting from 1 within each parent level"""
@@ -419,6 +442,9 @@ class CustomNestedListManager(BaseNestedListManager):
 
 
 class BaseNLM_UL_List(UIList):
+    
+    use_filter_show = False
+    
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
         nested_list_manager = self.get_list_manager(context)
         flattened = nested_list_manager.flatten_hierarchy()

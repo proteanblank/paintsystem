@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Context, Node, NodeTree, Image
+from bpy.types import Context, Node, NodeTree, Image, ImagePreview
 from typing import List
 from mathutils import Vector
 from typing import List, Tuple
@@ -295,3 +295,22 @@ def get_active_material_output(node_tree: NodeTree) -> Node:
         if node.bl_idname == "ShaderNodeOutputMaterial" and node.is_active_output:
             return node
     return None
+
+
+def is_image_painted(image: Image | ImagePreview) -> bool:
+    """Check if the image is painted
+
+    Args:
+        image (bpy.types.Image): The image to check
+
+    Returns:
+        bool: True if the image is painted, False otherwise
+    """
+    if not image:
+        return False
+    if isinstance(image, Image):
+        return image.pixels and len(image.pixels) > 0 and any(image.pixels)
+    elif isinstance(image, ImagePreview):
+        # print("ImagePreview", image.image_pixels, image.image_size[0], image.image_size[1], len(list(image.icon_pixels)[3::4]))
+        return any([pixel > 0 for pixel in list(image.image_pixels_float)[3::4]])
+    return False

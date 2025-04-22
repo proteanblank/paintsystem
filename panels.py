@@ -14,7 +14,7 @@ from bpy.types import (Panel,
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
-from .common import is_online, is_newer_than, icon_parser, import_legacy_updater, find_keymap, get_event_icons
+from .common import is_online, is_newer_than, icon_parser, import_legacy_updater, find_keymap, get_event_icons, is_image_painted
 from .operators_bake import is_bakeable
 from .custom_icons import get_icon
 # from .. import __package__ as base_package
@@ -760,7 +760,9 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
         active_group = ps.get_active_group()
         flattened = active_group.flatten_hierarchy()
         if index < len(flattened):
-            display_item, level = flattened[index]
+            # display_item, level = flattened[index]
+            display_item = item
+            level = active_group.get_item_level_from_id(display_item.id)
             row = layout.row(align=True)
             # Check if parent of the current item is enabled
             parent_item = ps.get_active_group().get_item_by_id(
@@ -774,16 +776,18 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
             #     row.separator()
             match display_item.type:
                 case 'IMAGE':
-                    if display_item.image.preview:
+                    if not display_item.image.preview:
+                        display_item.image.asset_generate_preview()
+                    if display_item.image.preview and is_image_painted(display_item.image.preview):
                         row.label(
                             icon_value=display_item.image.preview.icon_id)
                     # elif not display_item.image.is_dirty:
                     #     row.label(icon='IMAGE_DATA')
                     else:
-                        display_item.image.asset_generate_preview()
-                        row.label(icon='BLANK1')
+                        row.label(icon='IMAGE_DATA')
                 case 'FOLDER':
-                    row.label(icon='FILE_FOLDER')
+                    row.prop(display_item, "expanded", text="", icon='TRIA_DOWN' if display_item.expanded else 'TRIA_RIGHT', emboss=False)
+                    # row.label(icon='FILE_FOLDER')
                 case 'SOLID_COLOR':
                     rgb_node = None
                     for node in display_item.node_tree.nodes:
@@ -820,6 +824,57 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                      icon="HIDE_OFF" if display_item.enabled else "HIDE_ON", emboss=False)
             # row.label(text=f"Order: {display_item.order}")
             self.draw_custom_properties(row, display_item)
+
+    def filter_items(self, context, data, propname):
+        # This function gets the collection property (as the usual tuple (data, propname)), and must return two lists:
+        # * The first one is for filtering, it must contain 32bit integers were self.bitflag_filter_item marks the
+        #   matching item as filtered (i.e. to be shown). The upper 16 bits (including self.bitflag_filter_item) are
+        #   reserved for internal use, the lower 16 bits are free for custom use. Here we use the first bit to mark
+        #   VGROUP_EMPTY.
+        # * The second one is for reordering, it must return a list containing the new indices of the items (which
+        #   gives us a mapping org_idx -> new_idx).
+        # Please note that the default UI_UL_list defines helper functions for common tasks (see its doc for more info).
+        # If you do not make filtering and/or ordering, return empty list(s) (this will be more efficient than
+        # returning full lists doing nothing!).
+        layers = getattr(data, propname).values()
+        helper_funcs = bpy.types.UI_UL_list
+        flattened_layers = [v[0] for v in data.flatten_hierarchy()]
+
+        # Default return values.
+        flt_flags = []
+        flt_neworder = []
+
+        # Filtering by name
+        flt_flags = [self.bitflag_filter_item] * len(layers)
+
+        # Filter by not expanded folder.
+        # for idx, item in enumerate(layers):
+        #     parent_layer = data.get_item_by_id(item.parent_id)
+        #     if not parent_layer:
+        #         continue
+        #     if not parent_layer.expanded:
+        #         flt_flags[idx] &= ~self.bitflag_filter_item
+        # for idx, vg in enumerate(vgroups):
+        #     if vgroups_empty[vg.index][0]:
+        #         flt_flags[idx] |= self.VGROUP_EMPTY
+        #         if self.use_filter_empty and self.use_filter_empty_reverse:
+        #             flt_flags[idx] &= ~self.bitflag_filter_item
+        #     elif self.use_filter_empty and not self.use_filter_empty_reverse:
+        #         flt_flags[idx] &= ~self.bitflag_filter_item
+        # flt_neworder = helper_funcs.sort_items_helper(list(enumerate(layers)), lambda i: (i[1].order, i[1].parent_id))
+        print(flt_flags)
+        for idx, layer in enumerate(layers):
+            flt_neworder.append(flattened_layers.index(layer))
+            while layer.parent_id != -1:
+                layer = data.get_item_by_id(layer.parent_id)
+                if layer and not layer.expanded:
+                    flt_flags[idx] &= ~self.bitflag_filter_item
+                    break
+            
+        # _sort = [(idx, layers[item.index][1]) for idx, item in enumerate(layers)]
+        # flt_neworder = helper_funcs.sort_items_helper(_sort, lambda e: e[1])
+
+        return flt_flags, flt_neworder
 
     def draw_custom_properties(self, layout, item):
         if hasattr(item, 'custom_int'):
