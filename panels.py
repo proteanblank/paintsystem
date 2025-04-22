@@ -331,12 +331,12 @@ class MATERIAL_UL_PaintSystemMatSlots(UIList):
 
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             if ma:
-                row.prop(ma, "name", text="", emboss=False, icon_value=icon)
+                row.prop(ma, "name", text="", emboss=False, icon="MATERIAL")
             else:
                 row.label(text="", icon_value=icon)
         elif self.layout_type == 'GRID':
             row.alignment = 'CENTER'
-            row.label(text="", icon_value=icon)
+            row.label(text="", icon="MATERIAL")
         if has_ps:
             row.label(text="", icon='CHECKMARK')
 
