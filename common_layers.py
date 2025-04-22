@@ -108,7 +108,7 @@ class UVLayerHandler(Operator):
         mat_settings = ps.get_material_settings()
         if mat_settings:
             self.uv_map_mode = 'PAINT_SYSTEM' if mat_settings.use_paintsystem_uv else 'OPEN'
-            print(f"UV Mode: {self.uv_map_mode}")
+            # print(f"UV Mode: {self.uv_map_mode}")
 
     def set_uv_mode(self, context: Context):
         ps = PaintSystem(context)
