@@ -172,8 +172,7 @@ class NodeEntry:
     location: Vector
     inputs: Dict[str, NodeSocket] = field(default_factory=dict)
     outputs: Dict[str, NodeSocket] = field(default_factory=dict)
-    previous_node: Node | None = None
-    current_node: Node | None = None
+    is_previous_clipped: bool = False
     mask_color_input: NodeSocket | None = None
     mask_alpha_input: NodeSocket | None = None
 
@@ -281,8 +280,8 @@ class PaintSystemGroup(BaseNestedListManager):
 
         # lookup_socket_names = ['Color', 'Alpha']
         # lookup_socket_names.extend(special_inputs)
-        is_previous_clipped = False
         for item, _ in flattened:
+            print(item.name)
             is_clipped = item.clip
             node_entry = ps_nodes_store.get(item.parent_id)
 
@@ -351,11 +350,11 @@ class PaintSystemGroup(BaseNestedListManager):
             
             
             # CLIPPING
-            if is_previous_clipped and not is_clipped:
+            if node_entry.is_previous_clipped and not is_clipped:
                 for node in nodes:
                     node.select = False
                 group_node.select = True
-                is_previous_clipped = False
+                node_entry.is_previous_clipped = False
                 ps_nodes_store[item.parent_id] = NodeEntry(
                     inputs={
                         "Color": node_entry.inputs['Clip Color'],
@@ -369,7 +368,7 @@ class PaintSystemGroup(BaseNestedListManager):
                             node_entry.outputs['Alpha'])
             
             # CLIPPING
-            if is_clipped and not is_previous_clipped:
+            if is_clipped and not node_entry.is_previous_clipped:
                 alpha_over_nt = get_nodetree_from_library(
                     '_PS_Alpha_Over')
                 alpha_over_node = nodes.new('ShaderNodeGroup')
@@ -430,7 +429,7 @@ class PaintSystemGroup(BaseNestedListManager):
             # node_entry.alpha_input = group_node.inputs['Alpha']
 
             node_entry.location = group_node.location
-            is_previous_clipped = is_clipped
+            node_entry.is_previous_clipped = is_clipped
             
 
         
