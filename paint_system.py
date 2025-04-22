@@ -592,6 +592,7 @@ class PaintSystem:
         empty_object.location = obj.location
         empty_object.empty_display_type = 'SINGLE_ARROW'
         empty_object.show_in_front = True
+        empty_object.parent = obj
         new_layer.node_tree.nodes["Texture Coordinate"].object = empty_object
         # gradient_nt.nodes['Gradient'].label = name
 
