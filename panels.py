@@ -874,6 +874,8 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
                     row.label(icon='NODETREE')
                 case 'ATTRIBUTE':
                     row.label(icon='MESH_DATA')
+                case 'GRADIENT':
+                    row.label(icon='COLOR')
                 case _:
                     row.label(icon='BLANK1')
             row.prop(display_item, "name", text="", emboss=False)
@@ -1051,7 +1053,7 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         if not active_group.bake_image:
             row.menu("MAT_MT_PaintSystemMergeAndExport",
-                     icon='EXPORT', text="Merge and Export")
+                     icon='EXPORT', text="Merge and Bake")
         # has_dirty_images = any(
         #     [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
         # if has_dirty_images:
@@ -1390,7 +1392,31 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
                 if attribute_node:
                     box.label(text="Attribute Settings:", icon='MESH_DATA')
                     box.template_node_inputs(attribute_node)
-
+            case 'GRADIENT':
+                col = box.column(align=True)
+                row = col.row(align=True)
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                    row.scale_x = 1.5
+                else:
+                    row.scale_y = 1.2
+                    row.scale_x = 1.2
+                row.prop(active_layer, "clip", text="",
+                         icon="SELECT_INTERSECT")
+                row.prop(active_layer, "lock_layer",
+                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
+                row.prop(color_mix_node, "blend_type", text="")
+                row = col.row()
+                if not ps.preferences.use_compact_design:
+                    row.scale_y = 1.5
+                else:
+                    row.scale_y = 1.2
+                row.prop(ps.find_opacity_mix_node().inputs[0], "default_value",
+                         text="Opacity", slider=True)
+                color_ramp_node = ps.find_node(active_layer.node_tree, {
+                            "label": "Gradient Color Ramp"})
+                box.template_color_ramp(
+                    color_ramp_node, "color_ramp")
             case _:
                 col = box.column(align=True)
                 row = col.row(align=True)
@@ -1638,11 +1664,12 @@ class MAT_MT_PaintSystemMergeAndExport(Menu):
         col.label(text="Merge:")
         col.operator("paint_system.merge_group",
                      text="Merge Visible as New Layer", icon="RENDER_RESULT").as_new_layer = True
-        col.operator("paint_system.merge_group",
-                     text="Merge All Layers (Bake)").as_new_layer = False
         col.operator("paint_system.bake_image_id_to_image_layer",
-                     text="Merge Single to New Layer", icon="IMAGE_DATA").layer_id = active_layer.id
-        # col.separator()
+                     text="Convert Selected to Image Layer", icon="FILE_REFRESH").layer_id = active_layer.id
+        col.separator()
+        col.label(text="Bake:")
+        col.operator("paint_system.merge_group",
+                     text="Bake All Layers", icon="SCENE").as_new_layer = False
         # col.label(text="UV:")
         # TODO: Fix export merged image
         # col.separator()

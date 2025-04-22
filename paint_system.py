@@ -261,15 +261,42 @@ class PaintSystem:
         item_id = active_group.get_id_from_flattened_index(
             active_group.active_index)
 
-        self.delete_item_id(item_id)
+        return self.delete_item_id(item_id)
+        
+    def delete_item(self, item: PropertyGroup):
+        """Deletes the specified item and its children.
+
+        Args:
+            item (PropertyGroup): The item to be deleted.
+
+        Returns:
+            bool: True if the item was successfully deleted, False otherwise.
+        """
+        active_group = self.get_active_group()
+        item_id = active_group.get_id_from_flattened_index(item.id)
+
+        return self.delete_item_id(item_id)
     
     def delete_item_id(self, item_id):
         active_group = self.get_active_group()
+        item = active_group.get_item_by_id(item_id)
+        order = int(item.order)
+        # In case Item type is GRADIENT
+        if item.type == 'GRADIENT':
+            empty_object = None
+            if item.node_tree:
+                empty_object = item.node_tree.nodes["Texture Coordinate"].object
+            if empty_object and empty_object.type == 'EMPTY':
+                bpy.data.objects.remove(empty_object, do_unlink=True)
+                
         if item_id != -1 and active_group.remove_item_and_children(item_id, self._on_item_delete):
             # Update active_index
+            active_group.normalize_orders()
             flattened = active_group.flatten_hierarchy()
-            active_group.active_index = min(
-                active_group.active_index, len(flattened) - 1)
+            for i, item in enumerate(active_group.items):
+                if item.order == order:
+                    active_group.active_index = i
+                    break
 
             active_group.update_node_tree()
 
@@ -548,16 +575,22 @@ class PaintSystem:
         """
         obj = self.active_object
         active_group = self.get_active_group()
-        # # Get insertion position
-        # parent_id, insert_order = active_group.get_insertion_data()
+        view_layer = bpy.context.view_layer
+        
+        with bpy.context.temp_override():
+            if "Paint System Collection" not in view_layer.layer_collection.collection.children:
+                collection = bpy.data.collections.new("Paint System Collection")
+                view_layer.layer_collection.collection.children.link(collection)
+            else:
+                collection = view_layer.layer_collection.collection.children["Paint System Collection"]
 
-        # # Adjust existing items' order
-        # active_group.adjust_sibling_orders(parent_id, insert_order)
-
-        new_layer = self._add_layer(
-            name, '_PS_Gradient_Template', 'GRADIENT', make_copy=True)
-        empty_object = bpy.data.objects.new(f"{active_group.name} {name}", None)
+            new_layer = self._add_layer(
+                name, '_PS_Gradient_Template', 'GRADIENT', make_copy=True)
+            empty_object = bpy.data.objects.new(f"{active_group.name} {name}", None)
+            collection.objects.link(empty_object)
         empty_object.location = obj.location
+        empty_object.empty_display_type = 'SINGLE_ARROW'
+        empty_object.show_in_front = True
         new_layer.node_tree.nodes["Texture Coordinate"].object = empty_object
         # gradient_nt.nodes['Gradient'].label = name
 
@@ -625,7 +658,7 @@ class PaintSystem:
 
     def get_active_layer(self) -> Optional[PropertyGroup]:
         active_group = self.get_active_group()
-        if not active_group:
+        if not active_group or len(active_group.items) == 0 or active_group.active_index >= len(active_group.items):
             return None
 
         return active_group.items[active_group.active_index]
