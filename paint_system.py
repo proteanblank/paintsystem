@@ -25,6 +25,7 @@ LAYER_ENUM = [
     ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
     ('SHADER', "Shader", "Shader layer"),
     ('NODE_GROUP', "Node Group", "Node Group layer"),
+    ('GRADIENT', "Gradient", "Gradient layer"),
 ]
 SHADER_ENUM = [
     ('_PS_Toon_Shader', "Toon Shader (EEVEE)", "Toon Shader"),
@@ -522,6 +523,51 @@ class PaintSystem:
         #     parent_id=parent_id,
         #     order=insert_order,
         #     node_tree=adjustment_nt
+        # )
+
+        # Update active index
+        # if new_id != -1:
+        #     flattened = active_group.flatten_hierarchy()
+        #     for i, (item, _) in enumerate(flattened):
+        #         if item.id == new_id:
+        #             active_group.active_index = i
+        #             break
+
+        active_group.update_node_tree()
+
+        return new_layer
+    
+    def create_gradient_layer(self, name: str) -> PropertyGroup:
+        """Creates a new gradient layer in the active group.
+
+        Args:
+            name (str): The name of the new gradient layer.
+
+        Returns:
+            PropertyGroup: The newly created gradient layer.
+        """
+        obj = self.active_object
+        active_group = self.get_active_group()
+        # # Get insertion position
+        # parent_id, insert_order = active_group.get_insertion_data()
+
+        # # Adjust existing items' order
+        # active_group.adjust_sibling_orders(parent_id, insert_order)
+
+        new_layer = self._add_layer(
+            name, '_PS_Gradient_Template', 'GRADIENT', make_copy=True)
+        empty_object = bpy.data.objects.new(f"{active_group.name} {name}", None)
+        empty_object.location = obj.location
+        new_layer.node_tree.nodes["Texture Coordinate"].object = empty_object
+        # gradient_nt.nodes['Gradient'].label = name
+
+        # Create the new item
+        # new_id = active_group.add_item(
+        #     name=name,
+        #     item_type='GRADIENT',
+        #     parent_id=parent_id,
+        #     order=insert_order,
+        #     node_tree=gradient_nt
         # )
 
         # Update active index

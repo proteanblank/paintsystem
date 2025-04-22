@@ -935,6 +935,38 @@ class PAINTSYSTEM_OT_NewAdjustmentLayer(MultiMaterialOperator):
         return 0
 
 
+class PAINTSYSTEM_OT_NewGradientLayer(MultiMaterialOperator):
+    bl_idname = "paint_system.new_gradient_layer"
+    bl_label = "Add Gradient Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add a new gradient layer"
+    
+    def get_next_gradient_name(self, context: Context) -> str:
+        ps = PaintSystem(context)
+        flattened = ps.get_active_group().flatten_hierarchy()
+        number = get_highest_number_with_prefix(
+            'Gradient', [item[0].name for item in flattened]) + 1
+        return f"Gradient {number}"
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        return active_group
+
+    def process_material(self, context):
+        ps = PaintSystem(context)
+        # Look for get name from in adjustment_enum based on adjustment_type
+        layer_name = self.get_next_gradient_name(context)
+        print(layer_name)
+        ps.create_gradient_layer(layer_name)
+
+        # Force the UI to update
+        redraw_panel(self, context)
+
+        return 0
+
+
 class PAINTSYSTEM_OT_NewShaderLayer(MultiMaterialOperator):
     bl_idname = "paint_system.new_shader_layer"
     bl_label = "Add Shader Layer"
@@ -1760,6 +1792,7 @@ classes = (
     PAINTSYSTEM_OT_NewSolidColor,
     PAINTSYSTEM_OT_NewFolder,
     PAINTSYSTEM_OT_NewAdjustmentLayer,
+    PAINTSYSTEM_OT_NewGradientLayer,
     PAINTSYSTEM_OT_NewShaderLayer,
     PAITNSYSTEM_OT_NewNodeGroupLayer,
     PAINTSYSTEM_OT_NewAttributeLayer,

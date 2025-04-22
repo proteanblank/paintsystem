@@ -1557,7 +1557,7 @@ class MAT_PT_PaintSystemLayersAdvanced(Panel):
 # -------------------------------------------------------------------
 
 
-class MAT_MT_PaintSystemAddLayer(Menu):
+class MAT_MT_PaintSystemAddLayerMenu(Menu):
     bl_label = "Add Layer"
     bl_idname = "MAT_MT_PaintSystemAddLayer"
 
@@ -1579,6 +1579,10 @@ class MAT_MT_PaintSystemAddLayer(Menu):
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
         col.operator("paint_system.new_attribute_layer",
                      text="Attribute Color", icon='MESH_DATA')
+        col.separator()
+        col.label(text="--- GRADIENT ---")
+        col.operator("paint_system.new_gradient_layer",
+                     text="Gradient Layer", icon='COLOR')
 
         col.separator()
         col.label(text="--- SHADER ---")
@@ -1698,7 +1702,7 @@ classes = (
     MAT_MT_PaintSystemMaskMenu,
     MAT_PT_PaintSystemMaskSettings,
     MAT_PT_PaintSystemLayersAdvanced,
-    MAT_MT_PaintSystemAddLayer,
+    MAT_MT_PaintSystemAddLayerMenu,
     MAT_MT_BrushTooltips,
     MAT_MT_PaintSystemMergeAndExport,
     MAT_MT_PaintSystemMergeOptimize,
