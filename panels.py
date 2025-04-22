@@ -1085,7 +1085,7 @@ class MAT_PT_PaintSystemLayers(Panel):
         #         row.scale_y = 1.2
         #     row.prop(active_layer, "edit_mask", text="Editing Mask" if active_layer.edit_mask else "Click to Edit Mask", icon='MOD_MASK')
 
-        if active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
+        if active_layer and active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
             mask_box = box.box()
             split = mask_box.split(factor=0.6)
             split.alert = True
