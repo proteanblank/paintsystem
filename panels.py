@@ -609,7 +609,7 @@ class MAT_PT_Brush(Panel):
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        obj = ps.active_object
+        current_layer = ps.get_active_layer()
         # row = layout.row()
         # if not ps.preferences.use_compact_design:
         #     row.scale_y = 1.5
@@ -664,9 +664,12 @@ class MAT_PT_Brush(Panel):
         if brush:
             row = box.row()
             if not ps.preferences.use_compact_design:
-                row.scale_y = 1.5
-                row.scale_x = 1.5
-            row.operator("paint_system.toggle_brush_erase_alpha", text="Toggle Erase Alpha", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
+                row.scale_y = 1.2
+                row.scale_x = 1.2
+            if current_layer.mask_image and current_layer.edit_mask:
+                row.operator("paint_system.toggle_mask_erase", text="Toggle Mask Erase", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
+            else:
+                row.operator("paint_system.toggle_brush_erase_alpha", text="Toggle Erase Alpha", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
 
 
 class MAT_PT_BrushAdvanced(Panel):
@@ -1084,10 +1087,10 @@ class MAT_PT_PaintSystemLayers(Panel):
 
         if active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
             mask_box = box.box()
-            row = mask_box.row(align=True)
-            row.alert = True
-            row.label(text="You are editing the mask!", icon="INFO")
-            row.prop(active_layer, "edit_mask", text="", icon='X', emboss=False)
+            split = mask_box.split(factor=0.6)
+            split.alert = True
+            split.label(text="Editing Mask!", icon="INFO")
+            split.prop(active_layer, "edit_mask", text="Disable", icon='X', emboss=False)
         
         row = box.row()
         if not ps.preferences.use_compact_design:

@@ -12,7 +12,7 @@ from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, get_brushes_from_library, TEMPLATE_ENUM
 from mathutils import Vector
-from .common import redraw_panel, NodeOrganizer, get_active_material_output
+from .common import redraw_panel, NodeOrganizer, get_active_material_output, get_unified_settings
 from typing import List
 from .common_layers import UVLayerHandler
 
@@ -475,6 +475,22 @@ class PAINTSYSTEM_OT_ToggleBrushEraseAlpha(Operator):
                 else:
                     brush.blend = 'ERASE_ALPHA'  # Switch to Erase Alpha mode
         return {'FINISHED'}
+    
+
+class PAINTSYSTEM_OT_ToggleMaskErase(Operator):
+    bl_idname = "paint_system.toggle_mask_erase"
+    bl_label = "Toggle Brush Erase Alpha"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Toggle between brush and erase alpha"
+
+    def execute(self, context):
+        prop_owner = get_unified_settings(context, unified_name='use_unified_color')
+        # Alternate between Black and White
+        if prop_owner.color[0] == 1.0 and prop_owner.color[1] == 1.0 and prop_owner.color[2] == 1.0:
+            prop_owner.color = (0.0, 0.0, 0.0)
+        else:
+            prop_owner.color = (1.0, 1.0, 1.0)
+        return {'FINISHED'}
 
 # -------------------------------------------------------------------
 # For changing preferences
@@ -584,6 +600,7 @@ classes = (
     PAINTSYSTEM_OT_CreateTemplateSetup,
     PAINTSYSTEM_OT_ColorSampler,
     PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
+    PAINTSYSTEM_OT_ToggleMaskErase,
     PAINTSYSTEM_OT_DisableTooltips,
     PAINTSYSTEM_OT_FlipNormals,
     PAINTSYSTEM_OT_RecalculateNormals,
