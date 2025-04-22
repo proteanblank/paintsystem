@@ -266,7 +266,7 @@ class MAT_PT_PaintSystemQuickToolsMesh(Panel):
         row = box.row()
         row.alignment = "CENTER"
         row.label(text="Transforms:", icon="EMPTY_ARROWS")
-        if obj and (obj.scale[0] != obj.scale[1] or obj.scale[1] != obj.scale[2] or obj.scale[0] != obj.scale[2]):
+        if obj and (obj.scale[0] != 1 or obj.scale[1] != 1 or obj.scale[0] != 1):
             box1 = box.box()
             box1.alert = True
             col = box1.column(align=True)
