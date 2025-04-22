@@ -103,7 +103,7 @@ class NodeOrganizer:
 
 def get_object_uv_maps(self, context: Context):
     items = [
-        (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
+        (uv_map.name, uv_map.name, "") for uv_map in context.active_object.data.uv_layers
     ]
     return intern_enum_items(items)
 
@@ -314,3 +314,12 @@ def is_image_painted(image: Image | ImagePreview) -> bool:
         # print("ImagePreview", image.image_pixels, image.image_size[0], image.image_size[1], len(list(image.icon_pixels)[3::4]))
         return any([pixel > 0 for pixel in list(image.image_pixels_float)[3::4]])
     return False
+
+def get_unified_settings(context: Context, unified_name=None):
+    ups = context.tool_settings.unified_paint_settings
+    tool_settings = context.tool_settings.image_paint
+    brush = tool_settings.brush
+    prop_owner = brush
+    if unified_name and getattr(ups, unified_name):
+        prop_owner = ups
+    return prop_owner

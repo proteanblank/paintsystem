@@ -10,10 +10,10 @@ import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM, TEMPLATE_ENUM
-from .common import redraw_panel, get_object_uv_maps
+from .common import redraw_panel, get_unified_settings
 import re
 import copy
-from .common_layers import UVLayerHandler
+from .common_layers import UVLayerHandler, MultiMaterialOperator
 import numpy
 import pathlib
 from bpy.app.translations import pgettext_rpt as rpt_
@@ -60,7 +60,7 @@ class PAINTSYSTEM_OT_DuplicateGroupWarning(Operator):
             text="Click OK to create anyway, or cancel to choose a different name")
 
 
-class PAINTSYSTEM_OT_NewGroup(UVLayerHandler):
+class PAINTSYSTEM_OT_NewGroup(UVLayerHandler, MultiMaterialOperator):
     """Add a new group"""
     bl_idname = "paint_system.new_group"
     bl_label = "Add Paint System"
@@ -117,6 +117,8 @@ class PAINTSYSTEM_OT_NewGroup(UVLayerHandler):
         description="Set view transform to standard",
         default=True
     )
+    
+    
 
     def update_uv_mode(self, context: Context):
         self.uv_map_mode = 'PAINT_SYSTEM' if self.use_paintsystem_uv else 'OPEN'
@@ -130,11 +132,11 @@ class PAINTSYSTEM_OT_NewGroup(UVLayerHandler):
 
     hide_template: BoolProperty(default=False)
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         mat = ps.get_active_material()
-        obj = ps.active_object
-
+        obj = context.active_object
+        
         if not mat:
             # Create a new material
             mat = bpy.data.materials.new(f"{self.material_name}")
@@ -153,8 +155,9 @@ class PAINTSYSTEM_OT_NewGroup(UVLayerHandler):
             if group.name == self.group_name:
                 # bpy.ops.paint_system.duplicate_group_warning(
                 #     'INVOKE_DEFAULT', group_name=self.group_name)
-                self.report({'ERROR'}, "Group name already exists")
-                return {'CANCELLED'}
+                raise Exception("Group name already exists")
+                # self.report({'ERROR'}, "Group name already exists")
+                # return {'CANCELLED'}
 
         new_group = ps.add_group(self.group_name)
 
@@ -175,7 +178,7 @@ class PAINTSYSTEM_OT_NewGroup(UVLayerHandler):
         # Force the UI to update
         redraw_panel(self, context)
 
-        return {'FINISHED'}
+        return 0
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
@@ -193,16 +196,24 @@ class PAINTSYSTEM_OT_NewGroup(UVLayerHandler):
         layout = self.layout
         mat = ps.get_active_material()
         obj = ps.active_object
-        split = layout.split(factor=0.4)
-        split.scale_y = 1.5
-        if not mat:
-            split.label(text="New Material Name:")
-            split.prop(self, "material_name", text="")
+        
+        if len(context.selected_objects) == 1:
+            split = layout.split(factor=0.4)
+            split.scale_y = 1.5
+            if not mat:
+                split.label(text="New Material Name:")
+                split.prop(self, "material_name", text="")
+            else:
+                split.label(text="Selected Material:")
+                row = split.row(align=True)
+                row.prop(obj, "active_material", text="")
+                # row.operator("material.new", text="", icon='ADD')
         else:
-            split.label(text="Selected Material:")
-            row = split.row(align=True)
-            row.prop(obj, "active_material", text="")
-            # row.operator("material.new", text="", icon='ADD')
+            self.multiple_objects_ui(layout)
+            # row = box.row(align=True)
+            # row.prop(self, "multiple_objects", text="Selected Objects", icon='CHECKBOX_HLT' if self.multiple_objects else 'CHECKBOX_DEHLT')
+            # row.prop(self, "multiple_materials", text="All Materials", icon='CHECKBOX_HLT' if self.multiple_materials else 'CHECKBOX_DEHLT')
+            
         if not self.hide_template:
             # row = layout.row(align=True)
             # row.scale_y = 1.5
@@ -538,16 +549,16 @@ class PAINTSYSTEM_OT_CreateNewUVMap(Operator):
     )
 
     def execute(self, context):
-        current_mode = copy.deepcopy(context.object.mode)
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        mesh = context.object.data
+        # current_mode = copy.deepcopy(context.object.mode)
+        # bpy.ops.object.mode_set(mode='EDIT')
+        # bpy.ops.mesh.select_all(action='SELECT')
+        mesh = context.active_object.data
         uvmap = mesh.uv_layers.new(name=self.uv_map_name)
         # Set active UV Map
         mesh.uv_layers.active = mesh.uv_layers.get(uvmap.name)
         bpy.ops.uv.lightmap_pack(
             PREF_CONTEXT='ALL_FACES', PREF_PACK_IN_ONE=True, PREF_MARGIN_DIV=0.2)
-        bpy.ops.object.mode_set(mode=current_mode)
+        # bpy.ops.object.mode_set(mode=current_mode)
         return {'FINISHED'}
 
     # def invoke(self, context, event):
@@ -589,7 +600,7 @@ class PAINTSYSTEM_OT_DuplicateLayer(Operator):
             text="Click OK to duplicate, or cancel to keep the layer")
 
 
-class PAINTSYSTEM_OT_NewAttributeLayer(Operator):
+class PAINTSYSTEM_OT_NewAttributeLayer(MultiMaterialOperator):
     """Add a new attribute layer"""
     bl_idname = "paint_system.new_attribute_layer"
     bl_label = "Add Attribute Layer"
@@ -616,14 +627,14 @@ class PAINTSYSTEM_OT_NewAttributeLayer(Operator):
     )
     disable_popup: BoolProperty(default=False)
 
-    def execute(self, context):
+    def process_material(self, context):
         if not self.attribute_name:
             self.report({'ERROR'}, "Attribute name cannot be empty")
-            return {'CANCELLED'}
+            return 1
         ps = PaintSystem(context)
         ps.create_attribute_layer(
             f"{self.attribute_name} Attribute", self.attribute_name, self.attribute_type)
-        return {'FINISHED'}
+        return 0
 
     def invoke(self, context, event):
         if self.disable_popup:
@@ -632,11 +643,13 @@ class PAINTSYSTEM_OT_NewAttributeLayer(Operator):
 
     def draw(self, context):
         layout = self.layout
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop(self, "attribute_name")
         layout.prop(self, "attribute_type", text="Type")
 
 
-class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
+class PAINTSYSTEM_OT_NewImage(UVLayerHandler, MultiMaterialOperator):
     bl_idname = "paint_system.new_image"
     bl_label = "New Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -679,7 +692,7 @@ class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
     )
     disable_popup: BoolProperty(default=False)
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         self.set_uv_mode(context)
         active_group = ps.get_active_group()
@@ -695,7 +708,7 @@ class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
         )
         image.generated_color = (0, 0, 0, 0)
         ps.create_image_layer(self.name, image, self.uv_map_name)
-        return {'FINISHED'}
+        return 0
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
@@ -707,6 +720,8 @@ class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
 
     def draw(self, context):
         layout = self.layout
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop(self, "name")
         box = layout.box()
         box.label(text="Image Resolution", icon='IMAGE_DATA')
@@ -720,7 +735,7 @@ class PAINTSYSTEM_OT_NewImage(UVLayerHandler):
         self.select_uv_ui(box)
 
 
-class PAINTSYSTEM_OT_OpenImage(UVLayerHandler):
+class PAINTSYSTEM_OT_OpenImage(UVLayerHandler, MultiMaterialOperator):
     bl_idname = "paint_system.open_image"
     bl_label = "Open Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -735,13 +750,13 @@ class PAINTSYSTEM_OT_OpenImage(UVLayerHandler):
         options={'HIDDEN'}
     )
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         self.set_uv_mode(context)
         image = bpy.data.images.load(self.filepath, check_existing=True)
 
         ps.create_image_layer(image.name, image, self.uv_map_name)
-        return {'FINISHED'}
+        return 0
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
@@ -751,11 +766,13 @@ class PAINTSYSTEM_OT_OpenImage(UVLayerHandler):
 
     def draw(self, context):
         layout = self.layout
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         box = layout.box()
         self.select_uv_ui(box)
 
 
-class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler):
+class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler, MultiMaterialOperator):
     bl_idname = "paint_system.open_existing_image"
     bl_label = "Open Existing Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -763,19 +780,19 @@ class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler):
 
     image_name: StringProperty()
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         self.set_uv_mode(context)
         active_group = ps.get_active_group()
         if not active_group:
-            return {'CANCELLED'}
+            return 1
         image = bpy.data.images.get(self.image_name)
         if not image:
             self.report({'ERROR'}, "Image not found")
-            return {'CANCELLED'}
+            return 1
 
         ps.create_image_layer(self.image_name, image, self.uv_map_name)
-        return {'FINISHED'}
+        return 0
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
@@ -785,13 +802,15 @@ class PAINTSYSTEM_OT_OpenExistingImage(UVLayerHandler):
 
     def draw(self, context):
         layout = self.layout
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop_search(self, "image_name", bpy.data,
                            "images", text="Image")
         box = layout.box()
         self.select_uv_ui(box)
 
 
-class PAINTSYSTEM_OT_NewSolidColor(Operator):
+class PAINTSYSTEM_OT_NewSolidColor(MultiMaterialOperator):
     bl_idname = "paint_system.new_solid_color"
     bl_label = "New Solid Color"
     bl_options = {'REGISTER', 'UNDO'}
@@ -819,10 +838,10 @@ class PAINTSYSTEM_OT_NewSolidColor(Operator):
     )
     disable_popup: BoolProperty(default=False)
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         ps.create_solid_color_layer(self.name, self.color)
-        return {'FINISHED'}
+        return 0
 
     def invoke(self, context, event):
         self.name = self.get_next_image_name(context)
@@ -832,11 +851,13 @@ class PAINTSYSTEM_OT_NewSolidColor(Operator):
 
     def draw(self, context):
         layout = self.layout
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop(self, "name")
         layout.prop(self, "color")
 
 
-class PAINTSYSTEM_OT_NewFolder(Operator):
+class PAINTSYSTEM_OT_NewFolder(MultiMaterialOperator):
     bl_idname = "paint_system.new_folder"
     bl_label = "Add Folder"
     bl_options = {'REGISTER', 'UNDO'}
@@ -861,14 +882,14 @@ class PAINTSYSTEM_OT_NewFolder(Operator):
         active_group = ps.get_active_group()
         return active_group
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         ps.create_folder(self.folder_name)
 
         # Force the UI to update
         redraw_panel(self, context)
 
-        return {'FINISHED'}
+        return 0
 
     def invoke(self, context, event):
         self.folder_name = self.get_next_folder_name(context)
@@ -878,10 +899,12 @@ class PAINTSYSTEM_OT_NewFolder(Operator):
 
     def draw(self, context):
         layout = self.layout
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.prop(self, "folder_name")
 
 
-class PAINTSYSTEM_OT_NewAdjustmentLayer(Operator):
+class PAINTSYSTEM_OT_NewAdjustmentLayer(MultiMaterialOperator):
     bl_idname = "paint_system.new_adjustment_layer"
     bl_label = "Add Adjustment Layer"
     bl_options = {'REGISTER', 'UNDO'}
@@ -899,7 +922,7 @@ class PAINTSYSTEM_OT_NewAdjustmentLayer(Operator):
         active_group = ps.get_active_group()
         return active_group
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         # Look for get name from in adjustment_enum based on adjustment_type
         layer_name = next(name for identifier, name,
@@ -909,10 +932,10 @@ class PAINTSYSTEM_OT_NewAdjustmentLayer(Operator):
         # Force the UI to update
         redraw_panel(self, context)
 
-        return {'FINISHED'}
+        return 0
 
 
-class PAINTSYSTEM_OT_NewShaderLayer(Operator):
+class PAINTSYSTEM_OT_NewShaderLayer(MultiMaterialOperator):
     bl_idname = "paint_system.new_shader_layer"
     bl_label = "Add Shader Layer"
     bl_options = {'REGISTER', 'UNDO'}
@@ -929,7 +952,7 @@ class PAINTSYSTEM_OT_NewShaderLayer(Operator):
         active_group = ps.get_active_group()
         return active_group
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         # Look for get name from in adjustment_enum based on adjustment_type
         layer_name = next(name for identifier, name,
@@ -939,10 +962,10 @@ class PAINTSYSTEM_OT_NewShaderLayer(Operator):
         # Force the UI to update
         redraw_panel(self, context)
 
-        return {'FINISHED'}
+        return 0
 
 
-class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
+class PAITNSYSTEM_OT_NewNodeGroupLayer(MultiMaterialOperator):
     bl_idname = "paint_system.new_node_group_layer"
     bl_label = "Add Node Group Layer"
     bl_options = {'REGISTER', 'UNDO'}
@@ -966,31 +989,33 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
         items=get_node_groups,
     )
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         if not self.get_node_groups(context):
-            return {'CANCELLED'}
+            return 0
 
         node_tree = bpy.data.node_groups.get(self.node_tree_name)
         if not node_tree:
             self.report({'ERROR'}, "Node Group not found")
-            return {'CANCELLED'}
+            return 0
 
         if not ps.is_valid_ps_nodetree(node_tree):
             self.report({'ERROR'}, "Node Group not compatible")
-            return {'CANCELLED'}
+            return 0
 
         ps.create_node_group_layer(self.node_tree_name, self.node_tree_name)
 
         # Force the UI to update
         redraw_panel(self, context)
-        return {'FINISHED'}
+        return 1
 
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         ps = PaintSystem(context)
         if not self.get_node_groups(context):
             layout.label(text="No node group found", icon='ERROR')
@@ -1003,7 +1028,7 @@ class PAITNSYSTEM_OT_NewNodeGroupLayer(Operator):
             layout.label(text="Color & Alpha Input/Output Pair not Found")
 
 
-class PAINTSYSTEM_OT_NewMaskImage(UVLayerHandler):
+class PAINTSYSTEM_OT_NewMaskImage(UVLayerHandler, MultiMaterialOperator):
     bl_idname = "paint_system.new_mask_image"
     bl_label = "New Mask Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -1055,7 +1080,7 @@ class PAINTSYSTEM_OT_NewMaskImage(UVLayerHandler):
     )
     disable_popup: BoolProperty(default=False)
 
-    def execute(self, context):
+    def process_material(self, context):
         ps = PaintSystem(context)
         self.set_uv_mode(context)
         ps.get_material_settings().use_paintsystem_uv = self.uv_map_mode == "PAINT_SYSTEM"
@@ -1076,7 +1101,8 @@ class PAINTSYSTEM_OT_NewMaskImage(UVLayerHandler):
         active_layer.mask_image = image
         active_layer.enable_mask = True
         active_layer.mask_uv_map = self.uv_map_name
-        return {'FINISHED'}
+        active_layer.edit_mask = True
+        return 0
 
     def invoke(self, context, event):
         ps = PaintSystem(context)
@@ -1097,6 +1123,8 @@ class PAINTSYSTEM_OT_NewMaskImage(UVLayerHandler):
 
     def draw(self, context):
         layout = self.layout
+        if len(context.selected_objects) > 1:
+            self.multiple_objects_ui(layout)
         layout.label(text="Initial Mask:")
         row = layout.row()
         row.prop(self, "initial_mask", expand=True)
@@ -1173,7 +1201,7 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
     def invoke(self, context, event):
         if self.disable_popup:
             return self.execute(context)
-        return context.window_manager.invoke_props_dialog(self)
+        return context.window_manager.invoke_props_dialog(self, width=200)
 
     def draw(self, context):
         layout = self.layout
@@ -1185,8 +1213,7 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
         layout.prop(self, "invert_r", text="Red")
         layout.prop(self, "invert_g", text="Green")
         layout.prop(self, "invert_b", text="Blue")
-        if image.alp:
-            layout.prop(self, "invert_a", text="Alpha")
+        layout.prop(self, "invert_a", text="Alpha")
 
 
 class PAINTSYSTEM_OT_ExportActiveLayer(Operator):
@@ -1269,6 +1296,8 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
             col = box.column(align=True)
             col.prop(self, "width")
             col.prop(self, "height")
+        else:
+            box.label(text=f"{self.width} x {self.height}")
 
 
 class PAINTSYSTEM_OT_ClearImage(Operator):
@@ -1287,6 +1316,35 @@ class PAINTSYSTEM_OT_ClearImage(Operator):
         # Replace every pixel with a transparent pixel
         pixels = numpy.empty(len(image.pixels), dtype=numpy.float32)
         pixels[::4] = 0.0
+        image.pixels.foreach_set(pixels)
+        image.update()
+        image.update_tag()
+        return {'FINISHED'}
+    
+class PAINTSYSTEM_OT_FillImage(Operator):
+    bl_idname = "paint_system.fill_image"
+    bl_label = "Fill Image"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Fill the active image with current color"
+
+    image_name: StringProperty()
+
+    def execute(self, context):
+        if not self.image_name:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
+        image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        # Replace every pixel with a transparent pixel
+        pixels = numpy.empty(len(image.pixels), dtype=numpy.float32)
+        prop_owner = get_unified_settings(context, "use_unified_color")
+        color = prop_owner.color
+        
+        # Fill the image with the current brush color
+        pixels[::4] = color[0]  # R
+        pixels[1::4] = color[1]  # G
+        pixels[2::4] = color[2]  # B
+        pixels[3::4] = 1.0  # A - full opacity
+        
         image.pixels.foreach_set(pixels)
         image.update()
         image.update_tag()
@@ -1711,6 +1769,7 @@ classes = (
     PAINTSYSTEM_OT_InvertColors,
     PAINTSYSTEM_OT_ResizeImage,
     PAINTSYSTEM_OT_ClearImage,
+    PAINTSYSTEM_OT_FillImage,
     PAINTSYSTEM_OT_ProjectEdit,
     PAINTSYSTEM_OT_ProjectApply,
     PAINTSYSTEM_OT_QuickEdit,

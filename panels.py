@@ -14,7 +14,7 @@ from bpy.types import (Panel,
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
 from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
-from .common import is_online, is_newer_than, icon_parser, import_legacy_updater, find_keymap, get_event_icons, is_image_painted
+from .common import is_online, is_newer_than, icon_parser, import_legacy_updater, find_keymap, get_event_icons, is_image_painted, get_unified_settings
 from .operators_bake import is_bakeable
 from .custom_icons import get_icon
 # from .. import __package__ as base_package
@@ -184,12 +184,13 @@ class MAT_PT_PaintSystemQuickToolsDisplay(Panel):
         overlay = space.overlay
 
         box = layout.box()
-        row = box.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.5
-            row.scale_x = 1.5
-        row.prop(overlay,
-                 "show_wireframes", text="Toggle Wireframe", icon='MOD_WIREFRAME')
+        if obj:
+            row = box.row()
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.5
+                row.scale_x = 1.5
+            row.prop(obj,
+                 "show_wire", text="Toggle Wireframe", icon='MOD_WIREFRAME')
         row = box.row()
         if not ps.preferences.use_compact_design:
             row.scale_y = 1
@@ -285,6 +286,35 @@ class MAT_PT_PaintSystemQuickToolsMesh(Panel):
             "object.origin_set", text="Set Origin", property="type", icon="EMPTY_AXIS")
 
 
+class MAT_PT_PaintSystemQuickToolsPaint(Panel):
+    bl_idname = 'MAT_PT_PaintSystemQuickToolsPaint'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Paint"
+    bl_category = 'Quick Tools'
+    bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
+    
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        obj = ps.active_object
+        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
+    
+    def draw_header(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        layout.label(icon="BRUSHES_ALL")
+    
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        row = layout.row()
+        if not ps.preferences.use_compact_design:
+            row.scale_y = 1.5
+            row.scale_x = 1.5
+        row.operator("paint_system.quick_edit", text="Edit Externally", icon='IMAGE')
+
+
 class MATERIAL_UL_PaintSystemMatSlots(UIList):
 
     def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
@@ -329,7 +359,7 @@ class MAT_PT_PaintSystemGroups(Panel):
     def draw_header(self, context):
         layout = self.layout
         ps = PaintSystem(context)
-        layout.label(icon_value=get_icon("paint_system"))
+        layout.label(icon_value=get_icon("sunflower"))
 
     def draw(self, context):
         layout = self.layout
@@ -358,30 +388,29 @@ class MAT_PT_PaintSystemGroups(Panel):
 
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
             col = layout.column(align=True)
-            if len(ob.material_slots) > 1:
-                row = col.row()
-                if not ps.preferences.use_compact_design:
-                    row.scale_y = 1.2
-                row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
-                
-                col = row.column(align=True)
-                col.operator("object.material_slot_add", icon='ADD', text="")
-                col.operator("object.material_slot_remove", icon='REMOVE', text="")
-                if ob.mode == 'EDIT':
-                    row = layout.row(align=True)
-                    row.operator("object.material_slot_assign", text="Assign")
-                    row.operator("object.material_slot_select", text="Select")
-                    row.operator("object.material_slot_deselect", text="Deselect")
-            else:
-                row = col.row()
-                row.label(text="Material:")
-                row.operator("object.material_slot_add", icon='ADD', text="")
-                row = layout.row()
+            row = col.row()
+            row.label(text="Material:")
+            row = col.row()
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.2
+            row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
+            
+            col = row.column(align=True)
+            col.operator("object.material_slot_add", icon='ADD', text="")
+            col.operator("object.material_slot_remove", icon='REMOVE', text="")
+            if ob.mode == 'EDIT':
                 row = layout.row(align=True)
-                if not ps.preferences.use_compact_design:
-                    row.scale_x = 1.5
-                    row.scale_y = 1.5
-                row.template_ID(ob, "active_material")
+                row.operator("object.material_slot_assign", text="Assign")
+                row.operator("object.material_slot_select", text="Select")
+                row.operator("object.material_slot_deselect", text="Deselect")
+            # else:
+            #     row.operator("object.material_slot_add", icon='ADD', text="")
+            #     row = layout.row()
+            #     row = layout.row(align=True)
+            #     if not ps.preferences.use_compact_design:
+            #         row.scale_x = 1.5
+            #         row.scale_y = 1.5
+            #     row.template_ID(ob, "active_material")
 
         if not hasattr(mat, "paint_system") or len(mat.paint_system.groups) == 0:
             col = layout.column(align=True)
@@ -407,6 +436,19 @@ class MAT_PT_PaintSystemGroups(Panel):
             #              text="", icon='ADD')
             # col = row.column(align=True)
             # col.menu("MAT_MT_PaintSystemGroupMenu", text="", icon='COLLAPSEMENU')
+        
+        # Warning about avtive modifiers
+        if ob.modifiers:
+            box = layout.box()
+            box.alert = True
+            col = box.column(align=True)
+            row = col.row()
+            row.alignment = "CENTER"
+            row.label(text="Modifiers Detected!", icon="ERROR")
+            row = col.row()
+            row.alignment = "CENTER"
+            row.label(text="Please apply all modifiers")
+        
 
 
 class MAT_PT_GroupAdvanced(Panel):
@@ -494,6 +536,8 @@ class MAT_MT_PaintSystemImageMenu(Menu):
         layout.operator("paint_system.export_active_layer",
                         text="Export Layer", icon='EXPORT')
         layout.separator()
+        layout.operator("paint_system.fill_image", 
+                        text="Fill Image", icon='SNAP_FACE').image_name = image_name
         layout.operator("paint_system.invert_colors",
                         icon="MOD_MASK").image_name = image_name
         layout.operator("paint_system.resize_image",
@@ -509,16 +553,6 @@ class MAT_MT_PaintSystemImageMenu(Menu):
 
 def set_active_panel(context: Context, panel_name):
     context.region.active_panel_category = panel_name
-
-
-def get_unified_settings(context: Context, unified_name=None):
-    ups = context.tool_settings.unified_paint_settings
-    tool_settings = context.tool_settings.image_paint
-    brush = tool_settings.brush
-    prop_owner = brush
-    if unified_name and getattr(ups, unified_name):
-        prop_owner = ups
-    return prop_owner
 
 
 def prop_unified(
@@ -624,11 +658,40 @@ class MAT_PT_Brush(Panel):
                      "use_unified_size", icon="WORLD", text="Size", slider=True)
         prop_unified(col, context, "strength",
                      "use_unified_strength", icon="WORLD", text="Strength")
-        row = box.row(align=True)
-        row.alignment = 'CENTER'
-        row.prop(ps.settings, "allow_image_overwrite",
-                 text="Auto Image Select", icon='FILE_IMAGE')
         # row.label(text="Brush Shortcuts")
+        
+        brush = tool_settings.brush
+        if brush:
+            row = box.row()
+            if not ps.preferences.use_compact_design:
+                row.scale_y = 1.5
+                row.scale_x = 1.5
+            row.operator("paint_system.toggle_brush_erase_alpha", text="Toggle Erase Alpha", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
+
+
+class MAT_PT_BrushAdvanced(Panel):
+    bl_idname = 'MAT_PT_BrushAdvanced'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Advacnced Settings"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_Brush'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        image_paint = context.tool_settings.image_paint
+        layout.prop(image_paint, "use_occlude", text="Occlude Faces")
+        layout.prop(image_paint, "use_backface_culling", text="Backface Culling")
+        
+        layout.prop(image_paint, "use_normal_falloff", text="Normal Falloff")
+        col = layout.column(align=True)
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(image_paint, "normal_angle", text="Angle")
+        layout.prop(ps.settings, "allow_image_overwrite",
+                 text="Auto Image Select", icon='FILE_IMAGE')
 
 
 class MAT_MT_BrushTooltips(Menu):
@@ -650,6 +713,8 @@ class MAT_MT_BrushTooltips(Menu):
         self.draw_shortcut(col, kmi, "Toggle Erase Alpha")
         kmi = find_keymap("paint_system.color_sampler")
         self.draw_shortcut(col, kmi, "Eyedropper")
+        # kmi = find_keymap("object.transfer_mode")
+        # self.draw_shortcut(col, kmi, "Switch Object")
         col.label(text="Scale Brush Size", icon='EVENT_F')
         layout.separator()
         layout.operator('wm.url_open', text="Suggest more shortcuts on Github!",
@@ -679,6 +744,8 @@ class MAT_PT_BrushColor(Panel):
 
     def draw_header_preset(self, context):
         layout = self.layout
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
         ups = context.tool_settings.unified_paint_settings
         row = layout.row(align=True)
         row.prop(get_unified_settings(context, "use_unified_color"), "color",
@@ -947,6 +1014,7 @@ class MAT_PT_PaintSystemLayers(Panel):
     def draw(self, context):
         layout = self.layout
         ps = PaintSystem(context)
+        obj = ps.active_object
         active_group = ps.get_active_group()
         active_layer = ps.get_active_layer()
         mat = ps.get_active_material()
@@ -1014,6 +1082,13 @@ class MAT_PT_PaintSystemLayers(Panel):
         #         row.scale_y = 1.2
         #     row.prop(active_layer, "edit_mask", text="Editing Mask" if active_layer.edit_mask else "Click to Edit Mask", icon='MOD_MASK')
 
+        if active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
+            mask_box = box.box()
+            row = mask_box.row(align=True)
+            row.alert = True
+            row.label(text="You are editing the mask!", icon="INFO")
+            row.prop(active_layer, "edit_mask", text="", icon='X', emboss=False)
+        
         row = box.row()
         if not ps.preferences.use_compact_design:
             row.scale_y = 1.5
@@ -1087,6 +1162,31 @@ class MAT_PT_PaintSystemBakeSettings(Panel):
         # row.operator("paint_system.bake_image", text="Bake Image")
 
 
+class MAT_MT_PaintSystemMaskMenu(Menu):
+    bl_label = "Image Menu"
+    bl_idname = "MAT_MT_PaintSystemMaskMenu"
+
+    @classmethod
+    def poll(cls, context):
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        return active_layer and active_layer.mask_image
+
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        active_layer = ps.get_active_layer()
+        image_name = active_layer.mask_image.name
+        layout.operator("paint_system.fill_image", text="Fill Mask",
+                        icon="SNAP_FACE").image_name = image_name
+        layout.operator("paint_system.invert_colors", text="Invert Mask",
+                        icon="MOD_MASK").image_name = image_name
+        layout.operator("paint_system.resize_image", text="Resize Mask",
+                        icon="CON_SIZELIMIT").image_name = image_name
+        layout.operator("paint_system.delete_mask_image",
+                        icon="TRASH").image_name = image_name
+
+
 class MAT_PT_PaintSystemMaskSettings(Panel):
     bl_idname = 'MAT_PT_PaintSystemMaskSettings'
     bl_space_type = "VIEW_3D"
@@ -1143,7 +1243,9 @@ class MAT_PT_PaintSystemMaskSettings(Panel):
                            text="Invert Mask", icon='MOD_MASK')
         ops.image_name = active_layer.mask_image.name
         ops.disable_popup = True
-        row.operator("paint_system.delete_mask_image", text="", icon='TRASH')
+        row.menu("MAT_MT_PaintSystemMaskMenu",
+                     text="", icon='COLLAPSEMENU')
+        # row.operator("paint_system.delete_mask_image", text="", icon='TRASH')
         box = layout.box()
 
         box.label(text="UV Map:", icon="UV")
@@ -1461,7 +1563,7 @@ class MAT_MT_PaintSystemAddLayer(Menu):
         row = layout.row()
         col = row.column()
         col.separator()
-        col.label(text="Image Layer:")
+        col.label(text="--- IMAGE ---")
         col.operator("paint_system.new_image",
                      text="New Image Layer", icon="FILE")
         col.operator("paint_system.open_image",
@@ -1469,25 +1571,25 @@ class MAT_MT_PaintSystemAddLayer(Menu):
         col.operator("paint_system.open_existing_image",
                      text="Use Existing Image")
         col.separator()
-        col.label(text="Color:")
+        col.label(text="--- COLOR ---")
         col.operator("paint_system.new_solid_color", text="Solid Color",
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
         col.operator("paint_system.new_attribute_layer",
                      text="Attribute Color", icon='MESH_DATA')
 
         col.separator()
-        col.label(text="Shader Layer:")
+        col.label(text="--- SHADER ---")
         for idx, (node_type, name, description) in enumerate(SHADER_ENUM):
             col.operator("paint_system.new_shader_layer",
                          text=name, icon='SHADING_RENDERED' if idx == 0 else 'NONE').shader_type = node_type
 
         col = row.column()
-        col.label(text="Adjustment Layer:")
+        col.label(text="--- ADJUSTMENT ---")
         for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
             col.operator("paint_system.new_adjustment_layer",
                          text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
         col.separator()
-        col.label(text="Custom Layer:")
+        col.label(text="--- CUSTOM ---")
         col.operator("paint_system.new_node_group_layer",
                      text="Custom Node Tree", icon='NODETREE')
         # col = row.column()
@@ -1581,7 +1683,7 @@ classes = (
     MAT_PT_GroupAdvanced,
     MAT_MT_PaintSystemGroupMenu,
     MAT_PT_Brush,
-    # MAT_PT_BrushAdvanced,
+    MAT_PT_BrushAdvanced,
     MAT_PT_BrushColor,
     MAT_PT_BrushColorPalette,
     # MAT_PT_BrushSettings,
@@ -1590,6 +1692,7 @@ classes = (
     MAT_PT_PaintSystemLayers,
     # MAT_PT_PaintSystemBakeSettings,
     MAT_PT_PaintSystemLayersSettings,
+    MAT_MT_PaintSystemMaskMenu,
     MAT_PT_PaintSystemMaskSettings,
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddLayer,
@@ -1601,6 +1704,7 @@ classes = (
     MAT_PT_PaintSystemQuickTools,
     MAT_PT_PaintSystemQuickToolsDisplay,
     MAT_PT_PaintSystemQuickToolsMesh,
+    MAT_PT_PaintSystemQuickToolsPaint,
 )
 
 register, unregister = register_classes_factory(classes)

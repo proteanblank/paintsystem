@@ -11,6 +11,85 @@ from .common import get_object_uv_maps
 from .paint_system import PaintSystem
 
 
+class MultiMaterialOperator(Operator):
+    multiple_objects: BoolProperty(
+        name="Multiple Objects",
+        description="Run the operator on multiple objects",
+        default=True,
+    )
+    multiple_materials: BoolProperty(
+        name="Multiple Materials",
+        description="Run the operator on multiple materials",
+        default=False,
+    )
+    def execute(self, context: Context):
+        error_count = 0
+        objects: list[bpy.types.Object] = []
+        if self.multiple_objects:
+            objects.extend(context.selected_objects)
+        else:
+            objects.append(context.active_object)
+        
+        materials = set()
+        for object in objects:
+            object_mats = object.data.materials
+            if object_mats:
+                if self.multiple_materials:
+                    for mat in object_mats:
+                        if mat in materials:
+                            continue
+                        with context.temp_override(active_object=object, selected_objects=[object], active_material=mat):
+                            error_count += self._process_material(bpy.context)
+                        materials.add(mat)
+                else:
+                    with context.temp_override(active_object=object, selected_objects=[object], active_material=object.active_material):
+                        error_count += self._process_material(bpy.context)
+                    materials.add(object.active_material)
+            else:
+                with context.temp_override(active_object=object, selected_objects=[object]):
+                    error_count += self._process_material(bpy.context)
+        
+        if error_count > 0:
+            self.report({'WARNING'}, f"Completed with {error_count} error{'s' if error_count > 1 else ''}")
+        
+        return {'FINISHED'}
+    
+    # @staticmethod
+    # def process_object(self, context: Context, obj: bpy.types.Object):
+    #     error_count = 0
+    #     materials = set()
+    #     if self.multiple_materials:
+    #         materials = obj.data.materials
+    #         if not materials:
+    #             with context.temp_override(active_object=obj, selected_objects=[obj]):
+    #                 error_count += self._process_material(bpy.context)
+    #         else:
+    #             for mat in obj.data.materials:
+    #                 with context.temp_override(active_object=obj, selected_objects=[obj], active_material=mat):
+    #                     error_count += self._process_material(bpy.context)
+    #     else:
+    #         with context.temp_override(active_object=obj, selected_objects=[obj]):
+    #             error_count += self._process_material(bpy.context)
+                
+    #     return error_count
+    
+    def _process_material(self, context: Context):
+        try:
+            return self.process_material(context)
+        except Exception as e:
+            print(f"Error processing material: {e}")
+            return 1
+        
+    def multiple_objects_ui(self, layout):
+        box = layout.box()
+        box.label(text="Applying to all selected objects", icon='INFO')
+    
+    def process_material(self, context: Context):
+        raise NotImplementedError('This method should be overridden in subclasses')
+        return 0  # Return 0 errors by default
+
+
+
 class UVLayerHandler(Operator):
     uv_map_mode: EnumProperty(
         name="UV Map",
