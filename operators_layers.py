@@ -419,11 +419,7 @@ class PAINTSYSTEM_OT_MoveUp(Operator):
 
         if active_group.execute_movement(item_id, 'UP', self.action):
             # Update active_index to follow the moved item
-            flattened = active_group.flatten_hierarchy()
-            for i, (item, _) in enumerate(flattened):
-                if item.id == item_id:
-                    active_group.active_index = i
-                    break
+            # active_group.active_index = active_group.items.values().index(self)
 
             active_group.update_node_tree()
 
@@ -500,6 +496,7 @@ class PAINTSYSTEM_OT_MoveDown(Operator):
     def execute(self, context):
         ps = PaintSystem(context)
         active_group = ps.get_active_group()
+        active_layer = ps.get_active_layer()
         if not active_group:
             return {'CANCELLED'}
 
@@ -508,11 +505,7 @@ class PAINTSYSTEM_OT_MoveDown(Operator):
 
         if active_group.execute_movement(item_id, 'DOWN', self.action):
             # Update active_index to follow the moved item
-            flattened = active_group.flatten_hierarchy()
-            for i, (item, _) in enumerate(flattened):
-                if item.id == item_id:
-                    active_group.active_index = i
-                    break
+            # active_group.active_index = active_group.items.values().index(self)
 
             active_group.update_node_tree()
 
