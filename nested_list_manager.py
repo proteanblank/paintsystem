@@ -34,7 +34,7 @@ class BaseNestedListManager(PropertyGroup):
         # if active_id != -1:
         #     return self.get_item_by_id(active_id)
         # return None
-        if not self.active_index:
+        if self.items is None or self.active_index < 0 or self.active_index >= len(self.items):
             return None
         return self.items[self.active_index]
 
@@ -139,7 +139,7 @@ class BaseNestedListManager(PropertyGroup):
         return -1
 
     def flatten_hierarchy(self):
-        children = self.items
+        # children = self.items
         # print("Children:", [(i.id, i.parent_id, i.order) for i in children])
         # flattened = sorted(
         #     children, key=lambda i: (i.order, i.parent_id))
