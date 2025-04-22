@@ -78,6 +78,13 @@ class PaintSystemLayer(BaseNestedListItem):
 
     def update_node_tree(self, context):
         PaintSystem(context).get_active_group().update_node_tree()
+        
+    def select_layer(self, context):
+        ps = PaintSystem(context)
+        active_group = ps.get_active_group()
+        if not active_group:
+            return
+        active_group.active_index = active_group.items.values().index(self)
 
     name: StringProperty(
         name="Name",
@@ -154,7 +161,7 @@ class PaintSystemLayer(BaseNestedListItem):
         name="Expanded",
         description="Expand the layer",
         default=True,
-        update=update_node_tree
+        update=select_layer
     )
 
 
