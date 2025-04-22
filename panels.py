@@ -929,7 +929,7 @@ class MAT_PT_UL_PaintSystemLayerList(BaseNLM_UL_List):
         #     elif self.use_filter_empty and not self.use_filter_empty_reverse:
         #         flt_flags[idx] &= ~self.bitflag_filter_item
         # flt_neworder = helper_funcs.sort_items_helper(list(enumerate(layers)), lambda i: (i[1].order, i[1].parent_id))
-        print(flt_flags)
+        # print(flt_flags)
         for idx, layer in enumerate(layers):
             flt_neworder.append(flattened_layers.index(layer))
             while layer.parent_id != -1:
