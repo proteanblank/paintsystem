@@ -13,7 +13,7 @@ from bpy.types import (Panel,
                        UIList)
 from bpy.utils import register_classes_factory
 from .nested_list_manager import BaseNLM_UL_List
-from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM
+from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM, GRADIENT_ENUM
 from .common import is_online, is_newer_than, icon_parser, import_legacy_updater, find_keymap, get_event_icons, is_image_painted, get_unified_settings
 from .operators_bake import is_bakeable
 from .custom_icons import get_icon
@@ -317,7 +317,7 @@ class MAT_PT_PaintSystemQuickToolsPaint(Panel):
 
 class MATERIAL_UL_PaintSystemMatSlots(UIList):
 
-    def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
+    def draw_item(self, _context, layout, _data, item, _icon, _active_data, _active_propname, _index):
         # assert(isinstance(item, bpy.types.MaterialSlot)
         # ob = data
         slot = item
@@ -333,10 +333,7 @@ class MATERIAL_UL_PaintSystemMatSlots(UIList):
             if ma:
                 row.prop(ma, "name", text="", emboss=False, icon="MATERIAL")
             else:
-                row.label(text="", icon_value=icon)
-        elif self.layout_type == 'GRID':
-            row.alignment = 'CENTER'
-            row.label(text="", icon="MATERIAL")
+                row.label(text="", icon="MATERIAL")
         if has_ps:
             row.label(text="", icon='CHECKMARK')
 
@@ -387,17 +384,23 @@ class MAT_PT_PaintSystemGroups(Panel):
         #     # col.prop(mat, "surface_render_method", text="")
 
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
-            col = layout.column(align=True)
-            row = col.row()
-            row.label(text="Material:")
-            row = col.row()
+            row = layout.row()
             if not ps.preferences.use_compact_design:
-                row.scale_y = 1.2
-            row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
+                row.scale_x = 1.5
+                row.scale_y = 1.5
+            # row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
+            row.template_ID(ob, "active_material", text="")
+            # box = row.box()
+            # col = box.column(align=True)
+            # for idx, material_slot in enumerate(ob.material_slots):
+            #     is_selected = ob.active_material_index == idx
+            #     op = col.operator("paint_system.select_material_index", text=material_slot.material.name if material_slot.material else " ", icon="MATERIAL", depress=is_selected, emboss=is_selected)
+            #     op.index = idx
             
-            col = row.column(align=True)
-            col.operator("object.material_slot_add", icon='ADD', text="")
-            col.operator("object.material_slot_remove", icon='REMOVE', text="")
+            # row.operator("object.material_slot_add", icon='ADD', text="")
+            # col = row.column(align=True)
+            # col.operator("object.material_slot_add", icon='ADD', text="")
+            # col.operator("object.material_slot_remove", icon='REMOVE', text="")
             if ob.mode == 'EDIT':
                 row = layout.row(align=True)
                 row.operator("object.material_slot_assign", text="Assign")
@@ -1607,8 +1610,9 @@ class MAT_MT_PaintSystemAddLayerMenu(Menu):
                      text="Attribute Color", icon='MESH_DATA')
         col.separator()
         col.label(text="--- GRADIENT ---")
-        col.operator("paint_system.new_gradient_layer",
-                     text="Gradient Layer", icon='COLOR')
+        for idx, (node_type, name, description) in enumerate(GRADIENT_ENUM):
+            col.operator("paint_system.new_gradient_layer",
+                         text=name, icon='COLOR' if idx == 0 else 'NONE').gradient_type = node_type
 
         col.separator()
         col.label(text="--- SHADER ---")

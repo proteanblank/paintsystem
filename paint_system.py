@@ -39,6 +39,10 @@ TEMPLATE_ENUM = [
     ('TRANSPARENT', "None", "Start off with a blank setup" , "FILE", 3),
     # ('NONE', "Manual", "Just add node group to material", "NONE", 3),
 ]
+GRADIENT_ENUM = [
+    ('LINEAR', "Linear Gradient", "Linear gradient"),
+    ('RADIAL', "Radial Gradient", "Radial gradient"),
+]
 
 
 def get_addon_filepath():
@@ -565,7 +569,7 @@ class PaintSystem:
 
         return new_layer
     
-    def create_gradient_layer(self, name: str) -> PropertyGroup:
+    def create_gradient_layer(self, name: str, gradient_type: str) -> PropertyGroup:
         """Creates a new gradient layer in the active group.
 
         Args:
@@ -577,6 +581,7 @@ class PaintSystem:
         obj = self.active_object
         active_group = self.get_active_group()
         view_layer = bpy.context.view_layer
+        gradient_type = gradient_type.title()
         
         with bpy.context.temp_override():
             if "Paint System Collection" not in view_layer.layer_collection.collection.children:
@@ -586,11 +591,14 @@ class PaintSystem:
                 collection = view_layer.layer_collection.collection.children["Paint System Collection"]
 
             new_layer = self._add_layer(
-                name, '_PS_Gradient_Template', 'GRADIENT', make_copy=True)
+                name, f'_PS_{gradient_type}_Gradient_Template', 'GRADIENT', make_copy=True)
             empty_object = bpy.data.objects.new(f"{active_group.name} {name}", None)
             collection.objects.link(empty_object)
         empty_object.location = obj.location
-        empty_object.empty_display_type = 'SINGLE_ARROW'
+        if gradient_type == 'Linear':
+            empty_object.empty_display_type = 'SINGLE_ARROW'
+        elif gradient_type == 'Radial':
+            empty_object.empty_display_type = 'SPHERE'
         empty_object.show_in_front = True
         empty_object.parent = obj
         new_layer.node_tree.nodes["Texture Coordinate"].object = empty_object

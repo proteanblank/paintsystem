@@ -14,6 +14,7 @@ from mathutils import Vector
 from .paint_system import PaintSystem, get_nodetree_from_library, LAYER_ENUM, TEMPLATE_ENUM
 from dataclasses import dataclass, field
 from typing import Dict
+import time
 
 
 def get_all_group_names(self, context):
@@ -180,6 +181,7 @@ class NodeEntry:
 class PaintSystemGroup(BaseNestedListManager):
 
     def update_node_tree(self, context=bpy.context):
+        time_start = time.time()
         self.normalize_orders()
         flattened = self.flatten_hierarchy()
         interface: NodeTreeInterface = self.node_tree.interface
@@ -281,7 +283,6 @@ class PaintSystemGroup(BaseNestedListManager):
         # lookup_socket_names = ['Color', 'Alpha']
         # lookup_socket_names.extend(special_inputs)
         for item, _ in flattened:
-            print(item.name)
             is_clipped = item.clip
             node_entry = ps_nodes_store.get(item.parent_id)
 
@@ -463,7 +464,7 @@ class PaintSystemGroup(BaseNestedListManager):
         # connect_mask_nodes(node_entry, ng_input)
         ng_input.location = node_entry.location + Vector((-200, 0))
         
-        print("Updated node tree")
+        print("Updated node tree: %.4f sec" % (time.time() - time_start))
 
     # Define the collection property directly in the class
     items: CollectionProperty(type=PaintSystemLayer)

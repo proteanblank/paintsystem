@@ -9,7 +9,7 @@ from bpy.props import (
 import gpu
 from bpy.types import Operator, Context
 from bpy.utils import register_classes_factory
-from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM, TEMPLATE_ENUM
+from .paint_system import PaintSystem, ADJUSTMENT_ENUM, SHADER_ENUM, TEMPLATE_ENUM, GRADIENT_ENUM
 from .common import redraw_panel, get_unified_settings
 import re
 import copy
@@ -202,7 +202,7 @@ class PAINTSYSTEM_OT_NewGroup(UVLayerHandler, MultiMaterialOperator):
             split.scale_y = 1.5
             if not mat:
                 split.label(text="New Material Name:")
-                split.prop(self, "material_name", text="")
+                split.prop(self, "material_name", text="", icon='MATERIAL')
             else:
                 split.label(text="Selected Material:")
                 row = split.row(align=True)
@@ -934,12 +934,19 @@ class PAINTSYSTEM_OT_NewGradientLayer(MultiMaterialOperator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Add a new gradient layer"
     
+    gradient_type: EnumProperty(
+        name="Gradient",
+        items=GRADIENT_ENUM,
+        default="LINEAR",
+    )
+    
     def get_next_gradient_name(self, context: Context) -> str:
         ps = PaintSystem(context)
+        gradient_type = self.gradient_type.title()
         flattened = ps.get_active_group().flatten_hierarchy()
         number = get_highest_number_with_prefix(
-            'Gradient', [item[0].name for item in flattened]) + 1
-        return f"Gradient {number}"
+            f'{gradient_type} Gradient', [item[0].name for item in flattened]) + 1
+        return f"{gradient_type} Gradient {number}"
 
     @classmethod
     def poll(cls, context):
@@ -951,8 +958,7 @@ class PAINTSYSTEM_OT_NewGradientLayer(MultiMaterialOperator):
         ps = PaintSystem(context)
         # Look for get name from in adjustment_enum based on adjustment_type
         layer_name = self.get_next_gradient_name(context)
-        print(layer_name)
-        ps.create_gradient_layer(layer_name)
+        ps.create_gradient_layer(layer_name, self.gradient_type)
 
         # Force the UI to update
         redraw_panel(self, context)
