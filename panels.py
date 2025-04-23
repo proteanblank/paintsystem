@@ -647,14 +647,14 @@ class MAT_PT_Brush(Panel):
         # row.operator("paint_system.set_active_panel",
         #              text="Advanced Settings", icon="PREFERENCES").category = "Tool"
 
-        brush_imported = False
-        for brush in bpy.data.brushes:
-            if brush.name.startswith("PS_"):
-                brush_imported = True
-                break
-        if not brush_imported:
-            layout.operator("paint_system.add_preset_brushes",
-                            text="Add Preset Brushes", icon="IMPORT")
+        # brush_imported = False
+        # for brush in bpy.data.brushes:
+        #     if brush.name.startswith("PS_"):
+        #         brush_imported = True
+        #         break
+        # if not brush_imported:
+        #     layout.operator("paint_system.add_preset_brushes",
+        #                     text="Add Preset Brushes", icon="IMPORT")
 
         tool_settings = context.tool_settings.image_paint
         # Check blender version
