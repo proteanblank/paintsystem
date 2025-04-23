@@ -697,10 +697,19 @@ class MAT_PT_Brush(Panel):
             if not ps.preferences.use_compact_design:
                 row.scale_y = 1.2
                 row.scale_x = 1.2
-            if current_layer.mask_image and current_layer.edit_mask:
+            if current_layer and current_layer.mask_image and current_layer.edit_mask:
                 row.operator("paint_system.toggle_mask_erase", text="Toggle Mask Erase", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
             else:
                 row.operator("paint_system.toggle_brush_erase_alpha", text="Toggle Erase Alpha", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
+        
+        brush_imported = False
+        for brush in bpy.data.brushes:
+            if brush.name.startswith("PS_"):
+                brush_imported = True
+                break
+        if not brush_imported:
+            layout.operator("paint_system.add_preset_brushes",
+                            text="Add Preset Brushes", icon="IMPORT")
 
 
 class MAT_PT_BrushAdvanced(Panel):
