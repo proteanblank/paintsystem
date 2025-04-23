@@ -3,7 +3,6 @@ import bpy
 from bpy.props import (
     BoolProperty,
     StringProperty,
-    FloatVectorProperty,
     EnumProperty,
     IntProperty
 )
@@ -567,6 +566,26 @@ class PAINTSYSTEM_OT_RecalculateNormals(Operator):
             bpy.ops.object.mode_set(mode=orig_mode)
         return {'FINISHED'}
 
+
+class PAINTSYSTEM_OT_SelectMaterialIndex(Operator):
+    """Select the item in the UI list"""
+    bl_idname = "paint_system.select_material_index"
+    bl_label = "Select Material Index"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Select the material index in the UI list"
+
+    index: IntProperty()
+
+    def execute(self, context):
+        ps = PaintSystem(context)
+        ob = ps.active_object
+        if not ob:
+            return {'CANCELLED'}
+        if ob.type != 'MESH':
+            return {'CANCELLED'}
+        ob.active_material_index = self.index
+        return {'FINISHED'}
+
 # -------------------------------------------------------------------
 # For testing
 # -------------------------------------------------------------------
@@ -604,6 +623,7 @@ classes = (
     PAINTSYSTEM_OT_DisableTooltips,
     PAINTSYSTEM_OT_FlipNormals,
     PAINTSYSTEM_OT_RecalculateNormals,
+    PAINTSYSTEM_OT_SelectMaterialIndex,
     # PAINTSYSTEM_OT_Test,
 )
 

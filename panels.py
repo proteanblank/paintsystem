@@ -316,26 +316,47 @@ class MAT_PT_PaintSystemQuickToolsPaint(Panel):
 
 
 class MATERIAL_UL_PaintSystemMatSlots(UIList):
+    
+    use_filter_show = False
 
-    def draw_item(self, _context, layout, _data, item, _icon, _active_data, _active_propname, _index):
+    def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
         # assert(isinstance(item, bpy.types.MaterialSlot)
         # ob = data
-        slot = item
-        ma = slot.material
-        has_ps = ma and hasattr(ma, "paint_system") and ma.paint_system.groups
+        pass
+        # slot = item
+        # ma = slot.material
+        # has_ps = ma and hasattr(ma, "paint_system") and ma.paint_system.groups
 
-        layout.context_pointer_set("id", ma)
-        layout.context_pointer_set("material_slot", slot)
+        # layout.context_pointer_set("id", ma)
+        # layout.context_pointer_set("material_slot", slot)
         
-        row = layout.row(align=True)
+        # row = layout.row(align=True)
 
-        if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            if ma:
-                row.prop(ma, "name", text="", emboss=False, icon="MATERIAL")
+        # if self.layout_type in {'DEFAULT', 'COMPACT'}:
+        #     if ma:
+        #         row.prop(ma, "name", text="", emboss=False, icon_value=icon)
+        #     else:
+        #         row.label(text="", icon="MATERIAL")
+        # if has_ps:
+        #     row.label(text="", icon='CHECKMARK')
+
+
+class MAT_MT_PaintSystemMaterialSelectMenu(Menu):
+    bl_label = "Material Select Menu"
+    bl_idname = "MAT_MT_PaintSystemMaterialSelectMenu"
+
+    def draw(self, context):
+        layout = self.layout
+        ps = PaintSystem(context)
+        ob = ps.active_object
+        for idx, material_slot in enumerate(ob.material_slots):
+            is_selected = ob.active_material_index == idx
+            mat = material_slot.material is not None
+            if mat and hasattr(mat, "paint_system") and mat.paint_system.groups:
+                op = layout.operator("paint_system.select_material_index", text=material_slot.material.name if mat else "Empty Material", icon="MATERIAL" if mat else "MESH_CIRCLE", depress=is_selected)
             else:
-                row.label(text="", icon="MATERIAL")
-        if has_ps:
-            row.label(text="", icon='CHECKMARK')
+                op = layout.operator("paint_system.select_material_index", text=material_slot.material.name if mat else "Empty Material", icon="MATERIAL" if mat else "MESH_CIRCLE", depress=is_selected)
+            op.index = idx
 
 
 class MAT_PT_PaintSystemGroups(Panel):
@@ -384,12 +405,19 @@ class MAT_PT_PaintSystemGroups(Panel):
         #     # col.prop(mat, "surface_render_method", text="")
 
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
-            row = layout.row()
+            row = layout.row(align=True)
             if not ps.preferences.use_compact_design:
                 row.scale_x = 1.5
-                row.scale_y = 1.5
+                row.scale_y = 1.2
+            # row.prop_enum(ob, "material_slot_selector", "Material", text="")
             # row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
-            row.template_ID(ob, "active_material", text="")
+            # row.template_ID(ob, "material_slots", text="Material Slots")
+            row.menu("MAT_MT_PaintSystemMaterialSelectMenu", text="" if ob.active_material else "Empty Material", icon="MATERIAL" if ob.active_material else "MESH_CIRCLE")
+            if mat:
+                row.prop(mat, "name", text="")
+            # row.template_ID(ob, "active_material", text="")
+            # row.prop_search(ob, "active_material", ob, "material_slots", text="")
+            # row.panel_prop(ob, "material_slots")
             # box = row.box()
             # col = box.column(align=True)
             # for idx, material_slot in enumerate(ob.material_slots):
@@ -398,9 +426,9 @@ class MAT_PT_PaintSystemGroups(Panel):
             #     op.index = idx
             
             # row.operator("object.material_slot_add", icon='ADD', text="")
-            # col = row.column(align=True)
-            # col.operator("object.material_slot_add", icon='ADD', text="")
-            # col.operator("object.material_slot_remove", icon='REMOVE', text="")
+            col = row.row(align=True)
+            col.operator("object.material_slot_add", icon='ADD', text="")
+            col.operator("object.material_slot_remove", icon='REMOVE', text="")
             if ob.mode == 'EDIT':
                 row = layout.row(align=True)
                 row.operator("object.material_slot_assign", text="Assign")
@@ -1731,6 +1759,7 @@ classes = (
     # MAT_PT_PaintSystemBakeSettings,
     MAT_PT_PaintSystemLayersSettings,
     MAT_MT_PaintSystemMaskMenu,
+    MAT_MT_PaintSystemMaterialSelectMenu,
     MAT_PT_PaintSystemMaskSettings,
     MAT_PT_PaintSystemLayersAdvanced,
     MAT_MT_PaintSystemAddLayerMenu,
