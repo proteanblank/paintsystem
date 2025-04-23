@@ -283,9 +283,10 @@ class PaintSystem:
     
     def delete_item_id(self, item_id):
         active_group = self.get_active_group()
+        active_layer = self.get_active_layer()
         item = active_group.get_item_by_id(item_id)
-        order = int(item.order)
-        parent_id = int(item.parent_id)
+        order = int(active_layer.order)
+        parent_id = int(active_layer.parent_id)
         # In case Item type is GRADIENT
         if item.type == 'GRADIENT':
             empty_object = None
