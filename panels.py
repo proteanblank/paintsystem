@@ -1236,7 +1236,7 @@ class MAT_PT_PaintSystemMaskSettings(Panel):
     bl_idname = 'MAT_PT_PaintSystemMaskSettings'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_label = "Mask"
+    bl_label = "Mask Image"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_PaintSystemLayers'
     bl_options = {'DEFAULT_CLOSED'}
