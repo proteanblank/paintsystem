@@ -1435,6 +1435,7 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
             case 'GRADIENT':
                 col = box.column(align=True)
                 row = col.row(align=True)
+                layer_node_group = ps.get_active_layer_node_group()
                 if not ps.preferences.use_compact_design:
                     row.scale_y = 1.5
                     row.scale_x = 1.5
@@ -1457,6 +1458,9 @@ class MAT_PT_PaintSystemLayersSettings(Panel):
                             "label": "Gradient Color Ramp"})
                 box.template_color_ramp(
                     color_ramp_node, "color_ramp")
+                box.prop(layer_node_group.inputs['Use Steps'], "default_value",
+                         text="Use Steps")
+                box.prop(layer_node_group.inputs['Steps'], "default_value", text="Steps")
             case _:
                 col = box.column(align=True)
                 row = col.row(align=True)
