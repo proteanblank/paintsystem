@@ -36,8 +36,8 @@ TEMPLATE_ENUM = [
     ('STANDARD', "Standard", "Replace the existing material and start off with a basic setup", "IMAGE", 0),
     ('EXISTING', "Convert Existing Material", "Add to existing material setup", "FILE_REFRESH", 1),
     ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 2),
-    ('TRANSPARENT', "None", "Start off with a blank setup" , "FILE", 3),
-    # ('NONE', "Manual", "Just add node group to material", "NONE", 3),
+    ('TRANSPARENT', "Transparent", "Start off with a transparent setup" , "FILE", 3),
+    ('NONE', "Manual", "Just add node group to material", "NONE", 4),
 ]
 GRADIENT_ENUM = [
     ('LINEAR', "Linear Gradient", "Linear gradient"),
