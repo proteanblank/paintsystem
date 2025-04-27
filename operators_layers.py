@@ -135,7 +135,7 @@ class PAINTSYSTEM_OT_NewGroup(UVLayerHandler, MultiMaterialOperator):
     def process_material(self, context):
         ps = PaintSystem(context)
         mat = ps.get_active_material()
-        obj = context.active_object
+        obj = context.object
         
         if not mat:
             # Create a new material
@@ -545,7 +545,7 @@ class PAINTSYSTEM_OT_CreateNewUVMap(Operator):
         # current_mode = copy.deepcopy(context.object.mode)
         # bpy.ops.object.mode_set(mode='EDIT')
         # bpy.ops.mesh.select_all(action='SELECT')
-        mesh = context.active_object.data
+        mesh = context.object.data
         uvmap = mesh.uv_layers.new(name=self.uv_map_name)
         # Set active UV Map
         mesh.uv_layers.active = mesh.uv_layers.get(uvmap.name)

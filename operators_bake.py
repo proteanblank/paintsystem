@@ -210,7 +210,7 @@ def bake_node(context: Context, target_node: Node, image: Image, uv_layer: str, 
     # Change the only selected object to the active one
     # TODO: Allow baking multiple objects
     for obj in context.scene.objects:
-        if obj != context.active_object:
+        if obj != context.object:
             obj.select_set(False)
         else:
             obj.select_set(True)

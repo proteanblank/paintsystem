@@ -533,10 +533,10 @@ class PAINTSYSTEM_OT_FlipNormals(Operator):
     
     @classmethod
     def poll(cls, context):
-        return context.active_object and context.active_object.type == 'MESH'
+        return context.object and context.object.type == 'MESH'
 
     def execute(self, context):
-        obj = context.active_object
+        obj = context.object
         orig_mode = str(obj.mode)
         if obj.type == 'MESH':
             bpy.ops.object.mode_set(mode='EDIT')
@@ -554,10 +554,10 @@ class PAINTSYSTEM_OT_RecalculateNormals(Operator):
     
     @classmethod
     def poll(cls, context):
-        return context.active_object and context.active_object.type == 'MESH'
+        return context.object and context.object.type == 'MESH'
 
     def execute(self, context):
-        obj = context.active_object
+        obj = context.object
         orig_mode = str(obj.mode)
         if obj.type == 'MESH':
             bpy.ops.object.mode_set(mode='EDIT')

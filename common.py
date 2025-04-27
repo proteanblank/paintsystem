@@ -103,7 +103,7 @@ class NodeOrganizer:
 
 def get_object_uv_maps(self, context: Context):
     items = [
-        (uv_map.name, uv_map.name, "") for uv_map in context.active_object.data.uv_layers
+        (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
     ]
     return intern_enum_items(items)
 

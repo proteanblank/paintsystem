@@ -23,7 +23,7 @@ def bake_node(node_name, bake_type):
     Returns:
         bool: True if successful, False otherwise
     """
-    obj = bpy.context.active_object
+    obj = bpy.context.object
     if not obj or not obj.active_material:
         return False
 

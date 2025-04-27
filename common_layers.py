@@ -24,11 +24,10 @@ class MultiMaterialOperator(Operator):
     )
     def execute(self, context: Context):
         error_count = 0
-        objects: list[bpy.types.Object] = []
+        objects = set()
+        objects.add(context.object)
         if self.multiple_objects:
-            objects.extend(context.selected_objects)
-        else:
-            objects.append(context.active_object)
+            objects.update(context.selected_objects)
         
         materials = set()
         for object in objects:
