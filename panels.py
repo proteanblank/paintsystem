@@ -145,21 +145,21 @@ class PaintSystemPreferences(AddonPreferences):
 # -------------------------------------------------------------------
 # Group Panels
 # -------------------------------------------------------------------
-class MAT_PT_PaintSystemQuickTools(Panel):
-    bl_idname = 'MAT_PT_PaintSystemQuickTools'
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_label = "Quick Tools"
-    bl_category = 'Quick Tools'
-    # bl_options = {'DEFAULT_CLOSED'}
+# class MAT_PT_PaintSystemQuickTools(Panel):
+#     bl_idname = 'MAT_PT_PaintSystemQuickTools'
+#     bl_space_type = "VIEW_3D"
+#     bl_region_type = "UI"
+#     bl_label = "Quick Tools"
+#     bl_category = 'Quick Tools'
+#     # bl_options = {'DEFAULT_CLOSED'}
 
-    def draw(self, context):
-        # Get available modes that can be set of the active object
-        ps = PaintSystem(context)
-        obj = ps.active_object
-        layout = self.layout
-        space = context.area.spaces[0]
-        overlay = space.overlay
+#     def draw(self, context):
+#         # Get available modes that can be set of the active object
+#         ps = PaintSystem(context)
+#         obj = ps.active_object
+#         layout = self.layout
+#         space = context.area.spaces[0]
+#         overlay = space.overlay
 
 
 class MAT_PT_PaintSystemQuickToolsDisplay(Panel):
@@ -168,7 +168,7 @@ class MAT_PT_PaintSystemQuickToolsDisplay(Panel):
     bl_region_type = "UI"
     bl_label = "Display"
     bl_category = 'Quick Tools'
-    bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
+    # bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw_header(self, context):
@@ -211,7 +211,7 @@ class MAT_PT_PaintSystemQuickToolsMesh(Panel):
     bl_region_type = "UI"
     bl_label = "Mesh"
     bl_category = 'Quick Tools'
-    bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
+    # bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
 
     def draw_header(self, context):
         layout = self.layout
@@ -292,7 +292,7 @@ class MAT_PT_PaintSystemQuickToolsPaint(Panel):
     bl_region_type = "UI"
     bl_label = "Paint"
     bl_category = 'Quick Tools'
-    bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
+    # bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
     
     @classmethod
     def poll(cls, context):
@@ -1781,7 +1781,7 @@ classes = (
     MAT_MT_PaintSystemMergeOptimize,
     MAT_MT_PaintSystemImageMenu,
     # MAT_PT_PaintSystemTest,
-    MAT_PT_PaintSystemQuickTools,
+    # MAT_PT_PaintSystemQuickTools,
     MAT_PT_PaintSystemQuickToolsDisplay,
     MAT_PT_PaintSystemQuickToolsMesh,
     MAT_PT_PaintSystemQuickToolsPaint,
