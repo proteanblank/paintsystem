@@ -13,5 +13,5 @@ In blender click **Edit > Preferences > Add-ons**
 
 Navigate to the downloaded .zip file and install it.
 
-## Introduction
-[Youtube Video](https://youtu.be/WpwZXU6VnuA?si=Ud2-SwYbK1VDJDXP)
+## Documentation
+[Paint System Documentation](https://prairie-yarrow-e25.notion.site/PAINT-SYSTEM-DOCUMENTATION-1910a7029e86803f9ac3e0c79c67bd8c?pvs=74)
