@@ -274,9 +274,13 @@ class PaintSystemGroup(BaseNestedListManager):
         # Add group input and output nodes
         ng_input = nodes.new('NodeGroupInput')
         ng_output = nodes.new('NodeGroupOutput')
+        clamp_node = nodes.new('ShaderNodeClamp')
+        clamp_node.hide = True
+        clamp_node.location = ng_output.location + Vector((0, -120))
+        links.new(ng_output.inputs['Alpha'], clamp_node.outputs['Result'])
         ps_nodes_store[-1] = NodeEntry(
             inputs={'Color': ng_output.inputs['Color'],
-                    'Alpha': ng_output.inputs['Alpha'],
+                    'Alpha': clamp_node.inputs['Value'],
                     },
             location=ng_output.location)
 
@@ -459,10 +463,14 @@ class PaintSystemGroup(BaseNestedListManager):
                         links.new(socket, ng_input.outputs[socket.name])
 
         node_entry = ps_nodes_store[-1]
-        links.new(node_entry.inputs['Color'], ng_input.outputs['Color'])
-        links.new(node_entry.inputs['Alpha'], ng_input.outputs['Alpha'])
         # connect_mask_nodes(node_entry, ng_input)
         ng_input.location = node_entry.location + Vector((-200, 0))
+        clamp_node = nodes.new('ShaderNodeClamp')
+        clamp_node.hide = True
+        clamp_node.location = ng_input.location + Vector((0, -120))
+        links.new(clamp_node.inputs['Value'], ng_input.outputs['Alpha'])
+        links.new(node_entry.inputs['Color'], ng_input.outputs['Color'])
+        links.new(node_entry.inputs['Alpha'], clamp_node.outputs['Result'])
         
         print("Updated node tree: %.4f sec" % (time.time() - time_start))
 
