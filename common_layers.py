@@ -29,21 +29,25 @@ class MultiMaterialOperator(Operator):
         if self.multiple_objects:
             objects.update(context.selected_objects)
         
-        materials = set()
+        seen_materials = set()
         for object in objects:
+            if object.type != 'MESH':
+                continue
             object_mats = object.data.materials
             if object_mats:
                 if self.multiple_materials:
                     for mat in object_mats:
-                        if mat in materials:
+                        if mat in seen_materials:
                             continue
                         with context.temp_override(active_object=object, selected_objects=[object], active_material=mat):
                             error_count += self._process_material(bpy.context)
-                        materials.add(mat)
+                        seen_materials.add(mat)
                 else:
+                    if object.active_material in seen_materials:
+                        continue
                     with context.temp_override(active_object=object, selected_objects=[object], active_material=object.active_material):
                         error_count += self._process_material(bpy.context)
-                    materials.add(object.active_material)
+                    seen_materials.add(object.active_material)
             else:
                 with context.temp_override(active_object=object, selected_objects=[object]):
                     error_count += self._process_material(bpy.context)
