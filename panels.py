@@ -169,7 +169,6 @@ class MAT_PT_PaintSystemQuickToolsDisplay(Panel):
     bl_label = "Display"
     bl_category = 'Quick Tools'
     # bl_parent_id = 'MAT_PT_PaintSystemQuickTools'
-    bl_options = {'DEFAULT_CLOSED'}
 
     def draw_header(self, context):
         layout = self.layout
