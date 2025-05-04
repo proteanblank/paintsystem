@@ -78,11 +78,11 @@ class PAINTSYSTEM_OT_TogglePaintMode(Operator):
             return {'CANCELLED'}
 
         bpy.ops.object.mode_set(mode='TEXTURE_PAINT', toggle=True)
-
+        is_cycles = bpy.context.scene.render.engine == 'CYCLES'
         if bpy.context.object.mode == 'TEXTURE_PAINT':
             # Change shading mode
-            if bpy.context.space_data.shading.type != 'RENDERED':
-                bpy.context.space_data.shading.type = 'RENDERED'
+            if bpy.context.space_data.shading.type != ('RENDERED' if not is_cycles else 'MATERIAL'):
+                bpy.context.space_data.shading.type = ('RENDERED' if not is_cycles else 'MATERIAL')
 
             # if ps.preferences.unified_brush_color:
             #     bpy.context.scene.tool_settings.unified_paint_settings.use_unified_color = True
