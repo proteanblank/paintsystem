@@ -40,23 +40,31 @@ def update_active_image(self=None, context: Context = None):
     if not active_layer:
         return
 
-    if image_paint.mode == 'IMAGE':
-        image_paint.mode = 'MATERIAL'
-    selected_image = active_layer.mask_image if active_layer.edit_mask else active_layer.image
-    for i, image in enumerate(mat.texture_paint_images):
-        if not selected_image or active_layer.lock_layer or active_group.use_bake_image:
-            if image_paint.mode == 'MATERIAL':
+    if image_paint.mode == 'MATERIAL':
                 image_paint.mode = 'IMAGE'
-            image_paint.canvas = None
-            # Unable to paint
-            return
-        if image == selected_image:
-            mat.paint_active_slot = i
-            # Get uv map name
-            uv_map_node = ps.find_uv_map_node()
-            if uv_map_node:
-                ps.active_object.data.uv_layers[uv_map_node.uv_map].active = True
-            break
+    selected_image: Image = active_layer.mask_image if active_layer.edit_mask else active_layer.image
+    if not selected_image or active_layer.lock_layer or active_group.use_bake_image:
+        image_paint.canvas = None
+        # Unable to paint
+        return
+    else:
+        # print("Selected image: ", selected_image)
+        image_paint.canvas = selected_image
+        uv_map_node = ps.find_uv_map_node()
+        if uv_map_node:
+            ps.active_object.data.uv_layers[uv_map_node.uv_map].active = True
+    # for i, image in enumerate(mat.texture_paint_images):
+    #     if not selected_image or active_layer.lock_layer or active_group.use_bake_image:
+    #         image_paint.canvas = None
+    #         # Unable to paint
+    #         return
+    #     if image == selected_image:
+    #         image_paint.canvas = selected_image
+    #         # Get uv map name
+    #         uv_map_node = ps.find_uv_map_node()
+    #         if uv_map_node:
+    #             ps.active_object.data.uv_layers[uv_map_node.uv_map].active = True
+    #         break
 
 
 def update_brush_settings(self=None, context: Context = bpy.context):
