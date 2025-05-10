@@ -442,7 +442,6 @@ class PAINTSYSTEM_OT_ColorSampler(Operator):
         brush_settings = tool_settings.image_paint.brush
         unified_settings.color = pix_value
         brush_settings.color = pix_value
-
         return {'FINISHED'}
 
     @classmethod
