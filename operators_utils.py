@@ -4,7 +4,8 @@ from bpy.props import (
     BoolProperty,
     StringProperty,
     EnumProperty,
-    IntProperty
+    IntProperty,
+    FloatVectorProperty,
 )
 import gpu
 from bpy.types import Operator, Context
@@ -428,10 +429,78 @@ class PAINTSYSTEM_OT_ColorSampler(Operator):
     x: IntProperty()
     y: IntProperty()
 
-    def execute(self, context):
-        # Get the screen dimensions
-        x, y = self.x, self.y
+    # def execute(self, context):
+    #     # Get the screen dimensions
+    #     bpy.context.window.cursor_set('EYEDROPPER')
+    #     x, y = self.x, self.y
 
+    #     buffer = gpu.state.active_framebuffer_get()
+    #     pixel = buffer.read_color(x, y, 1, 1, 3, 0, 'FLOAT')
+    #     pixel.dimensions = 1 * 1 * 3
+    #     pix_value = [float(item) for item in pixel]
+
+    #     tool_settings = bpy.context.scene.tool_settings
+    #     unified_settings = tool_settings.unified_paint_settings
+    #     brush_settings = tool_settings.image_paint.brush
+    #     unified_settings.color = pix_value
+    #     brush_settings.color = pix_value
+
+    #     return {'FINISHED'}
+    
+    # --- Operator Properties ---
+    # These can be set when calling the operator or in a keymap
+    sample_for_palette: BoolProperty(
+        name="Sample for Palette",
+        description="Hint for custom sampler: if this action is for a palette",
+        default=False
+    )
+    sample_merged: BoolProperty(
+        name="Sample Merged",
+        description="Hint for custom sampler: sample merged layers (if applicable in your logic)",
+        default=False # Mirrored from the C code's "merged" property
+    )
+
+    # --- Internal State Variables ---
+    _initial_mouse_x: IntProperty()
+    _initial_mouse_y: IntProperty()
+    _initial_brush_color: FloatVectorProperty(size=3)
+    _initial_brush_show_cursor_state: BoolProperty()
+    _invoking_mouse_button: StringProperty() # Stores the event.type of the invoking mouse button
+    
+    def _get_brush_cursor_state(self, context):
+        if context.space_data and context.space_data.type == 'IMAGE_EDITOR':
+            return context.space_data.overlay.show_paint_cursor
+        # Add logic for 3D view paint cursor if needed
+        return True # Default
+
+    def _set_brush_cursor_state(self, context, show_cursor):
+        if context.space_data and context.space_data.type == 'IMAGE_EDITOR':
+            overlay = context.space_data.overlay
+            if hasattr(overlay, 'show_paint_cursor'): # Check attribute exists
+                 overlay.show_paint_cursor = show_cursor
+        # Add logic for 3D view paint cursor if needed
+        if context.area:
+            context.area.tag_redraw()
+
+    
+    def _redraw_relevant_areas(self, context):
+        # A simple redraw for the current area is often sufficient
+        if context.area:
+            context.area.tag_redraw()
+        # For broader updates if needed:
+        # for window in context.window_manager.windows:
+        #     for area in window.screen.areas:
+        #         area.tag_redraw()
+
+    def _cleanup_modal_state(self, context: Context):
+        """Restores cursor, status text, and redraws."""
+        # if self._initial_brush_show_cursor_state is not None: # Check if it was set
+        #      self._set_brush_cursor_state(context, self._initial_brush_show_cursor_state)
+        context.window.cursor_modal_restore()
+        context.workspace.status_text_set(None)
+        self._redraw_relevant_areas(context)
+        
+    def _call_custom_logic(self, context, x, y):
         buffer = gpu.state.active_framebuffer_get()
         pixel = buffer.read_color(x, y, 1, 1, 3, 0, 'FLOAT')
         pixel.dimensions = 1 * 1 * 3
@@ -443,17 +512,64 @@ class PAINTSYSTEM_OT_ColorSampler(Operator):
         unified_settings.color = pix_value
         brush_settings.color = pix_value
 
-        return {'FINISHED'}
 
     @classmethod
     def poll(cls, context):
         ps = PaintSystem(context)
         return context.area.type == 'VIEW_3D' and ps.active_object.mode == 'TEXTURE_PAINT'
-
+    
     def invoke(self, context, event):
+        # This operator is designed to be invoked by a mouse button press.
+        # Example keymap: event.type = 'LEFTMOUSE', event.value = 'PRESS'
+        
+        # Ensure it's a mouse event that can start a press-hold
+        if event.value != 'PRESS':
+            print(event.value)
+            self.report({'WARNING'}, "Operator should be invoked by a mouse 'PRESS' event.")
+            return {'CANCELLED'}
+
         self.x = event.mouse_x
         self.y = event.mouse_y
-        return self.execute(context)
+
+        context.window.cursor_modal_set('EYEDROPPER') # Or any other cursor you prefer
+
+        # Initial action on press
+        # self._call_custom_logic(context, event.mouse_region_x, event.mouse_region_y)
+        
+        context.workspace.status_text_set(
+            f"Hold and move mouse. Release to confirm. ESC to cancel."
+        )
+        
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+    
+    def modal(self, context, event):
+        print("Modal Event:", event.type, event.value)
+        context.window.cursor_modal_set('EYEDROPPER')
+        # Mouse Move: Update while button is (implicitly) held
+        if event.type == 'MOUSEMOVE' or event.type == 'INBETWEEN_MOUSEMOVE' or event.type == "PRESS":
+            self._call_custom_logic(context, event.mouse_region_x, event.mouse_region_y)
+            return {'RUNNING_MODAL'}
+
+        # Completion: Release of the *same* mouse button that invoked the operator
+        if event.value == 'RELEASE':
+            # Optional: Perform a final action at the release location
+            self._call_custom_logic(context, event.mouse_region_x, event.mouse_region_y)
+            
+            self._cleanup_modal_state(context)
+            return {'FINISHED'}
+
+        # Allow some pass-through for navigation, but be cautious.
+        # If you return PASS_THROUGH too broadly, you might lose modal control.
+        # if event.type in {'MIDDLEMOUSE', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE'}:
+        #     return {'PASS_THROUGH'}
+            
+        return {'RUNNING_MODAL'} # Keep modal running for unhandled relevant events
+
+    # def invoke(self, context, event):
+    #     self.x = event.mouse_x
+    #     self.y = event.mouse_y
+    #     return self.execute(context)
 
 
 class PAINTSYSTEM_OT_ToggleBrushEraseAlpha(Operator):
@@ -640,7 +756,7 @@ def register():
     if kc:
         km = kc.keymaps.new(name="3D View", space_type='VIEW_3D')
         kmi = km.keymap_items.new(
-            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'I', 'PRESS', repeat=True)
+            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'I', 'PRESS')
         kmi = km.keymap_items.new(
             PAINTSYSTEM_OT_ToggleBrushEraseAlpha.bl_idname, type='E', value='PRESS')
         addon_keymaps.append((km, kmi))
