@@ -18,7 +18,11 @@ from .common import is_online, is_newer_than, icon_parser, import_legacy_updater
 from .operators_bake import is_bakeable
 from .custom_icons import get_icon
 # from .. import __package__ as base_package
-addon_updater_ops = import_legacy_updater()
+
+use_legacy_updater = not is_newer_than(4, 5, 0)
+if use_legacy_updater:  # Check if Blender version is older than 4.5.0
+    addon_updater_ops = import_legacy_updater()
+
 
 
 def node_input_prop(layout, node, name, text=None):
@@ -132,14 +136,15 @@ class PaintSystemPreferences(AddonPreferences):
         if kmi:
             self.draw_shortcut(box, kmi, "Toggle Eraser")
 
-        if is_online():
-            # Updater draw function, could also pass in col as third arg.
-            if addon_updater_ops:
-                addon_updater_ops.update_settings_ui(self, context)
-        else:
-            self.auto_check_update = False
-            layout.label(
-                text="Please allow online access in user preferences to use the updater")
+        if use_legacy_updater:
+            if is_online():
+                # Updater draw function, could also pass in col as third arg.
+                if addon_updater_ops:
+                    addon_updater_ops.update_settings_ui(self, context)
+            else:
+                self.auto_check_update = False
+                layout.label(
+                    text="Please allow online access in user preferences to use the updater")
 
 
 # -------------------------------------------------------------------

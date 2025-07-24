@@ -16,7 +16,7 @@ import bpy
 from .properties import update_active_image
 from bpy.app.handlers import persistent
 from .paint_system import PaintSystem, get_paint_system_images
-from .common import import_legacy_updater
+from .common import import_legacy_updater, is_newer_than
 from .custom_icons import load_custom_icons, unload_custom_icons
 from . import auto_load
 
@@ -25,7 +25,7 @@ bl_info = {
     "author": "Tawan Sunflower, @blastframe",
     "description": "",
     "blender": (4, 1, 0),
-    "version": (1, 3, 3),
+    "version": (1, 3, 4),
     "location": "View3D > Sidebar > Paint System",
     "warning": "",
     "category": "Node",
@@ -38,7 +38,10 @@ bl_info_copy = bl_info.copy()
 print("Paint System: Registering...", __package__)
 
 auto_load.init()
-addon_updater_ops = import_legacy_updater()
+
+use_legacy_updater = not is_newer_than(4, 5, 0)
+if use_legacy_updater:  # Check if Blender version is older than 4.5.0
+    addon_updater_ops = import_legacy_updater()
 
 
 @persistent
@@ -86,7 +89,7 @@ _register, _unregister = register_submodule_factory(__name__, submodules)
 def register():
     _register()
     load_custom_icons()
-    if addon_updater_ops:
+    if addon_updater_ops and use_legacy_updater:
         addon_updater_ops.register(bl_info_copy)
     bpy.app.handlers.depsgraph_update_post.append(texture_paint_handler)
     bpy.app.handlers.save_pre.append(save_handler)
@@ -97,7 +100,7 @@ def unregister():
     bpy.app.handlers.load_post.remove(refresh_image)
     bpy.app.handlers.save_pre.remove(save_handler)
     bpy.app.handlers.depsgraph_update_post.remove(texture_paint_handler)
-    if addon_updater_ops:
+    if addon_updater_ops and use_legacy_updater:
         addon_updater_ops.unregister()
     unload_custom_icons()
     _unregister()
