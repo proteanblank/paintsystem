@@ -3,8 +3,9 @@ import os
 
 ICON_FOLDER = 'icons'
 
+custom_icons = None
 
-def load_custom_icons():
+def load_icons():
     import bpy.utils.previews
     # Custom Icon
     if not hasattr(bpy.utils, 'previews'):
@@ -21,7 +22,7 @@ def load_custom_icons():
         custom_icons.load(icon_name, folder + f, 'IMAGE')
 
 
-def unload_custom_icons():
+def unload_icons():
     global custom_icons
     if hasattr(bpy.utils, 'previews'):
         bpy.utils.previews.remove(custom_icons)

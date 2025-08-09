@@ -14,7 +14,7 @@
 import bpy
 from bpy.utils import register_submodule_factory
 from bpy.app.handlers import persistent
-from .custom_icons import load_custom_icons, unload_custom_icons
+from .custom_icons import load_icons, unload_icons
 
 bl_info = {
     "name": "Paint System",
@@ -39,6 +39,7 @@ submodules = [
     # "operators_layers",
     # "operators_utils",
     # "operators_bake",
+    "paintsystem",
     "panels",
     "operators",
     # "tests",
@@ -48,12 +49,11 @@ submodules = [
 
 _register, _unregister = register_submodule_factory(__name__, submodules)
 
-
 def register():
+    load_icons()
     _register()
-    load_custom_icons()
-
-
+    
 def unregister():
-    unload_custom_icons()
     _unregister()
+    unload_icons()
+    print("Paint System: Unregistered", __package__)
