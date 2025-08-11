@@ -1,6 +1,6 @@
 import bpy
 from dataclasses import dataclass
-from .. import __package__ as ps
+from .. import global_package as ps
 
 @dataclass
 class PaintSystemPreferences:

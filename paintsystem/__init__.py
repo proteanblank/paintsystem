@@ -5,6 +5,7 @@ from .common import get_preferences
 
 submodules = [
     "data",
+    "graph",
     # "move",
 ]
 

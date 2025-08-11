@@ -23,6 +23,7 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
+        # ps_ctx = self.ensure_context(context)  # not strictly necessary here
         layout.label(text="Welcome to the Paint System!")
         layout.operator("paint_system.new_image_layer", text="Create New Image Layer")
 

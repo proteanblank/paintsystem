@@ -1,10 +1,10 @@
 import bpy
 from bpy.types import Operator
 from ..utils import get_next_unique_name
-from ..paintsystem import parse_context
 from ..paintsystem.data import CHANNEL_TYPE_ENUM
 from .utils import redraw_panel
 from .common import PSContextMixin
+from .list_manager import ListManager
 
 class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
     """Create a new channel in the Paint System"""
@@ -14,7 +14,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
     
     def get_unique_channel_name(self, context):
         """Set a unique name for the new channel."""
-        parsed_context = parse_context(context)
+        parsed_context = PSContextMixin.parse_context(context)
         active_group = parsed_context.get("active_group")
         return get_next_unique_name(self.channel_name, [channel.name for channel in active_group.channels])
 
@@ -31,11 +31,21 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
     )
     
     def execute(self, context):
-        channels = self.active_group.channels
+        ps_ctx = self.ensure_context(context)
+        channels = ps_ctx.active_group.channels
+        node_tree = bpy.data.node_groups.new(name=self.channel_name, type='ShaderNodeTree')
+        node_tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
+        node_tree.interface.new_socket("Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
+        node_tree.interface.new_socket("Color", in_out="INPUT", socket_type="NodeSocketColor")
+        node_tree.interface.new_socket("Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
         new_channel = channels.add()
+        ps_ctx.active_group.active_index = len(channels) - 1
         unique_name = self.get_unique_channel_name(context)
         new_channel.name = unique_name
         new_channel.type = self.channel_type
+        new_channel.node_tree = node_tree
+        new_channel.update_node_tree(context)
+        ps_ctx.active_group.update_node_tree(context)
         redraw_panel(context)
         return {'FINISHED'}
     
@@ -62,24 +72,73 @@ class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     @classmethod
-    def _poll(self, context):
-        return self.ps_mat_data and self.ps_mat_data.active_index >= 0
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        ps_mat_data = ps_ctx.ps_mat_data
+        return bool(ps_mat_data and ps_mat_data.active_index >= 0)
 
     def execute(self, context):
-        
-        active_index = self.ps_mat_data.active_index
-        if active_index < 0 or active_index >= len(self.active_group.channels):
+        ps_ctx = self.ensure_context(context)
+        active_index = ps_ctx.active_group.active_index
+        if active_index < 0 or active_index >= len(ps_ctx.active_group.channels):
             self.report({'ERROR'}, "No valid channel selected")
             return {'CANCELLED'}
         
-        self.active_group.channels.remove(active_index)
-        self.ps_mat_data.active_index = max(0, active_index - 1)
+        ps_ctx.active_group.channels.remove(active_index)
+        ps_ctx.active_group.active_index = max(0, active_index - 1)
+        print(ps_ctx.active_group.active_index)
+        ps_ctx.active_group.update_node_tree(context)
         redraw_panel(context)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_MoveChannelUp(PSContextMixin, Operator):
+    """Move the selected channel in the Paint System"""
+    bl_idname = "paint_system.move_channel_up"
+    bl_label = "Move Channel"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        active_group = ps_ctx.active_group
+        lm = ListManager(active_group, 'channels', active_group, 'active_index')
+        return bool(active_group and active_group.active_index >= 0 and "UP" in lm.possible_moves())
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        active_group = ps_ctx.active_group
+        lm = ListManager(active_group, 'channels', active_group, 'active_index')
+        lm.move_active_up()
+        ps_ctx.active_group.update_node_tree(context)
+        return {'FINISHED'}
+
+class PAINTSYSTEM_OT_MoveChannelDown(PSContextMixin, Operator):
+    """Move the selected channel in the Paint System"""
+    bl_idname = "paint_system.move_channel_down"
+    bl_label = "Move Channel"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        active_group = ps_ctx.active_group
+        lm = ListManager(active_group, 'channels', active_group, 'active_index')
+        return bool(active_group and active_group.active_index >= 0 and "DOWN" in lm.possible_moves())
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        active_group = ps_ctx.active_group
+        lm = ListManager(active_group, 'channels', active_group, 'active_index')
+        lm.move_active_down()
+        ps_ctx.active_group.update_node_tree(context)
         return {'FINISHED'}
 
 classes = (
     PAINTSYSTEM_OT_AddChannel,
     PAINTSYSTEM_OT_DeleteChannel,
+    PAINTSYSTEM_OT_MoveChannelUp,
+    PAINTSYSTEM_OT_MoveChannelDown,
 )
 
 register, unregister = bpy.utils.register_classes_factory(classes)

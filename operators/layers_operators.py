@@ -3,7 +3,16 @@ from bpy.types import Operator
 from bpy.props import StringProperty, IntProperty, EnumProperty
 from bpy.utils import register_classes_factory
 from .utils import redraw_panel
-from ..paintsystem.create import create_image_layer
+from ..paintsystem.create import (
+    create_image_layer,
+    create_folder_layer,
+    create_solid_color_layer,
+    create_attribute_layer,
+    create_adjustment_layer,
+    create_shader_layer,
+    create_node_group_layer,
+    create_gradient_layer,
+)
 from ..utils import get_next_unique_name
 from .common import PSContextMixin
 
@@ -14,8 +23,9 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     @classmethod
-    def _poll(self, context):
-        return self.active_channel is not None
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
 
     layer_name: StringProperty(
         name="Layer Name",
@@ -24,12 +34,189 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, Operator):
     )
 
     def execute(self, context):
+        ps_ctx = self.ensure_context(context)
         img = bpy.data.images.new(
             name=self.layer_name, width=1024, height=1024, alpha=True)
         img.generated_color = (0, 0, 0, 0)
-        new_layer = create_image_layer(self.active_channel, img, self.layer_name)
+        layer = create_image_layer(ps_ctx.active_channel, img, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
 
+
+class PAINTSYSTEM_OT_NewFolder(PSContextMixin, Operator):
+    """Create a new folder layer"""
+    bl_idname = "paint_system.new_folder_layer"
+    bl_label = "New Folder"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new folder",
+        default="New Folder"
+    )
+
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        layer = create_folder_layer(ps_ctx.active_channel, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_NewSolidColor(PSContextMixin, Operator):
+    """Create a new solid color layer"""
+    bl_idname = "paint_system.new_solid_color_layer"
+    bl_label = "New Solid Color Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new solid color layer",
+        default="New Solid Color Layer"
+    )
+
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        layer = create_solid_color_layer(ps_ctx.active_channel, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_NewAttribute(PSContextMixin, Operator):
+    """Create a new attribute layer"""
+    bl_idname = "paint_system.new_attribute_layer"
+    bl_label = "New Attribute Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new attribute layer",
+        default="New Attribute Layer"
+    )
+
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        layer = create_attribute_layer(ps_ctx.active_channel, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, Operator):
+    """Create a new adjustment layer"""
+    bl_idname = "paint_system.new_adjustment_layer"
+    bl_label = "New Adjustment Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new adjustment layer",
+        default="New Adjustment Layer"
+    )
+
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        layer = create_adjustment_layer(ps_ctx.active_channel, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_NewShader(PSContextMixin, Operator):
+    """Create a new shader layer"""
+    bl_idname = "paint_system.new_shader_layer"
+    bl_label = "New Shader Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new shader layer",
+        default="New Shader Layer"
+    )
+
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        layer = create_shader_layer(ps_ctx.active_channel, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_NewNodeGroup(PSContextMixin, Operator):
+    """Create a new node group layer"""
+    bl_idname = "paint_system.new_node_group_layer"
+    bl_label = "New Node Group Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new node group layer",
+        default="New Node Group Layer"
+    )
+
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        layer = create_node_group_layer(ps_ctx.active_channel, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_NewGradient(PSContextMixin, Operator):
+    """Create a new gradient layer"""
+    bl_idname = "paint_system.new_gradient_layer"
+    bl_label = "New Gradient Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new gradient layer",
+        default="New Gradient Layer"
+    )
+
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        layer = create_gradient_layer(ps_ctx.active_channel, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
 
 class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, Operator):
     """Remove the active item"""
@@ -39,13 +226,15 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, Operator):
     bl_description = "Remove the active item"
 
     @classmethod
-    def _poll(cls, context):
-        return cls.active_layer is not None
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_layer is not None
 
     def execute(self, context):
-        active_channel = self.active_channel
-        active_layer = self.active_layer
-        global_layer = self.active_global_layer
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
+        active_layer = ps_ctx.active_layer
+        global_layer = ps_ctx.active_global_layer
         item_id = active_layer.id
         order = int(active_layer.order)
         parent_id = int(active_layer.parent_id)
@@ -67,7 +256,7 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, Operator):
                     active_channel.active_index = i
                     break
 
-            active_channel.update_node_tree()
+            active_channel.update_node_tree(context)
         active_channel.active_index = min(
             active_channel.active_index, len(active_channel.layers) - 1)
         
@@ -78,8 +267,9 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, Operator):
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
+        ps_ctx = self.ensure_context(context)
         layout = self.layout
-        active_layer = self.active_layer
+        active_layer = ps_ctx.active_layer
         layout.label(
             text=f"Delete '{active_layer.name}' ?", icon='ERROR')
         layout.label(
@@ -103,15 +293,18 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, Operator):
     )
 
     @classmethod
-    def _poll(cls, context):
-        active_channel = cls.active_channel
-        item_id = active_channel.get_id_from_flattened_index(
-            active_channel.active_index)
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        active_channel = ps_ctx.active_channel
+        if not active_channel:
+            return False
+        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
         options = active_channel.get_movement_options(item_id, 'UP')
-        return active_channel and options
+        return bool(options)
 
     def invoke(self, context, event):
-        active_channel = self.active_channel
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
 
@@ -133,7 +326,8 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, Operator):
         return {'FINISHED'}
 
     def draw_menu(self, self_menu, context):
-        active_channel = self.active_channel
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
         item_id = active_channel.get_id_from_flattened_index(
@@ -145,7 +339,8 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, Operator):
                 setattr(op, key, value)
 
     def execute(self, context):
-        active_channel = self.active_channel
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
         item_id = active_channel.get_id_from_flattened_index(
@@ -155,7 +350,7 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, Operator):
             # Update active_index to follow the moved item
             # active_group.active_index = active_group.layers.values().index(self)
 
-            active_channel.update_node_tree()
+            active_channel.update_node_tree(context)
 
             # Force the UI to update
             redraw_panel(context)
@@ -182,15 +377,18 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, Operator):
     )
 
     @classmethod
-    def _poll(cls, context):
-        active_channel = cls.active_channel
-        item_id = active_channel.get_id_from_flattened_index(
-            active_channel.active_index)
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        active_channel = ps_ctx.active_channel
+        if not active_channel:
+            return False
+        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
         options = active_channel.get_movement_options(item_id, 'DOWN')
-        return active_channel and options
+        return bool(options)
 
     def invoke(self, context, event):
-        active_channel = self.active_channel
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
 
@@ -212,7 +410,8 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, Operator):
         return {'FINISHED'}
 
     def draw_menu(self, self_menu, context):
-        active_channel = self.active_channel
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
 
@@ -225,7 +424,8 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, Operator):
                 setattr(op, key, value)
 
     def execute(self, context):
-        active_channel = self.active_channel
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
 
@@ -236,7 +436,7 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, Operator):
             # Update active_index to follow the moved item
             # active_group.active_index = active_group.items.values().index(self)
 
-            active_channel.update_node_tree()
+            active_channel.update_node_tree(context)
 
             # Force the UI to update
             redraw_panel(context)
@@ -248,6 +448,13 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, Operator):
 
 classes = (
     PAINTSYSTEM_OT_NewImage,
+    PAINTSYSTEM_OT_NewFolder,
+    PAINTSYSTEM_OT_NewSolidColor,
+    PAINTSYSTEM_OT_NewAttribute,
+    PAINTSYSTEM_OT_NewAdjustment,
+    PAINTSYSTEM_OT_NewShader,
+    PAINTSYSTEM_OT_NewNodeGroup,
+    PAINTSYSTEM_OT_NewGradient,
     PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,

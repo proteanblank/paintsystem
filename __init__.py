@@ -31,8 +31,9 @@ bl_info = {
 
 bl_info_copy = bl_info.copy()
 
-print("Paint System: Registering...", __package__)
+global_package = __package__
 
+print("Paint System: Registering...", __package__)
 
 submodules = [
     # "properties",

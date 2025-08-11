@@ -2,7 +2,7 @@ import bpy
 from bpy.utils import register_submodule_factory
 
 submodules = [
-    "graph",
+    # "graph",
     "layers_operators",
     "channel_operators",
     "group_operators",

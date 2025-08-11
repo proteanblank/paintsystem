@@ -25,6 +25,7 @@ def is_image_painted(image: Image | ImagePreview) -> bool:
 
 class MAT_PT_UL_PaintSystemLayerList(PSContextMixin, UIList):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
+        # The UIList passes channel as 'data'
         active_channel = data
         flattened = active_channel.flatten_hierarchy()
         if index < len(flattened):
@@ -136,12 +137,14 @@ class MAT_PT_PaintSystemLayers(PSContextMixin, Panel):
     #                     text="Auto Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
 
     @classmethod
-    def _poll(cls, context):
-        return cls.active_channel is not None
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
 
     def draw_header_preset(self, context):
         layout = self.layout
-        active_channel = self.active_channel
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
         flattened = active_channel.flatten_hierarchy()
         has_dirty_images = any(
             [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
@@ -156,10 +159,11 @@ class MAT_PT_PaintSystemLayers(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
-        obj = self.active_object
-        active_channel = self.active_channel
-        active_layer = self.active_global_layer
-        mat = self.active_material
+        ps_ctx = self.ensure_context(context)
+        obj = ps_ctx.active_object
+        active_channel = ps_ctx.active_channel
+        active_layer = ps_ctx.active_global_layer
+        mat = ps_ctx.active_material
         # contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
         #                           active_channel.node_tree for node in mat.node_tree.nodes])
 
@@ -237,7 +241,7 @@ class MAT_PT_PaintSystemLayers(PSContextMixin, Panel):
         col.operator("paint_system.move_up", icon="TRIA_UP", text="")
         col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 
-        active_layer = self.active_layer
+        active_layer = ps_ctx.active_layer
         if not active_layer:
             return
 

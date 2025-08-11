@@ -11,7 +11,8 @@ class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
     bl_description = "Toggle between texture paint and object mode"
 
     def execute(self, context):
-        active_channel = self.active_channel
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
 

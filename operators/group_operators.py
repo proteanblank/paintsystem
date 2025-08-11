@@ -2,6 +2,7 @@ import bpy
 from .list_manager import ListManager
 from bpy.utils import register_classes_factory
 from .common import PSContextMixin
+from ..paintsystem.data import parse_context
 
 
 class PAINTSYSTEM_OT_NewGroup(PSContextMixin, bpy.types.Operator):
@@ -17,12 +18,14 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, bpy.types.Operator):
     )
 
     def execute(self, context):
-        node_tree = bpy.data.node_groups.new(name=self.group_name, type='ShaderNodeTree')
-        ps_mat_data = self.ps_mat_data
+        ps_ctx = self.ensure_context(context)
+        node_tree = bpy.data.node_groups.new(name=f"Paint System ({self.group_name})", type='ShaderNodeTree')
+        ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         new_group = lm.add_item()
         new_group.name = self.group_name
         new_group.node_tree = node_tree
+        new_group.update_node_tree(context)
         return {'FINISHED'}
 
 
@@ -33,12 +36,13 @@ class PAINTSYSTEM_OT_DeleteGroup(PSContextMixin, bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
-    def _poll(cls, context):
-        ps_mat_data = cls.ps_mat_data
-        return cls.active_group
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_group is not None
 
     def execute(self, context):
-        ps_mat_data = self.ps_mat_data
+        ps_ctx = self.ensure_context(context)
+        ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         lm.remove_active_item()
         return {'FINISHED'}
@@ -61,11 +65,13 @@ class PAINTSYSTEM_OT_MoveGroup(PSContextMixin, bpy.types.Operator):
 
     @classmethod
     def _poll(cls, context):
-        ps_mat_data = cls.ps_mat_data
-        return ps_mat_data and ps_mat_data.active_index >= 0
+        parsed = parse_context(context)
+        ps_mat_data = parsed.get('ps_mat_data')
+        return bool(ps_mat_data and ps_mat_data.active_index >= 0)
 
     def execute(self, context):
-        ps_mat_data = self.ps_mat_data
+        ps_ctx = self.ensure_context(context)
+        ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         lm.move_active_down() if self.direction == 'DOWN' else lm.move_active_up()
         return {'FINISHED'}
