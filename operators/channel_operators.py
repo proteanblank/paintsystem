@@ -29,6 +29,11 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
         items=CHANNEL_TYPE_ENUM,
         default='COLOR'
     )
+    use_alpha: bpy.props.BoolProperty(
+        name="Use Alpha",
+        description="Use alpha for the new channel",
+        default=True
+    )
     
     def execute(self, context):
         ps_ctx = self.ensure_context(context)
@@ -43,6 +48,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
         unique_name = self.get_unique_channel_name(context)
         new_channel.name = unique_name
         new_channel.type = self.channel_type
+        new_channel.use_alpha = self.use_alpha
         new_channel.node_tree = node_tree
         new_channel.update_node_tree(context)
         ps_ctx.active_group.update_node_tree(context)
@@ -58,6 +64,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
         layout = self.layout
         layout.prop(self, "channel_name", text="Name")
         layout.prop(self, "channel_type", text="Type")
+        layout.prop(self, "use_alpha", text="Use Alpha")
         unique_name = self.get_unique_channel_name(context)
         if unique_name != self.channel_name:
             box = layout.box()

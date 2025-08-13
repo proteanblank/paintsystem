@@ -103,12 +103,15 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
     bl_region_type = "UI"
     bl_label = "Channels Settings"
     bl_category = 'Paint System'
-    bl_parent_id = 'MAT_PT_PaintSystemMainPanel'
+    bl_parent_id = 'MAT_PT_ChannelsPanel'
     
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.ensure_context(context)
-        layout.prop(ps_ctx.active_channel, "use_alpha")
+        active_channel = ps_ctx.active_channel
+        layout.prop(active_channel, "use_alpha")
+        if active_channel.type == "VECTOR":
+            layout.prop(active_channel, "normalize")
 
 
 classes = (

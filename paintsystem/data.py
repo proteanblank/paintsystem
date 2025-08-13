@@ -341,13 +341,23 @@ class Channel(BaseNestedListManager):
                     case _:
                         pass
                 if not prev_layer_name:
-                    node_builder.link("group_input", layer_name, "Color", "Color")
+                    if self.type == "VECTOR" and self.normalize:
+                        node_builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
+                        node_builder.link("group_input", "normalize", "Color", "Vector")
+                        node_builder.link("normalize", layer_name, "Vector", "Color")
+                    else:
+                        node_builder.link("group_input", layer_name, "Color", "Color")
                     node_builder.link("group_input", layer_name, "Alpha", "Alpha")
                 else:
                     node_builder.link(prev_layer_name, layer_name, "Color", "Color")
                     node_builder.link(prev_layer_name, layer_name, "Alpha", "Alpha")
                 prev_layer_name = layer_name
-            node_builder.link(prev_layer_name, "group_output", "Color", "Color")
+            if self.type == "VECTOR" and self.normalize:
+                node_builder.add_node("unnormalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (2, 2, 2), 2: (-1, -1, -1)})
+                node_builder.link(prev_layer_name, "unnormalize", "Color", "Vector")
+                node_builder.link("unnormalize", "group_output", "Vector", "Color")
+            else:
+                node_builder.link(prev_layer_name, "group_output", "Color", "Color")
             node_builder.link(prev_layer_name, "group_output", "Alpha", "Alpha")
         else:
             node_builder.link("group_input", "group_output", "Color", "Color")
@@ -405,7 +415,14 @@ class Channel(BaseNestedListManager):
     use_alpha: BoolProperty(
         name="Use Alpha",
         description="Use alpha channel in the Paint System",
-        default=True
+        default=True,
+        update=update_active_group
+    )
+    normalize: BoolProperty(
+        name="Normalize",
+        description="Normalize the channel",
+        default=False,
+        update=update_node_tree
     )
     bake_image: PointerProperty(
         name="Bake Image",
@@ -426,6 +443,7 @@ class Channel(BaseNestedListManager):
 class Group(PropertyGroup):
     """Base class for Paint System groups"""
     def update_node_tree(self, context):
+        print("update_node_tree")
         node_tree = self.node_tree
         node_tree.name = f"Paint System ({self.name})"
         if not isinstance(node_tree, bpy.types.NodeTree):
@@ -433,92 +451,88 @@ class Group(PropertyGroup):
             return
         
         # Ensure node sockets are in the correct order
+        def detect_change(old, new):
+            if len(new) > len(old):  # ADD
+                for i in range(len(new)):
+                    if i >= len(old) or old[i] != new[i]:
+                        return "ADD", i
+
+            elif len(new) < len(old):  # REMOVE
+                for i in range(len(old)):
+                    if i >= len(new) or old[i] != new[i]:
+                        return "REMOVE", i
+
+            else:  # Same length: MOVE or RENAME
+                # Check if it's a MOVE
+                for i in range(len(old)):
+                    if old[i] != new[i]:
+                        # MOVE: element exists in both lists but index changed
+                        if old[i] in new and new[i] in old:
+                            return "MOVE", i
+                        else:
+                            return "RENAME", i
+
+            return None, None  # No change
         
         nt_interface = node_tree.interface
         nt_sockets = nt_interface.items_tree
+        expected_sockets = []
+        for channel in self.channels:
+            expected_sockets.append((channel.name, f"NodeSocket{channel.type.title()}"))
+            if channel.use_alpha:
+                expected_sockets.append((f"{channel.name} Alpha", "NodeSocketFloat"))
         
-        # Simplified: synchronize output and input sockets with channels
-        channel_types = {str(channel.name): f"NodeSocket{channel.type.title()}" for channel in self.channels}
-
-        if len(self.channels) * 4 == len(nt_sockets): # 4 because each channel has 4 sockets (2 input, 2 output)
-            # Can be either channel renamed or channel moved
-            all_channel_found = True
-            input_sockets = [socket for socket in nt_sockets if socket.item_type == "SOCKET" and socket.in_out == "INPUT"]
-            for channel in self.channels:
-                if channel.name not in input_sockets:
-                    all_channel_found = False
-                    break
-            if all_channel_found:
-                # Channel is moved
-                for idx, channel in enumerate(self.channels):
-                    expected_output_socket_idx = idx * 2
-                    expected_input_socket_idx = (idx + len(self.channels)) * 2
-                    output_socket = next((socket for socket in nt_sockets if socket.item_type == "SOCKET" and socket.in_out == "OUTPUT" and socket.name == channel.name), None)
-                    input_socket = next((socket for socket in nt_sockets if socket.item_type == "SOCKET" and socket.in_out == "INPUT" and socket.name == channel.name), None)
-                    if output_socket.index != expected_output_socket_idx:
-                        nt_interface.move(output_socket, expected_output_socket_idx)
-                        if channel.use_alpha:
-                            output_alpha_socket = nt_sockets[output_socket.index + 1]
-                            nt_interface.move(output_alpha_socket, expected_output_socket_idx + 1)
-                        nt_interface.move(input_socket, expected_input_socket_idx)
-                        if channel.use_alpha:
-                            input_alpha_socket = nt_sockets[input_socket.index + 1]
-                            nt_interface.move(input_alpha_socket, expected_input_socket_idx + 1)
-                        continue
+        def ensure_sockets(expected_sockets, in_out = "OUTPUT"):
+            if in_out == "INPUT":
+                offset_idx = len(expected_sockets)
             else:
-                # Channel is renamed
-                for idx, channel in enumerate(self.channels):
-                    expected_output_socket_idx = idx * 2
-                    expected_input_socket_idx = (idx + len(self.channels)) * 2
-                    output_socket = nt_sockets[expected_output_socket_idx]
-                    input_socket = nt_sockets[expected_input_socket_idx]
-                    if output_socket.name != channel.name:
-                        output_socket.name = channel.name
-                        input_socket.name = channel.name
-                        # Get alpha sockets
-                        output_alpha_socket = nt_sockets[expected_output_socket_idx + 1]
-                        input_alpha_socket = nt_sockets[expected_input_socket_idx + 1]
-                        output_alpha_socket.name = f"{channel.name} Alpha"
-                        input_alpha_socket.name = f"{channel.name} Alpha"
-                        continue
-        elif len(self.channels) * 4 < len(nt_sockets):
-            # a channel is deleted
-            # print("a channel is deleted")
-            expected_sockets = [str(channel.name) for channel in self.channels] + [f"{channel.name} Alpha" for channel in self.channels]
-            for socket in nt_sockets[:]:
-                if socket.item_type == "SOCKET" and socket.name not in expected_sockets:
-                    nt_interface.remove(socket)
-        elif len(self.channels) * 4 > len(nt_sockets):
-            # a channel is added
-            # print("a channel is added")
-            # Added channel is always at the of the channel list
-            new_channel_name = self.channels[-1].name
-            nt_interface.new_socket(name=new_channel_name, socket_type=channel_types[new_channel_name], in_out="INPUT")
-            nt_interface.new_socket(name=f"{new_channel_name} Alpha", socket_type="NodeSocketFloat", in_out="INPUT")
-            nt_interface.new_socket(name=new_channel_name, socket_type=channel_types[new_channel_name], in_out="OUTPUT")
-            nt_interface.new_socket(name=f"{new_channel_name} Alpha", socket_type="NodeSocketFloat", in_out="OUTPUT")
-        # print("Done")
-        # Check socket type
-        for idx, channel in enumerate(self.channels):
-            expected_output_socket_idx = idx * 2
-            expected_input_socket_idx = (idx + len(self.channels)) * 2
-            output_socket = nt_sockets[expected_output_socket_idx]
-            input_socket = nt_sockets[expected_input_socket_idx]
-            if output_socket.socket_type != channel_types[channel.name]:
-                output_socket.socket_type = channel_types[channel.name]
-            if input_socket.socket_type != channel_types[channel.name]:
-                input_socket.socket_type = channel_types[channel.name]
-        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Group Graph", verbose=True)
+                offset_idx = 0
+            while True:
+                output_sockets = [socket for socket in nt_sockets if socket.item_type == "SOCKET" and socket.in_out == in_out]
+                output_sockets_names = [socket.name for socket in output_sockets]
+                change, idx = detect_change(output_sockets_names, [socket[0] for socket in expected_sockets])
+                print(output_sockets_names, [socket[0] for socket in expected_sockets])
+                if change is None:
+                    break
+                match change:
+                    case "ADD":
+                        socket_name, socket_type = expected_sockets[idx]
+                        socket = nt_interface.new_socket(name=socket_name, socket_type=socket_type, in_out=in_out)
+                        nt_interface.move(socket, idx + offset_idx)
+                    case "REMOVE":
+                        socket = output_sockets[idx]
+                        nt_interface.remove(socket)
+                    case "MOVE":
+                        socket = output_sockets[idx]
+                        expected_socket_idx = [socket[0] for socket in expected_sockets].index(socket.name)
+                        print("move", socket.name, expected_socket_idx, offset_idx)
+                        nt_interface.move(socket, expected_socket_idx + offset_idx + 1)
+                    case "RENAME":
+                        socket = output_sockets[idx]
+                        socket.name = expected_sockets[idx][0]
+            
+            # ensure socket type
+            for idx, socket in enumerate(output_sockets):
+                if socket.socket_type != expected_sockets[idx][1]:
+                    socket.socket_type = expected_sockets[idx][1]
+        
+        ensure_sockets(expected_sockets, "OUTPUT")
+        ensure_sockets(expected_sockets, "INPUT")
+        
+        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Group Graph", clear=True, verbose=True)
         node_builder.add_node("group_input", "NodeGroupInput")
         node_builder.add_node("group_output", "NodeGroupOutput")
         for channel in self.channels:
             channel_name = channel.name
             c_alpha_name = f"{channel.name} Alpha"
-            node_builder.add_node(channel_name, "ShaderNodeGroup", {"node_tree": channel.node_tree})
+            node_builder.add_node(channel_name, "ShaderNodeGroup", {"node_tree": channel.node_tree}, {"Alpha": 1})
             node_builder.link("group_input", channel_name, channel_name, "Color")
-            node_builder.link("group_input", channel_name, c_alpha_name, "Alpha")
+                
+            if channel.use_alpha:
+                node_builder.link("group_input", channel_name, c_alpha_name, "Alpha")
             node_builder.link(channel_name, "group_output", "Color", channel_name)
-            node_builder.link(channel_name, "group_output", "Alpha", c_alpha_name)
+            if channel.use_alpha:
+                node_builder.link(channel_name, "group_output", "Alpha", c_alpha_name)
         node_builder.compile()
     
     name: StringProperty(

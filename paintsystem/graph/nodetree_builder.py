@@ -198,7 +198,6 @@ class NodeTreeBuilder:
             return
         
         self._log("Hydrating existing nodes from frame")
-        node_appearances = {}
         for node in self.tree.nodes:
             # print(f"Hydrating node '{node.name}'", getattr(node, 'parent', None), self.frame)
             if getattr(node, 'parent', None) == self.frame and node.type != 'FRAME':
@@ -326,6 +325,7 @@ class NodeTreeBuilder:
             self._log(f"Graph is adjustable but already compiled. Skipping node '{identifier}'")
             return
         
+        self._log(f"Adding node '{identifier}' of type '{node_type}' with properties '{properties}' and default values '{default_values}'")
         self.__add_nodes_commands[identifier] = Add_Node(
             identifier=identifier, node_type=node_type, properties=properties, default_values=default_values)
 
@@ -341,7 +341,7 @@ class NodeTreeBuilder:
         Returns:
             The created Blender node object.
         """
-
+        print(identifier, node_type, properties, default_values)
         existing = next((node for node in self.nodes.values() if self.get_node_identifier(node) == identifier), None)
         node = None
         if existing is not None and getattr(existing, 'bl_idname', None) == node_type:
@@ -393,13 +393,13 @@ class NodeTreeBuilder:
         if default_values:
             for input_name, value in default_values.items():
                 # Check if the input socket exists on the node
-                if input_name in node.inputs:
-                    try:
-                        node.inputs[input_name].default_value = value
-                    except Exception as e:
-                        self._log(f"Warning: Could not set default value for input '{input_name}' to '{value}'. Error: {e}")
-                else:
-                    self._log(f"Warning: Input socket '{input_name}' not found on node type '{node_type}'.")
+                # if input_name in node.inputs:
+                try:
+                    node.inputs[input_name].default_value = value
+                except Exception as e:
+                    self._log(f"Warning: Could not set default value for input '{input_name}' to '{value}'. Error: {e}")
+                # else:
+                #     self._log(f"Warning: Input socket '{input_name}' not found on node type '{node_type}'.")
 
         # return node_name
 
