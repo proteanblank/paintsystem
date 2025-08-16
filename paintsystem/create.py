@@ -25,10 +25,10 @@ def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLa
     global_layer.type = layer_type
     global_layer.node_tree = node_tree
     # Ensure we set the declared property name
-    global_layer.name = layer_name
+    # global_layer.name = layer_name
     return global_layer
 
-def add_global_layer_to_channel(channel: Channel, global_layer: GlobalLayer) -> Layer:
+def add_global_layer_to_channel(channel: Channel, global_layer: GlobalLayer, layer_name: str) -> Layer:
     parent_id, insert_order = channel.get_insertion_data()
     # Adjust existing items' order
     channel.adjust_sibling_orders(parent_id, insert_order)
@@ -39,6 +39,7 @@ def add_global_layer_to_channel(channel: Channel, global_layer: GlobalLayer) -> 
             order=insert_order
         )
     layer.ref_layer_id = global_layer.id
+    layer.name = layer_name
     # Update active index
     new_id = layer.id
     if new_id != -1:

@@ -7,7 +7,7 @@ def create_image_graph(node_tree: bpy.types.NodeTree, img: bpy.types.Image):
     return builder
 
 def create_folder_graph(node_tree: bpy.types.NodeTree):
-    builder = create_mixing_graph(node_tree, "group_input", "Color", "group_input", "Alpha")
+    builder = create_mixing_graph(node_tree, "group_input", "Over Color", "group_input", "Over Alpha")
     return builder
 
 def create_solid_graph(node_tree: bpy.types.NodeTree, color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)):
@@ -15,7 +15,7 @@ def create_solid_graph(node_tree: bpy.types.NodeTree, color: tuple[float, float,
     builder.add_node("rgb", "ShaderNodeRGB", default_values={0: color})
     return builder
 
-def create_attribute_graph(node_tree: bpy.types.NodeTree, attribyte_name: str, attribute_type: str):
+def create_attribute_graph(node_tree: bpy.types.NodeTree):
     builder = create_mixing_graph(node_tree, "attribute", "Color")
-    builder.add_node("attribute", "ShaderNodeAttribute", default_values={0: color})
+    builder.add_node("attribute", "ShaderNodeAttribute")
     return builder

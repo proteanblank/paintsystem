@@ -94,7 +94,7 @@ class NodeTreeBuilder:
     Once the graph is defined, the `compile` method builds the actual node tree.
     """
 
-    def __init__(self, node_tree: bpy.types.NodeTree, frame_name: str = "", frame_color: Sequence[float] = None, adjustable: bool = False, clear: bool = False, node_width: int = 140, verbose: bool = False):
+    def __init__(self, node_tree: bpy.types.NodeTree, frame_name, frame_color: Sequence[float] = None, adjustable: bool = False, clear: bool = False, node_width: int = 140, verbose: bool = False):
         """
         Initializes the NodeTreeBuilder.
 
@@ -147,7 +147,7 @@ class NodeTreeBuilder:
 
     def _log(self, message: str) -> None:
         if self.verbose:
-            print(message)
+            print(self.frame.label, message)
 
     def _find_or_create_frame(self, frame_name: str, frame_color: Optional[Sequence[float]]) -> bpy.types.Node:
         """Find an existing frame by label or create a new one.
@@ -199,7 +199,6 @@ class NodeTreeBuilder:
         
         self._log("Hydrating existing nodes from frame")
         for node in self.tree.nodes:
-            # print(f"Hydrating node '{node.name}'", getattr(node, 'parent', None), self.frame)
             if getattr(node, 'parent', None) == self.frame and node.type != 'FRAME':
                 
                 # If the graph is adjustable, add all nodes in the frame to add commands which can be overridden with add_node commands
@@ -285,7 +284,6 @@ class NodeTreeBuilder:
                 # Keep START and END nodes if clean is False
                 if not clean:
                     continue
-            # print(f"Removing node {node.name}")
             self.tree.nodes.remove(node)
             del self.nodes[node_name]
 
@@ -329,9 +327,9 @@ class NodeTreeBuilder:
         self.__add_nodes_commands[identifier] = Add_Node(
             identifier=identifier, node_type=node_type, properties=properties, default_values=default_values)
 
-    def _add_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None) -> None:
+    def _create_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None) -> None:
         """
-        Adds a node to the graph definition.
+        Creates a node in the graph.
 
         Args:
             node_type (str): The Blender identifier for the node (e.g., 'ShaderNodeTexNoise').
@@ -341,7 +339,6 @@ class NodeTreeBuilder:
         Returns:
             The created Blender node object.
         """
-        print(identifier, node_type, properties, default_values)
         existing = next((node for node in self.nodes.values() if self.get_node_identifier(node) == identifier), None)
         node = None
         if existing is not None and getattr(existing, 'bl_idname', None) == node_type:
@@ -365,11 +362,6 @@ class NodeTreeBuilder:
                 except Exception:
                     pass
             node = self.tree.nodes.new(type=node_type)
-            node_name = identifier  # Set the Blender internal name for clarity
-            # try:
-            #     node.name = node_name
-            # except Exception:
-            #     pass
             node.parent = self.frame  # Set the parent frame for organization
             node.width = self.node_width
             # Persist identifier on the node as a custom property
@@ -401,8 +393,6 @@ class NodeTreeBuilder:
                 # else:
                 #     self._log(f"Warning: Input socket '{input_name}' not found on node type '{node_type}'.")
 
-        # return node_name
-
     def link(
         self,
         source: Union[str, 'NodeTreeBuilder'],
@@ -432,14 +422,12 @@ class NodeTreeBuilder:
                 self.nodes[str(source)] = source
                 self.sub_graphs.add(source)
             if isinstance(target, NodeTreeBuilder):
-                # print("Target is a NodeTreeBuilder")
                 self.nodes[str(target)] = target
                 self.sub_graphs.add(target)
             return
         
         # Check if the source and target are valid
         if isinstance(source, NodeTreeBuilder):
-            # print("Source is a NodeTreeBuilder")
             self.nodes[str(source)] = source
             self.sub_graphs.add(source)
         elif isinstance(source, str):
@@ -451,7 +439,6 @@ class NodeTreeBuilder:
                 "Source must be a NodeTreeBuilder instance or a string representing a node name.")
 
         if isinstance(target, NodeTreeBuilder):
-            # print("Target is a NodeTreeBuilder")
             self.nodes[str(target)] = target
             self.sub_graphs.add(target)
         elif isinstance(target, str):
@@ -505,7 +492,6 @@ class NodeTreeBuilder:
             bpy.types.Node, bpy.types.NodeSocket: The node and socket if found, otherwise None.
         """
         prefix = START if is_input_socket else END
-        # print(f"Searching for {'input' if is_input_socket else 'output'} socket with prefix '{prefix}' and name '{socket_name}'")
         for node in self.nodes.values():
             if node.type != 'REROUTE':
                 continue
@@ -657,7 +643,6 @@ class NodeTreeBuilder:
                 # Try to find node by prefix and create a reroute node if not found
                 # node, sock = self._get_socket_by_prefix(False, socket_name)
                 node = next((node for node in self.nodes.values() if node.get("identifier", None).startswith(f"{START}{socket}")), None)
-                # print(f"START {socket_name} node: {node}")
                 if not node:
                     node, sock = self._create_reroute_node(socket, False)
                 else:
@@ -766,7 +751,6 @@ class NodeTreeBuilder:
         # Capture current node state so we can restore user-changed values on recompilation
         saved_state: Dict[str, dict] = {}
         if self.compiled:
-            # print(f"Graph {self.frame.label} is already compiled")
             saved_state = self._capture_node_state()
             self._log("Graph already compiled. Recompiling...")
             # for subgraph in self.sub_graphs:
@@ -782,12 +766,11 @@ class NodeTreeBuilder:
         self._log("Adding nodes to the tree")
         start_time_add_nodes = time.time()
         for identifier, command in self.__add_nodes_commands.items():
-            self._add_node(identifier, command.node_type, command.properties, command.default_values)
+            self._create_node(identifier, command.node_type, command.properties, command.default_values)
         self._log(f"Time taken to add nodes: {time.time() - start_time_add_nodes} seconds")
 
         # Re-apply previously captured state (node-level props and input defaults)
         if saved_state:
-            # print(f"Applying saved state: {saved_state}")
             self._apply_node_state(saved_state)
 
         # --- Create the links between nodes ---
@@ -796,7 +779,7 @@ class NodeTreeBuilder:
         # self._log("Linking edges")
         start_time_link_edges = time.time()
         for idx, edge in enumerate(self.edges):
-            # self._log(f"Linking edge {idx + 1}: {edge.source} -> {edge.target}")
+            self._log(f"Linking edge {idx + 1}: {edge.source} -> {edge.target}")
             # Resolve the source node and its specific output socket
             source_node, source_sock = self._resolve_node_and_socket(
                 edge.source, edge.source_socket, is_source=True, edge_idx=idx
@@ -806,9 +789,6 @@ class NodeTreeBuilder:
             target_node, target_sock = self._resolve_node_and_socket(
                 edge.target, edge.target_socket, is_source=False, edge_idx=idx
             )
-            # self._log(f"Commencing link {idx + 1}")
-            # print(f"Source node: {source_node.name}, Source socket: {source_sock.name}")
-            # print(f"Target node: {target_node.name}, Target socket: {target_sock.name}")
             # Create the link between the resolved source and target sockets
             self.node_links.append(self.tree.links.new(source_sock, target_sock))
             # self._log(f"Linked edge {idx + 1}/{len(self.edges)}")
@@ -848,7 +828,6 @@ class NodeTreeBuilder:
         """
         captured: Dict[str, dict] = {}
         for identifier, node in list(self.nodes.items()):
-            # print(f"Capturing node state for '{identifier}'")
             # Skip subgraphs and special reroutes
             if isinstance(node, NodeTreeBuilder):
                 continue
@@ -866,15 +845,13 @@ class NodeTreeBuilder:
                         continue
                     if pid in {
                         'rna_type', 'type', 'location_absolute', 'location', 'internal_links',
-                        'inputs', 'outputs', 'parent', 'name', 'label', 'node_width'
+                        'inputs', 'outputs', 'parent', 'name', 'label', 'node_width', 'mute', 'hide'
                     }:
                         continue
                     ptype = getattr(prop, 'type', None)
                     # TODO: Capture color ramp values
                     if ptype in {'BOOLEAN', 'INT', 'FLOAT', 'STRING', 'ENUM'}:
                         try:
-                            # if node.name == 'mix_rgb.002':
-                            #     print(f"Capturing property '{pid}' of type '{ptype}'")
                             node_props[pid] = getattr(node, pid)
                         except Exception as e:
                             self._log(f"Warning: Could not capture property '{pid}' for '{identifier}'. Error: {e}")
@@ -921,7 +898,6 @@ class NodeTreeBuilder:
             if node is None or isinstance(node, NodeTreeBuilder):
                 self._log(f"Skipping node {identifier}")
                 continue
-            # print(f"Applying saved state for node {node.name}")
 
             props = state.get('properties', {})
             for pid, value in props.items():
@@ -969,8 +945,6 @@ class NodeTreeBuilder:
                 level_map[name] = 0
                 nodes_to_process.append(name)
                 
-        # all_edges = [*self.edges, *[edge for subgraph in self.sub_graphs for edge in subgraph.edges]]
-        # print(all_edges)
         layer_infos: Dict[int, LayerInfo] = {}
         
         while nodes_to_process:
@@ -987,8 +961,6 @@ class NodeTreeBuilder:
                     if source_node_name not in nodes_to_process and current_node_name != source_node_name:
                         nodes_to_process.append(source_node_name)
         
-        # print(f"Level map after processing: {level_map}")
-                    
         NODE_MARGIN = 20  # Margin between nodes
         
         for name, level in list(level_map.items()):
@@ -1004,12 +976,9 @@ class NodeTreeBuilder:
 
             layer_infos[level].nodes.append(name)
         
-        # print("Layer Info:", layer_infos)
-        
         def calculate_node_position(name: str, node: bpy.types.Node):
             current_level = level_map.get(name, 1)
             current_level_info = layer_infos.get(current_level, LayerInfo())
-            # print(f"Calculating position for node '{name}' at level {current_level} with current level info: {current_level_info}")
             x_pos = -1 * (sum(layer_infos[l].width for l in range(current_level) if l in layer_infos) + current_level * NODE_MARGIN)
             y_pos = 200
             if not isinstance(node, NodeTreeBuilder):
@@ -1027,7 +996,6 @@ class NodeTreeBuilder:
         
         for name, node in self.nodes.items():
             x_pos, y_pos = calculate_node_position(name, node)
-            # print(f"Positioning node {name} at level {current_level} with x={x_pos}, y={y_pos}")
             pos = Vector((x_pos, y_pos)) + self.node_offset
             if isinstance(node, NodeTreeBuilder):
                 node.set_node_offset(pos, arrange_nodes=True)

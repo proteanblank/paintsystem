@@ -236,18 +236,18 @@ class BaseNestedListManager(PropertyGroup):
                 # Special case: If the above item is the parent folder
                 if above_item.id == item.parent_id:
                     options.append(
-                        ('MOVE_OUT', f"Move out of folder '{above_item.name}'"))
+                        ('MOVE_OUT', f"Move out of '{above_item.name}'"))
                     return options  # Only show this option in this case
 
                 # Normal cases
                 if above_item.type == 'FOLDER':
                     options.append(
-                        ('MOVE_INTO', f"Move into folder '{above_item.name}'"))
+                        ('MOVE_INTO', f"Move into '{above_item.name}'"))
                 if above_item.parent_id != item.parent_id:
                     parent = self.get_item_by_id(above_item.parent_id)
                     parent_name = parent.name if parent else "root"
                     options.append(
-                        ('MOVE_ADJACENT', f"Move as sibling (into '{parent_name}')"))
+                        ('MOVE_ADJACENT', f"Move into '{parent_name}'"))
                 options.append(('SKIP', "Skip over"))
 
             # Check if at top of current parent
@@ -257,7 +257,7 @@ class BaseNestedListManager(PropertyGroup):
                 parent = self.get_item_by_id(item.parent_id)
                 if parent:
                     options.append(
-                        ('MOVE_OUT', f"Move out of folder '{parent.name}'"))
+                        ('MOVE_OUT', f"Move out of '{parent.name}'"))
 
         else:  # DOWN
             # Get next sibling item (skipping folder contents if necessary)
@@ -269,16 +269,16 @@ class BaseNestedListManager(PropertyGroup):
                     parent = self.get_item_by_id(item.parent_id)
                     if parent:
                         options.append(
-                            ('MOVE_OUT_BOTTOM', f"Move out of folder '{parent.name}'"))
+                            ('MOVE_OUT_BOTTOM', f"Move out of '{parent.name}'"))
             else:
                 if next_item.type == 'FOLDER':
                     options.append(
-                        ('MOVE_INTO_TOP', f"Move into folder '{next_item.name}' (at top)"))
+                        ('MOVE_INTO_TOP', f"Move into '{next_item.name}'"))
                 if next_item.parent_id != item.parent_id:
                     parent = self.get_item_by_id(next_item.parent_id)
                     parent_name = parent.name if parent else "root"
                     options.append(
-                        ('MOVE_ADJACENT', f"Move as sibling (into '{parent_name}')"))
+                        ('MOVE_ADJACENT', f"Move into '{parent_name}'"))
                 options.append(('SKIP', "Skip over"))
 
         return options

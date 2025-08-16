@@ -7,6 +7,7 @@ submodules = [
     "channel_operators",
     "group_operators",
     "utils_operators",
+    "image_operators",
 ]
 
 register, unregister = register_submodule_factory(__name__, submodules)

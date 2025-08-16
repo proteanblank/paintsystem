@@ -1,16 +1,16 @@
 from dataclasses import dataclass
 import bpy
 from bpy.props import PointerProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty, StringProperty
-from bpy.types import PropertyGroup, Image, NodeTree
+from bpy.types import PropertyGroup, Image, NodeTree, Node
 from bpy.utils import register_classes_factory
 from bpy.app.handlers import persistent
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 from ..custom_icons import get_icon
 from ..utils import get_next_unique_name
 from .graph import NodeTreeBuilder, START, END
-from .graph.premade import create_image_graph, create_folder_graph, create_solid_graph
+from .graph.premade import create_image_graph, create_folder_graph, create_solid_graph, create_attribute_graph
 from mathutils import Vector
-from typing import Dict
+from typing import Dict, List
 
 LAYER_TYPE_ENUM = [
     ('FOLDER', "Folder", "Folder layer"),
@@ -124,11 +124,11 @@ def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
     if context.mode != 'PAINT_TEXTURE':
         return
     ps_ctx = _parse_context(context)
-    global_layer = ps_ctx["active_global_layer"]
+    active_layer = ps_ctx["active_layer"]
     brush = context.tool_settings.image_paint.brush
     if not brush:
         return
-    brush.use_alpha = not global_layer.lock_alpha
+    brush.use_alpha = not active_layer.lock_alpha
 
 def update_active_image(self=None, context: bpy.types.Context = None):
     context = context or bpy.context
@@ -173,10 +173,38 @@ def update_active_group(self, context):
     active_group = ps_ctx["active_group"]
     if active_group:
         active_group.update_node_tree(context)
+
+def get_node_from_nodetree(node_tree: NodeTree, identifier: str) -> Node | None:
+    for node in node_tree.nodes:
+        if node.get("identifier", None) == identifier:
+            return node
+    return None
+
+def is_valid_ps_nodetree(node_tree: NodeTree) -> bool:
+        # check if the node tree has both Color and Alpha inputs and outputs
+        has_color_input = False
+        has_alpha_input = False
+        has_color_output = False
+        has_alpha_output = False
+        for interface_item in node_tree.interface.items_tree:
+            if interface_item.item_type == "SOCKET":
+                # print(interface_item.name, interface_item.socket_type, interface_item.in_out)
+                if interface_item.name == "Color" and interface_item.socket_type == "NodeSocketColor":
+                    if interface_item.in_out == "INPUT":
+                        has_color_input = True
+                    else:
+                        has_color_output = True
+                elif interface_item.name == "Alpha" and interface_item.socket_type == "NodeSocketFloat":
+                    if interface_item.in_out == "INPUT":
+                        has_alpha_input = True
+                    else:
+                        has_alpha_output = True
+        return has_color_input and has_alpha_input and has_color_output and has_alpha_output
+
 class GlobalLayer(PropertyGroup):
             
     def update_node_tree(self, context):
-        self.node_tree.name = f"PS_Layer ({self.name})"
+        self.node_tree.name = f".PS_Layer ({self.id})"
         match self.type:
             case "IMAGE":
                 image_graph = create_image_graph(self.node_tree, self.image)
@@ -188,7 +216,8 @@ class GlobalLayer(PropertyGroup):
                 solid_graph = create_solid_graph(self.node_tree, (1.0, 1.0, 1.0, 1.0))
                 solid_graph.compile()
             case "ATTRIBUTE":
-                attribute_graph
+                attribute_graph = create_attribute_graph(self.node_tree)
+                attribute_graph.compile()
             case _:
                 pass
             
@@ -206,15 +235,42 @@ class GlobalLayer(PropertyGroup):
             # Always unset the flag when done, even if errors occur
             self.update_node_tree(context)
             self.updating_name_flag = False
+            
+    def find_node(self, identifier: str) -> Node | None:
+        return get_node_from_nodetree(self.node_tree, identifier)
+            
+    @property
+    def mix_node(self) -> Node | None:
+        return self.find_node("mix_rgb")
+    
+    @property
+    def post_mix_node(self) -> Node | None:
+        return self.find_node("post_mix")
+    
+    @property
+    def pre_mix_node(self) -> Node | None:
+        return self.find_node("pre_mix")
+    
+    @property
+    def is_clip(self) -> bool:
+        if self.post_mix_node:
+            return self.post_mix_node.inputs["Clip"].default_value
+        return False
+
+    @property
+    def mix_factor(self) -> float:
+        if self.post_mix_node:
+            return self.post_mix_node.inputs["Factor"].default_value
+        return 1.0
     
     id: StringProperty()
     
-    name: StringProperty(
-        name="Name",
-        description="Layer name",
-        default="Layer",
-        update=update_layer_name
-    )
+    # name: StringProperty(
+    #     name="Name",
+    #     description="Layer name",
+    #     default="Layer",
+    #     update=update_layer_name
+    # )
     updating_name_flag: bpy.props.BoolProperty(
         default=False, 
         options={'SKIP_SAVE'} # Don't save this flag in the .blend file
@@ -234,18 +290,6 @@ class GlobalLayer(PropertyGroup):
     uv_map_name: StringProperty(
         name="UV Map",
         description="Name of the UV map to use",
-        update=update_node_tree
-    )
-    attribute_type: EnumProperty(
-        items=ATTRIBUTE_TYPE_ENUM,
-        name="Attribute Type",
-        description="Attribute type",
-        default='GEOMETRY',
-        update=update_node_tree
-    )
-    attribute_name: StringProperty(
-        name="Attribute Name",
-        description="Name of the attribute to use",
         update=update_node_tree
     )
     type: EnumProperty(
@@ -281,18 +325,25 @@ class Layer(BaseNestedListItem):
             global_layer.update_node_tree(context)
     
     ref_layer_id: StringProperty()
+    name: StringProperty(
+        name="Name",
+        description="Layer name",
+        default="Layer",
+        update=update_node_tree
+    )
     enabled: BoolProperty(
         name="Enabled",
         description="Toggle layer visibility",
         default=True,
-        update=update_active_channel
+        update=update_active_channel,
+        options=set()
     )
-    clip: BoolProperty(
-        name="Clip to Below",
-        description="Clip the layer to the one below",
-        default=False,
-        update=update_active_channel
-    )
+    # clip: BoolProperty(
+    #     name="Clip to Below",
+    #     description="Clip the layer to the one below",
+    #     default=False,
+    #     update=update_active_channel
+    # )
     lock_alpha: BoolProperty(
         name="Lock Alpha",
         description="Lock the alpha channel",
@@ -305,71 +356,67 @@ class Channel(BaseNestedListManager):
     """Custom data for material layers in the Paint System"""
     
     def update_node_tree(self, context):
-        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200)
+        if not self.node_tree:
+            return
+        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200, verbose=True)
         node_builder.add_node("group_input", "NodeGroupInput")
         node_builder.add_node("group_output", "NodeGroupOutput")
         flattened_layers = self.flatten_hierarchy()
-        if len(flattened_layers) > 0:
-            # prev_layer_name = None
+        @dataclass
+        class PreviousLayer:
+            color_name: str
+            color_socket: str
+            alpha_name: str
+            alpha_socket: str
             
-            @dataclass
-            class PreviousLayer:
-                color_name: str
-                color_socket: str
-                alpha_name: str
-                alpha_socket: str
-                
-            previous_dict: Dict[int, PreviousLayer] = {}
-            if self.type == "VECTOR" and self.normalize:
-                previous_dict[-1] = PreviousLayer(color_name="unnormalize", color_socket="Vector", alpha_name="group_output", alpha_socket="Alpha")
-                node_builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
-                node_builder.add_node("unnormalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (2, 2, 2), 2: (-1, -1, -1)})
-                node_builder.link("unnormalize", "group_output", "Vector", "Color")
-            else:
-                previous_dict[-1] = PreviousLayer(color_name="group_output", color_socket="Color", alpha_name="group_output", alpha_socket="Alpha")
+        previous_dict: Dict[int, PreviousLayer] = {}
+        if self.type == "VECTOR" and self.normalize:
+            node_builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
+        previous_dict[-1] = PreviousLayer(color_name="group_output", color_socket="Color", alpha_name="group_output", alpha_socket="Alpha")
+            
+        if len(flattened_layers) > 0:
             for layer, _ in flattened_layers:
                 previous_data = previous_dict.get(layer.parent_id, None)
                 global_layer = get_global_layer(layer)
-                layer_name = layer.name
-                node_builder.add_node(layer_name, "ShaderNodeGroup", {"node_tree": global_layer.node_tree, "mute": not layer.enabled})
+                layer_identifier = global_layer.id
+                node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree, "mute": not layer.enabled})
                 # match global_layer.type:
                 #     case "IMAGE":
                 #         layer_name = layer.name
                 #         node_builder.add_node(layer_name, "ShaderNodeGroup", {"node_tree": global_layer.node_tree})
                 #     case _:
                 #         pass
-                node_builder.link(layer_name, previous_data.color_name, "Color", previous_data.color_socket)
-                node_builder.link(layer_name, previous_data.alpha_name, "Alpha", previous_data.alpha_socket)
+                node_builder.link(layer_identifier, previous_data.color_name, "Color", previous_data.color_socket)
+                node_builder.link(layer_identifier, previous_data.alpha_name, "Alpha", previous_data.alpha_socket)
                 previous_dict[layer.parent_id] = PreviousLayer(
-                    color_name=layer_name,
+                    color_name=layer_identifier,
                     color_socket="Color",
-                    alpha_name=layer_name,
+                    alpha_name=layer_identifier,
                     alpha_socket="Alpha"
                 )
                 if global_layer.type == "FOLDER":
                     previous_dict[layer.id] = PreviousLayer(
-                        color_name=layer_name,
+                        color_name=layer_identifier,
                         color_socket="Over Color",
-                        alpha_name=layer_name,
+                        alpha_name=layer_identifier,
                         alpha_socket="Over Alpha"
                     )
-            prev_layer = previous_dict[-1]
-            if self.type == "VECTOR" and self.normalize:
-                node_builder.link("normalize", prev_layer.color_name, "Vector", prev_layer.color_socket)
-                node_builder.link("group_input", "normalize", "Color", "Vector")
-            else:
-                node_builder.link("group_input", prev_layer.color_name, "Color", "Color")
-            node_builder.link("group_input", prev_layer.color_name, "Alpha", "Alpha")
+        prev_layer = previous_dict[-1]
+        if self.type == "VECTOR" and self.normalize:
+            node_builder.link("normalize", prev_layer.color_name, "Vector", prev_layer.color_socket)
+            node_builder.link("group_input", "normalize", "Color", "Vector")
         else:
-            node_builder.link("group_input", "group_output", "Color", "Color")
-            node_builder.link("group_input", "group_output", "Alpha", "Alpha")
+            node_builder.link("group_input", prev_layer.color_name, "Color", "Color")
+        node_builder.link("group_input", prev_layer.color_name, "Alpha", "Alpha")
         node_builder.compile()
     
     def update_channel_name(self, context):
         """Update the channel name to ensure uniqueness."""
         if self.updating_name_flag:
             return
-        self.node_tree.name = f"PS_Channel ({self.name})"
+        if not self.node_tree:
+            return
+        self.node_tree.name = f".PS_Channel ({self.name})"
         self.updating_name_flag = True
         parsed_context = _parse_context(context)
         active_group = parsed_context.get("active_group")
@@ -419,6 +466,12 @@ class Channel(BaseNestedListManager):
         description="Use alpha channel in the Paint System",
         default=True,
         update=update_active_group
+    )
+    use_factor: BoolProperty(
+        name="Use Factor",
+        description="Use factor for the channel",
+        default=False,
+        update=update_node_tree
     )
     normalize: BoolProperty(
         name="Normalize",
@@ -474,6 +527,8 @@ class Channel(BaseNestedListManager):
 class Group(PropertyGroup):
     """Base class for Paint System groups"""
     def update_node_tree(self, context):
+        if not self.node_tree:
+            return
         print("update_node_tree")
         node_tree = self.node_tree
         node_tree.name = f"Paint System ({self.name})"
@@ -507,11 +562,20 @@ class Group(PropertyGroup):
         
         nt_interface = node_tree.interface
         nt_sockets = nt_interface.items_tree
-        expected_sockets = []
+        
+        @dataclass
+        class ExpectedSocket:
+            name: str
+            socket_type: str
+            subtype: str = "NONE"
+        
+        expected_sockets: List[ExpectedSocket] = []
         for channel in self.channels:
-            expected_sockets.append((channel.name, f"NodeSocket{channel.type.title()}", "NONE"))
+            expected_sockets.append(ExpectedSocket(channel.name, f"NodeSocket{channel.type.title()}", "FACTOR" if channel.use_factor else "NONE"))
             if channel.use_alpha:
-                expected_sockets.append((f"{channel.name} Alpha", "NodeSocketFloat", "FACTOR"))
+                expected_sockets.append(ExpectedSocket(f"{channel.name} Alpha", "NodeSocketFloat", "FACTOR"))
+        
+        print(expected_sockets)
         
         def ensure_sockets(expected_sockets, in_out = "OUTPUT"):
             if in_out == "INPUT":
@@ -521,43 +585,53 @@ class Group(PropertyGroup):
             while True:
                 output_sockets = [socket for socket in nt_sockets if socket.item_type == "SOCKET" and socket.in_out == in_out]
                 output_sockets_names = [socket.name for socket in output_sockets]
-                change, idx = detect_change(output_sockets_names, [socket[0] for socket in expected_sockets])
-                print(output_sockets_names, [socket[0] for socket in expected_sockets])
+                change, idx = detect_change(output_sockets_names, [socket.name for socket in expected_sockets])
+                print(change, idx)
                 if change is None:
                     break
                 match change:
                     case "ADD":
-                        socket_name, socket_type, subtype = expected_sockets[idx]
+                        socket_name, socket_type, subtype = expected_sockets[idx].name, expected_sockets[idx].socket_type, expected_sockets[idx].subtype
                         socket = nt_interface.new_socket(name=socket_name, socket_type=socket_type, in_out=in_out)
-                        if subtype == "FACTOR":
-                            socket.subtype = "FACTOR"
-                            socket.min_value = 0
-                            socket.max_value = 1
+                        if subtype:
+                            socket.subtype = subtype
+                            if subtype == "FACTOR":
+                                socket.min_value = 0
+                                socket.max_value = 1
                         nt_interface.move(socket, idx + offset_idx)
                     case "REMOVE":
                         socket = output_sockets[idx]
                         nt_interface.remove(socket)
                     case "MOVE":
                         socket = output_sockets[idx]
-                        expected_socket_idx = [socket[0] for socket in expected_sockets].index(socket.name)
+                        expected_socket_idx = [socket.name for socket in expected_sockets].index(socket.name)
                         print("move", socket.name, expected_socket_idx, offset_idx)
                         nt_interface.move(socket, expected_socket_idx + offset_idx + 1)
                     case "RENAME":
                         socket = output_sockets[idx]
-                        socket.name = expected_sockets[idx][0]
+                        socket.name = expected_sockets[idx].name
             
             # ensure socket type
             for idx, socket in enumerate(output_sockets):
-                if socket.socket_type != expected_sockets[idx][1]:
-                    socket.socket_type = expected_sockets[idx][1]
+                if socket.socket_type != expected_sockets[idx].socket_type:
+                    socket.socket_type = expected_sockets[idx].socket_type
+                if hasattr(socket, "subtype") and socket.subtype != expected_sockets[idx].subtype and expected_sockets[idx].subtype:
+                    socket.subtype = expected_sockets[idx].subtype
+                    if expected_sockets[idx].subtype == "FACTOR":
+                        socket.min_value = 0
+                        socket.max_value = 1
+                    socket.default_value = 1
         
         ensure_sockets(expected_sockets, "OUTPUT")
         ensure_sockets(expected_sockets, "INPUT")
         
-        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Group Graph", clear=True, verbose=True)
+        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Group Graph", clear=True)
         node_builder.add_node("group_input", "NodeGroupInput")
         node_builder.add_node("group_output", "NodeGroupOutput")
         for channel in self.channels:
+            if not channel.node_tree or len(channel.node_tree.interface.items_tree) == 0:
+                # Channel is not valid, skip it
+                continue
             channel_name = channel.name
             c_alpha_name = f"{channel.name} Alpha"
             node_builder.add_node(channel_name, "ShaderNodeGroup", {"node_tree": channel.node_tree}, {"Alpha": 1})
@@ -594,6 +668,10 @@ class PaintSystemGlobalData(PropertyGroup):
         description="Collection of layers in the Paint System"
     )
     active_index: IntProperty(name="Active Layer Index")
+    clipboard_layer_ids: StringProperty(
+        name="Clipboard Layer",
+        description="Store the layer id to be pasted"
+    )
 
 class MaterialData(PropertyGroup):
     """Custom data for channels in the Paint System"""

@@ -3,10 +3,10 @@ from bpy.types import Operator
 from ..utils import get_next_unique_name
 from ..paintsystem.data import CHANNEL_TYPE_ENUM
 from .utils import redraw_panel
-from .common import PSContextMixin
+from .common import PSContextMixin, MultiMaterialOperator
 from .list_manager import ListManager
 
-class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
+class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
     """Create a new channel in the Paint System"""
     bl_idname = "paint_system.add_channel"
     bl_label = "Add Channel"
@@ -34,8 +34,19 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
         description="Use alpha for the new channel",
         default=True
     )
+    normalize: bpy.props.BoolProperty(
+        name="Normalize Channel",
+        description="Normalize the channel",
+        default=False
+    )
+    use_factor: bpy.props.BoolProperty(
+        name="Use Factor",
+        description="Use factor for the channel",
+        default=False
+    )
     
-    def execute(self, context):
+    def process_material(self, context):
+        print(self.channel_name, self.use_factor)
         ps_ctx = self.ensure_context(context)
         channels = ps_ctx.active_group.channels
         node_tree = bpy.data.node_groups.new(name=f"PS_Channel ({self.channel_name})", type='ShaderNodeTree')
@@ -49,6 +60,8 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
         new_channel.name = unique_name
         new_channel.type = self.channel_type
         new_channel.use_alpha = self.use_alpha
+        new_channel.normalize = self.normalize
+        new_channel.use_factor = self.use_factor
         new_channel.node_tree = node_tree
         new_channel.update_node_tree(context)
         ps_ctx.active_group.update_node_tree(context)
@@ -65,6 +78,8 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
         layout.prop(self, "channel_name", text="Name")
         layout.prop(self, "channel_type", text="Type")
         layout.prop(self, "use_alpha", text="Use Alpha")
+        if self.channel_type == "VECTOR":
+            layout.prop(self, "normalize", text="Normalize")
         unique_name = self.get_unique_channel_name(context)
         if unique_name != self.channel_name:
             box = layout.box()
@@ -72,7 +87,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
             box.alignment = 'CENTER'
             box.label(text=f"Name will be changed to '{unique_name}'", icon='ERROR')
 
-class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, Operator):
+class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, MultiMaterialOperator):
     """Delete the selected channel in the Paint System"""
     bl_idname = "paint_system.delete_channel"
     bl_label = "Delete Channel"
@@ -84,7 +99,7 @@ class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, Operator):
         ps_mat_data = ps_ctx.ps_mat_data
         return bool(ps_mat_data and ps_mat_data.active_index >= 0)
 
-    def execute(self, context):
+    def process_material(self, context):
         ps_ctx = self.ensure_context(context)
         active_index = ps_ctx.active_group.active_index
         if active_index < 0 or active_index >= len(ps_ctx.active_group.channels):
@@ -99,7 +114,7 @@ class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_MoveChannelUp(PSContextMixin, Operator):
+class PAINTSYSTEM_OT_MoveChannelUp(PSContextMixin, MultiMaterialOperator):
     """Move the selected channel in the Paint System"""
     bl_idname = "paint_system.move_channel_up"
     bl_label = "Move Channel"
@@ -112,7 +127,7 @@ class PAINTSYSTEM_OT_MoveChannelUp(PSContextMixin, Operator):
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
         return bool(active_group and active_group.active_index >= 0 and "UP" in lm.possible_moves())
     
-    def execute(self, context):
+    def process_material(self, context):
         ps_ctx = self.ensure_context(context)
         active_group = ps_ctx.active_group
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
@@ -121,7 +136,7 @@ class PAINTSYSTEM_OT_MoveChannelUp(PSContextMixin, Operator):
         redraw_panel(context)
         return {'FINISHED'}
 
-class PAINTSYSTEM_OT_MoveChannelDown(PSContextMixin, Operator):
+class PAINTSYSTEM_OT_MoveChannelDown(PSContextMixin, MultiMaterialOperator):
     """Move the selected channel in the Paint System"""
     bl_idname = "paint_system.move_channel_down"
     bl_label = "Move Channel"
@@ -134,7 +149,7 @@ class PAINTSYSTEM_OT_MoveChannelDown(PSContextMixin, Operator):
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
         return bool(active_group and active_group.active_index >= 0 and "DOWN" in lm.possible_moves())
     
-    def execute(self, context):
+    def process_material(self, context):
         ps_ctx = self.ensure_context(context)
         active_group = ps_ctx.active_group
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
