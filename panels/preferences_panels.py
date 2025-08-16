@@ -2,25 +2,25 @@ import bpy
 from bpy.types import AddonPreferences
 from bpy.props import BoolProperty, IntProperty
 from bpy.utils import register_classes_factory
-from .. import __package__ as ps
+from ..preferences import addon_package
 
 class PaintSystemPreferences(AddonPreferences):
     """Demo bare-bones preferences"""
-    bl_idname = ps
+    bl_idname = addon_package()
 
-    show_tooltips = BoolProperty(
+    show_tooltips: BoolProperty(
         name="Show Tooltips",
         description="Show tooltips in the UI",
         default=True
     )
 
-    use_compact_design = BoolProperty(
+    use_compact_design: BoolProperty(
         name="Use Compact Design",
         description="Use a more compact design for the UI",
         default=False
     )
 
-    name_layers_group = BoolProperty(
+    name_layers_group: BoolProperty(
         name="Name Layers According to Group Name",
         default=False
     )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
+from ..nodetree_builder import NodeTreeBuilder
 
 import bpy
 
@@ -35,7 +36,7 @@ def get_library_nodetree(tree_name: str, library_filename: str = "library2.blend
         ValueError: If the requested node tree name does not exist in the library.
     """
     # 1) Check if the node tree already exists in the current .blend
-    existing_tree: Optional[bpy.types.NodeTree] = bpy.data.node_groups.get(tree_name)
+    existing_tree = bpy.data.node_groups.get(tree_name)
     if existing_tree is not None:
         return existing_tree
 
@@ -66,6 +67,29 @@ def get_library_nodetree(tree_name: str, library_filename: str = "library2.blend
                 f"Unexpected error: Node tree '{tree_name}' was not appended from '{library_filename}'."
             )
     return appended_tree
+
+def create_mixing_graph(node_tree: bpy.types.NodeTree, color_node_name: str, color_socket: str, alpha_node_name: str = None, alpha_socket: str = None) -> NodeTreeBuilder:
+    pre_mix = get_library_nodetree(".PS Pre Mix")
+    post_mix = get_library_nodetree(".PS Post Mix")
+    builder = NodeTreeBuilder(node_tree, "Image Layer", clear=True)
+    builder.add_node("group_input", "NodeGroupInput")
+    builder.add_node("group_output", "NodeGroupOutput")
+    builder.add_node("pre_mix", "ShaderNodeGroup", {"node_tree": pre_mix}, {"Over Alpha": 1.0})
+    builder.add_node("post_mix", "ShaderNodeGroup", {"node_tree": post_mix})
+    builder.add_node("mix_rgb", "ShaderNodeMix", {"blend_type": "MIX", "data_type": "RGBA"})
+    if alpha_node_name is not None and alpha_socket is not None:
+        builder.link(alpha_node_name, "pre_mix", alpha_socket, "Over Alpha")
+    builder.link("group_input", "pre_mix", "Color", "Color")
+    builder.link("group_input", "pre_mix", "Alpha", "Alpha")
+    builder.link("pre_mix", "mix_rgb", "Color", "A")
+    builder.link("pre_mix", "mix_rgb", "Over Alpha", "Factor")
+    builder.link(color_node_name, "mix_rgb", color_socket, "B")
+    builder.link("mix_rgb", "post_mix", "Result", "Color")
+    builder.link("pre_mix", "post_mix", "Over Alpha", "Over Alpha")
+    builder.link("group_input", "post_mix", "Alpha", "Alpha")
+    builder.link("post_mix", "group_output", "Color", "Color")
+    builder.link("post_mix", "group_output", "Alpha", "Alpha")
+    return builder
 
 
 __all__ = ["get_library_nodetree"]

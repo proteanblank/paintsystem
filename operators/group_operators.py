@@ -1,8 +1,7 @@
 import bpy
 from .list_manager import ListManager
 from bpy.utils import register_classes_factory
-from .common import PSContextMixin
-from ..paintsystem.data import parse_context
+from .common import PSContextMixin, scale_content
 
 
 class PAINTSYSTEM_OT_NewGroup(PSContextMixin, bpy.types.Operator):
@@ -16,8 +15,17 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, bpy.types.Operator):
         description="Name of the new group",
         default="New Group",
     )
+    
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None
 
     def execute(self, context):
+        # See if there is any material slot on the active object
+        if not context.active_object.active_material:
+            bpy.data.materials.new(name="New Material")
+            context.active_object.active_material = bpy.data.materials[-1]
+        
         ps_ctx = self.ensure_context(context)
         node_tree = bpy.data.node_groups.new(name=f"Paint System ({self.group_name})", type='ShaderNodeTree')
         ps_mat_data = ps_ctx.ps_mat_data
@@ -27,6 +35,15 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, bpy.types.Operator):
         new_group.node_tree = node_tree
         new_group.update_node_tree(context)
         return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=200)
+    
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row()
+        scale_content(context, self.layout)
+        row.prop(self, "group_name", text="Name")
 
 
 class PAINTSYSTEM_OT_DeleteGroup(PSContextMixin, bpy.types.Operator):
@@ -65,9 +82,8 @@ class PAINTSYSTEM_OT_MoveGroup(PSContextMixin, bpy.types.Operator):
 
     @classmethod
     def _poll(cls, context):
-        parsed = parse_context(context)
-        ps_mat_data = parsed.get('ps_mat_data')
-        return bool(ps_mat_data and ps_mat_data.active_index >= 0)
+        ps_ctx = cls.ensure_context(context)
+        return bool(ps_ctx.ps_mat_data and ps_ctx.ps_mat_data.active_index >= 0)
 
     def execute(self, context):
         ps_ctx = self.ensure_context(context)

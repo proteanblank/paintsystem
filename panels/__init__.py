@@ -3,8 +3,8 @@ from bpy.utils import register_submodule_factory
 
 submodules = [
     # "custom_icons",
-    "main_panels",
     "preferences_panels",
+    "main_panels",
     "channels_panels",
     "layers_panels",
 ]

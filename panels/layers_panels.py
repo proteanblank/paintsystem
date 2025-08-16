@@ -1,7 +1,7 @@
 import bpy
 from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel
 from bpy.utils import register_classes_factory
-from .common import PSContextMixin, scale_content, get_global_layer
+from .common import PSContextMixin, scale_content, get_global_layer, icon_parser,  get_icon
 
 
 def is_image_painted(image: Image | ImagePreview) -> bool:
@@ -30,7 +30,7 @@ class MAT_PT_UL_PaintSystemLayerList(PSContextMixin, UIList):
         flattened = active_channel.flatten_hierarchy()
         if index < len(flattened):
             global_item = get_global_layer(item)
-            level = active_channel.get_item_level_from_id(global_item.id)
+            level = active_channel.get_item_level_from_id(item.id)
             row = layout.row(align=True)
             # Check if parent of the current item is enabled
             parent_item = active_channel.get_item_by_id(
@@ -50,7 +50,7 @@ class MAT_PT_UL_PaintSystemLayerList(PSContextMixin, UIList):
                     else:
                         row.label(icon='IMAGE_DATA')
                 case 'FOLDER':
-                    row.prop(global_item, "expanded", text="", icon='TRIA_DOWN' if global_item.expanded else 'TRIA_RIGHT', emboss=False)
+                    row.prop(global_item, "is_expanded", text="", icon_only=True, icon_value=get_icon('folder-open') if global_item.is_expanded else get_icon('folder'), emboss=False)
                 case 'SOLID_COLOR':
                     rgb_node = None
                     for node in global_item.node_tree.nodes:
@@ -72,10 +72,9 @@ class MAT_PT_UL_PaintSystemLayerList(PSContextMixin, UIList):
                 case _:
                     row.label(icon='BLANK1')
             row.prop(global_item, "name", text="", emboss=False)
-
-            if global_item.mask_image:
-                row.prop(global_item, "enable_mask",
-                         icon='MOD_MASK' if global_item.enable_mask else 'MATPLANE', text="", emboss=False)
+            # if global_item.mask_image:
+            #     row.prop(global_item, "enable_mask",
+            #              icon='MOD_MASK' if global_item.enable_mask else 'MATPLANE', text="", emboss=False)
             if item.clip:
                 row.label(icon="SELECT_INTERSECT")
             if global_item.lock_layer:
@@ -109,7 +108,8 @@ class MAT_PT_UL_PaintSystemLayerList(PSContextMixin, UIList):
             flt_neworder.append(flattened_layers.index(layer))
             while layer.parent_id != -1:
                 layer = data.get_item_by_id(layer.parent_id)
-                if layer and not layer.expanded:
+                global_layer = get_global_layer(layer)
+                if global_layer and not global_layer.is_expanded:
                     flt_flags[idx] &= ~self.bitflag_filter_item
                     break
 
@@ -178,7 +178,7 @@ class MAT_PT_PaintSystemLayers(PSContextMixin, Panel):
         row.scale_x = 1.5
         # if contains_mat_setup:
         row.operator("paint_system.toggle_paint_mode",
-                        text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE')
+                        text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE', icon_value=get_icon('paintbrush'))
         # else:
         #     row.alert = True
         #     row.operator("paint_system.create_template_setup",
@@ -218,12 +218,12 @@ class MAT_PT_PaintSystemLayers(PSContextMixin, Panel):
         #         row.scale_y = 1.2
         #     row.prop(active_layer, "edit_mask", text="Editing Mask" if active_layer.edit_mask else "Click to Edit Mask", icon='MOD_MASK')
 
-        if active_layer and active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
-            mask_box = box.box()
-            split = mask_box.split(factor=0.6)
-            split.alert = True
-            split.label(text="Editing Mask!", icon="INFO")
-            split.prop(active_layer, "edit_mask", text="Disable", icon='X', emboss=False)
+        # if active_layer and active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
+        #     mask_box = box.box()
+        #     split = mask_box.split(factor=0.6)
+        #     split.alert = True
+        #     split.label(text="Editing Mask!", icon="INFO")
+        #     split.prop(active_layer, "edit_mask", text="Disable", icon='X', emboss=False)
         
         row = box.row()
         scale_content(context, row, scale_x=1, scale_y=1.5)
@@ -233,8 +233,8 @@ class MAT_PT_PaintSystemLayers(PSContextMixin, Panel):
         )
 
         col = row.column(align=True)
-        # col.menu("MAT_MT_PaintSystemAddLayer", icon='IMAGE_DATA', text="")
-        # col.operator("paint_system.new_folder", icon='NEWFOLDER', text="")
+        col.menu("MAT_MT_PaintSystemAddLayer", icon='IMAGE_DATA', text="")
+        col.operator("paint_system.new_folder_layer", icon='NEWFOLDER', text="")
         col.separator()
         col.operator("paint_system.delete_item", icon="TRASH", text="")
         col.separator()
@@ -245,8 +245,54 @@ class MAT_PT_PaintSystemLayers(PSContextMixin, Panel):
         if not active_layer:
             return
 
+
+class MAT_MT_PaintSystemAddLayerMenu(Menu):
+    bl_label = "Add Layer"
+    bl_idname = "MAT_MT_PaintSystemAddLayer"
+
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row()
+        col = row.column()
+        col.separator()
+        col.label(text="--- IMAGE ---")
+        col.operator("paint_system.new_image_layer",
+                     text="New Image Layer", icon="FILE")
+        # col.operator("paint_system.open_image",
+        #              text="Open External Image")
+        # col.operator("paint_system.open_existing_image",
+        #              text="Use Existing Image")
+        col.separator()
+        col.label(text="--- COLOR ---")
+        col.operator("paint_system.new_solid_color_layer", text="Solid Color",
+                     icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
+        col.operator("paint_system.new_attribute_layer_layer",
+                     text="Attribute Color", icon='MESH_DATA')
+        col.separator()
+        col.label(text="--- GRADIENT ---")
+        # for idx, (node_type, name, description) in enumerate(GRADIENT_ENUM):
+        #     col.operator("paint_system.new_gradient_layer",
+        #                  text=name, icon='COLOR' if idx == 0 else 'NONE').gradient_type = node_type
+
+        # col.separator()
+        # col.label(text="--- SHADER ---")
+        # for idx, (node_type, name, description) in enumerate(SHADER_ENUM):
+        #     col.operator("paint_system.new_shader_layer",
+        #                  text=name, icon='SHADING_RENDERED' if idx == 0 else 'NONE').shader_type = node_type
+
+        # col = row.column()
+        # col.label(text="--- ADJUSTMENT ---")
+        # for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
+        #     col.operator("paint_system.new_adjustment_layer",
+        #                  text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
+        col.separator()
+        col.label(text="--- CUSTOM ---")
+        col.operator("paint_system.new_node_group_layer",
+                     text="Custom Node Tree", icon='NODETREE')
+
 classes = (
     MAT_PT_UL_PaintSystemLayerList,
+    MAT_MT_PaintSystemAddLayerMenu,
     MAT_PT_PaintSystemLayers,
 )
 

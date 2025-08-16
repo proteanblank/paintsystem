@@ -1,12 +1,11 @@
-from dataclasses import dataclass
+from .paintsystem.common import PaintSystemPreferences
 
-@dataclass
-class PaintSystemPreferences:
-    show_tooltips: bool
-    use_compact_design: bool
-    name_layers_group: bool
+def addon_package() -> str:
+    """Get the addon package name"""
+    return __package__
 
 def get_preferences(context) -> PaintSystemPreferences:
     """Get the Paint System preferences"""
+    ps = addon_package()
     prefs:PaintSystemPreferences = context.preferences.addons[ps].preferences
     return prefs

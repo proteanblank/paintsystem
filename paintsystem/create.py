@@ -12,14 +12,12 @@ def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLa
     if not isinstance(layer_name, str):
         raise TypeError("layer_name must be a string")
     
-    node_tree = bpy.data.node_groups.new(name=layer_name, type='ShaderNodeTree')
+    node_tree = bpy.data.node_groups.new(name=f"PS_Layer ({layer_name})", type='ShaderNodeTree')
     node_tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
     node_tree.interface.new_socket("Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
     node_tree.interface.new_socket("Color", in_out="INPUT", socket_type="NodeSocketColor")
     node_tree.interface.new_socket("Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
     if layer_type == "FOLDER":
-        node_tree.interface.new_socket("Over Color", in_out="OUTPUT", socket_type="NodeSocketColor")
-        node_tree.interface.new_socket("Over Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
         node_tree.interface.new_socket("Over Color", in_out="INPUT", socket_type="NodeSocketColor")
         node_tree.interface.new_socket("Over Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
     global_layer = bpy.context.scene.ps_scene_data.layers.add()
@@ -31,68 +29,80 @@ def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLa
     return global_layer
 
 def add_global_layer_to_channel(channel: Channel, global_layer: GlobalLayer) -> Layer:
-    layer = channel.add_item(global_layer.name, "ITEM" if global_layer.type != 'FOLDER' else "FOLDER")
+    parent_id, insert_order = channel.get_insertion_data()
+    # Adjust existing items' order
+    channel.adjust_sibling_orders(parent_id, insert_order)
+    layer = channel.add_item(
+            global_layer.name,
+            "ITEM" if global_layer.type != 'FOLDER' else "FOLDER",
+            parent_id=parent_id,
+            order=insert_order
+        )
     layer.ref_layer_id = global_layer.id
+    # Update active index
+    new_id = layer.id
+    if new_id != -1:
+        for i, item in enumerate(channel.layers):
+            if item.id == new_id:
+                channel.active_index = i
+                break
     return layer
 
-def create_image_layer(channel: Channel, img: bpy.types.Image, layer_name="New Image Layer"):
-    """Create a new image layer."""
-    if not img:
-        raise ValueError("Image cannot be None")
-    if not isinstance(img, bpy.types.Image):
-        raise TypeError("img must be of type bpy.types.Image")
+# def create_image_layer(channel: Channel, global_layer: GlobalLayer, img: bpy.types.Image):
+#     """Create a new image layer."""
+#     if not img:
+#         raise ValueError("Image cannot be None")
+#     if not isinstance(img, bpy.types.Image):
+#         raise TypeError("img must be of type bpy.types.Image")
     
-    # Create a new ImageLayer instance
-    global_layer = add_global_layer("IMAGE", layer_name)
-    global_layer.image = img
-    layer = add_global_layer_to_channel(channel, global_layer)
-    return layer
+#     # Create a new ImageLayer instance
+#     global_layer.image = img
+#     layer = add_global_layer_to_channel(channel, global_layer)
+#     return layer
 
 
-def create_folder_layer(channel: Channel, layer_name: str = "New Folder") -> Layer:
-    """Create a new folder layer (dummy)."""
-    global_layer = add_global_layer("FOLDER", layer_name)
-    layer = add_global_layer_to_channel(channel, global_layer)
-    return layer
+# def create_folder_layer(channel: Channel, global_layer: GlobalLayer, layer_name: str = "New Folder") -> Layer:
+#     """Create a new folder layer (dummy)."""
+#     layer = add_global_layer_to_channel(channel, global_layer)
+#     return layer
 
 
-def create_solid_color_layer(channel: Channel, layer_name: str = "New Solid Color Layer") -> Layer:
-    """Create a new solid color layer (dummy)."""
-    global_layer = add_global_layer("SOLID_COLOR", layer_name)
-    layer = add_global_layer_to_channel(channel, global_layer)
-    return layer
+# def create_solid_color_layer(channel: Channel, global_layer: GlobalLayer) -> Layer:
+#     """Create a new solid color layer (dummy)."""
+#     layer = add_global_layer_to_channel(channel, global_layer)
+#     return layer
 
 
-def create_attribute_layer(channel: Channel, layer_name: str = "New Attribute Layer") -> Layer:
-    """Create a new attribute layer (dummy)."""
-    global_layer = add_global_layer("ATTRIBUTE", layer_name)
-    layer = add_global_layer_to_channel(channel, global_layer)
-    return layer
+# def create_attribute_layer(channel: Channel, global_layer: GlobalLayer, ) -> Layer:
+#     """Create a new attribute layer (dummy)."""
+#     global_layer = add_global_layer("ATTRIBUTE", layer_name)
+#     layer = add_global_layer_to_channel(channel, global_layer)
+#     return layer
 
 
-def create_adjustment_layer(channel: Channel, layer_name: str = "New Adjustment Layer") -> Layer:
-    """Create a new adjustment layer (dummy)."""
-    global_layer = add_global_layer("ADJUSTMENT", layer_name)
-    layer = add_global_layer_to_channel(channel, global_layer)
-    return layer
+# def create_adjustment_layer(channel: Channel, global_layer: GlobalLayer, ) -> Layer:
+#     """Create a new adjustment layer (dummy)."""
+#     global_layer = add_global_layer("ADJUSTMENT", layer_name)
+#     layer = add_global_layer_to_channel(channel, global_layer)
+#     return layer
 
 
-def create_shader_layer(channel: Channel, layer_name: str = "New Shader Layer") -> Layer:
-    """Create a new shader layer (dummy)."""
-    global_layer = add_global_layer("SHADER", layer_name)
-    layer = add_global_layer_to_channel(channel, global_layer)
-    return layer
+# def create_shader_layer(channel: Channel, global_layer: GlobalLayer, ) -> Layer:
+#     """Create a new shader layer (dummy)."""
+#     global_layer = add_global_layer("SHADER", layer_name)
+#     layer = add_global_layer_to_channel(channel, global_layer)
+#     return layer
 
 
-def create_node_group_layer(channel: Channel, layer_name: str = "New Node Group Layer") -> Layer:
-    """Create a new node group layer (dummy)."""
-    global_layer = add_global_layer("NODE_GROUP", layer_name)
-    layer = add_global_layer_to_channel(channel, global_layer)
-    return layer
+# def create_node_group_layer(channel: Channel, global_layer: GlobalLayer) -> Layer:
+#     """Create a new node group layer (dummy)."""
+#     global_layer = add_global_layer("NODE_GROUP", layer_name)
+#     layer = add_global_layer_to_channel(channel, global_layer)
+#     return layer
 
 
-def create_gradient_layer(channel: Channel, layer_name: str = "New Gradient Layer") -> Layer:
-    """Create a new gradient layer (dummy)."""
-    global_layer = add_global_layer("GRADIENT", layer_name)
-    layer = add_global_layer_to_channel(channel, global_layer)
-    return layer
+# def create_gradient_layer(channel: Channel, global_layer: GlobalLayer, ) -> Layer:
+#     """Create a new gradient layer (dummy)."""
+#     global_layer = add_global_layer("GRADIENT", layer_name)
+#     layer = add_global_layer_to_channel(channel, global_layer)
+#     return layer

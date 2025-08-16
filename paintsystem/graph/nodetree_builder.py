@@ -866,7 +866,7 @@ class NodeTreeBuilder:
                         continue
                     if pid in {
                         'rna_type', 'type', 'location_absolute', 'location', 'internal_links',
-                        'inputs', 'outputs', 'parent', 'name', 'label'
+                        'inputs', 'outputs', 'parent', 'name', 'label', 'node_width'
                     }:
                         continue
                     ptype = getattr(prop, 'type', None)

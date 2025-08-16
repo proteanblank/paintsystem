@@ -3,13 +3,14 @@ import bpy
 from bpy.props import PointerProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty, StringProperty
 from bpy.types import PropertyGroup, Image, NodeTree
 from bpy.utils import register_classes_factory
+from bpy.app.handlers import persistent
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 from ..custom_icons import get_icon
 from ..utils import get_next_unique_name
 from .graph import NodeTreeBuilder, START, END
-from .graph.premade import create_image_graph
+from .graph.premade import create_image_graph, create_folder_graph, create_solid_graph
 from mathutils import Vector
-import time
+from typing import Dict
 
 LAYER_TYPE_ENUM = [
     ('FOLDER', "Folder", "Folder layer"),
@@ -28,7 +29,39 @@ CHANNEL_TYPE_ENUM = [
     ('FLOAT', "Value", "Value channel", get_icon('float_socket'), 3),
 ]
 
-def parse_context(context: bpy.types.Context) -> dict:
+GRADIENT_ENUM = [
+    ('LINEAR', "Linear Gradient", "Linear gradient"),
+    ('RADIAL', "Radial Gradient", "Radial gradient"),
+]
+
+ADJUSTMENT_ENUM = [
+    ('ShaderNodeBrightContrast', "Brightness and Contrast", ""),
+    ('ShaderNodeGamma', "Gamma", ""),
+    ('ShaderNodeHueSaturation', "Hue Saturation Value", ""),
+    ('ShaderNodeInvert', "Invert", ""),
+    ('ShaderNodeRGBCurve', "RGB Curves", ""),
+    # ('ShaderNodeAmbientOcclusion', "Ambient Occlusion", ""),
+]
+
+COORDINATE_TYPE_ENUM = [
+    ('AUTO', "Auto UV", "Automatically create a new UV Map"),
+    ('UV', "Use Existing UV", "Open an existing UV Map"),
+    # ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
+    ('OBJECT', "Object", "Use a object output of Texture Coordinate node"),
+    ('CAMERA', "Camera", "Use a camera output of Texture Coordinate node"),
+    ('WINDOW', "Window", "Use a window output of Texture Coordinate node"),
+    ('REFLECTION', "Reflection", "Use a reflection output of Texture Coordinate node"),
+    ('POSITION', "Position", "Use a position output of Geometry node"),
+]
+
+ATTRIBUTE_TYPE_ENUM = [
+    ('GEOMETRY', "Geometry", "Geometry"),
+    ('OBJECT', "Object", "Object"),
+    ('INSTANCER', "Instancer", "Instancer"),
+    ('VIEW_LAYER', "View Layer", "View Layer")
+]
+
+def _parse_context(context: bpy.types.Context) -> dict:
         """
         Parses the Blender context to extract relevant information for the paint system.
         
@@ -87,133 +120,75 @@ def parse_context(context: bpy.types.Context) -> dict:
             "active_global_layer": get_global_layer(active_layer) if active_layer else None
         }
 
+def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
+    if context.mode != 'PAINT_TEXTURE':
+        return
+    ps_ctx = _parse_context(context)
+    global_layer = ps_ctx["active_global_layer"]
+    brush = context.tool_settings.image_paint.brush
+    if not brush:
+        return
+    brush.use_alpha = not global_layer.lock_alpha
+
+def update_active_image(self=None, context: bpy.types.Context = None):
+    context = context or bpy.context
+    ps_ctx = _parse_context(context)
+    image_paint = context.tool_settings.image_paint
+    mat = ps_ctx["active_material"]
+    active_channel = ps_ctx["active_channel"]
+    if not mat or not active_channel:
+        return
+    global_layer = ps_ctx["active_global_layer"]
+    update_brush_settings(self, context)
+    if not global_layer:
+        return
+
+    if image_paint.mode == 'MATERIAL':
+                image_paint.mode = 'IMAGE'
+    selected_image: Image = global_layer.image
+    if not selected_image or global_layer.lock_layer or active_channel.use_bake_image:
+        image_paint.canvas = None
+        # Unable to paint
+        return
+    else:
+        # print("Selected image: ", selected_image)
+        image_paint.canvas = selected_image
+        if global_layer.uv_map_name:
+            context.active_object.data.uv_layers[global_layer.uv_map_name].active = True
+
 def update_active_layer(self, context):
-    ps_ctx = parse_context(context)
+    ps_ctx = _parse_context(context)
     active_layer = ps_ctx["active_layer"]
     if active_layer:
         active_layer.update_node_tree(context)
 
 def update_active_channel(self, context):
-    ps_ctx = parse_context(context)
+    ps_ctx = _parse_context(context)
     active_channel = ps_ctx["active_channel"]
     if active_channel:
         active_channel.update_node_tree(context)
 
 def update_active_group(self, context):
-    ps_ctx = parse_context(context)
+    ps_ctx = _parse_context(context)
     active_group = ps_ctx["active_group"]
     if active_group:
         active_group.update_node_tree(context)
-
-# def update_node_tree(context):
-#     parsed_context = parse_context(context)
-#     active_group = parsed_context.get("active_group")
-#     if not active_group:
-#         return
-#     node_tree = active_group.node_tree
-#     if not isinstance(node_tree, bpy.types.NodeTree):
-#         print("Node tree is not a NodeTree")
-#         return
-    
-#     # Ensure node sockets are in the correct order
-    
-#     nt_interface = node_tree.interface
-#     nt_sockets = nt_interface.items_tree
-#     input_sockets = [socket for socket in nt_sockets if socket.item_type == "SOCKET" and socket.in_out == "INPUT"]
-#     output_sockets = [socket for socket in nt_sockets if socket.item_type == "SOCKET" and socket.in_out == "OUTPUT"]
-    
-#     # Simplified: synchronize output and input sockets with channels
-#     channel_names = [channel.name for channel in active_group.channels]
-#     channel_types = {channel.name: f"NodeSocket{channel.type.title()}" for channel in active_group.channels}
-
-#     # Helper to sync sockets
-#     def sync_sockets(sockets, in_out):
-#         offset = len(active_group.channels) * 2 if in_out == "INPUT" else 0
-#         for idx, name in enumerate(channel_names):
-#             socket = next((s for s in sockets if s.name == name), None)
-#             socket_alpha = next((s for s in sockets if s.name == f"{name} Alpha"), None)
-#             socket_type = channel_types[name]
-#             if not socket:
-#                 if idx == len(channel_names) - 1:
-#                     nt_interface.new_socket(name=name, socket_type=socket_type, in_out=in_out)
-#                     nt_interface.new_socket(name=f"{name} Alpha", socket_type="NodeSocketFloat", in_out=in_out)
-#                 else:
-#                     # rename socket to name
-#                     socket = sockets[idx * 2]
-#                     socket.name = name
-#                     socket_alpha = sockets[idx * 2 + 1]
-#                     socket_alpha.name = f"{name} Alpha"
-#             else:
-#                 # Move socket if out of order
-#                 target_idx = idx * 2
-#                 if sockets.index(socket) != target_idx:
-#                     nt_interface.move(socket, target_idx + offset)
-#                     nt_interface.move(socket_alpha, target_idx + offset + 1)
-#                 # Update type if needed
-#                 if getattr(socket, "socket_type", None) != socket_type:
-#                     socket.socket_type = socket_type
-
-#     sync_sockets(output_sockets, "OUTPUT")
-#     sync_sockets(input_sockets, "INPUT")
-    
-#     # Delete unused sockets
-#     expected_sockets = [channel.name for channel in active_group.channels] + [f"{channel.name} Alpha" for channel in active_group.channels]
-#     for socket in nt_sockets:
-#         if socket.item_type == "SOCKET" and socket.in_out == "INPUT" and socket.name not in expected_sockets:
-#             nt_interface.remove(socket)
-#         if socket.item_type == "SOCKET" and socket.in_out == "OUTPUT" and socket.name not in expected_sockets:
-#             nt_interface.remove(socket)
-            
-#     # Update the nodes in node tree
-#     start_time = time.time()
-#     node_builder = NodeTreeBuilder(node_tree, frame_name="Main Graph", verbose=True)
-#     node_builder.add_node("group_input", "NodeGroupInput")
-#     node_builder.add_node("group_output", "NodeGroupOutput")
-    
-#     for channel in active_group.channels:
-#         start_time_channel = time.time()
-#         c_alpha_name = f"{channel.name} Alpha"
-#         channel_graph = NodeTreeBuilder(node_tree, frame_name=f"{channel.name} Graph")
-#         node_builder.link("group_input", channel_graph, channel.name, "Color")
-#         node_builder.link("group_input", channel_graph, c_alpha_name, "Alpha")
-#         if len(channel.layers) > 0:
-#             previous_layer_graph = None
-#             flattened_layers = channel.flatten_hierarchy()
-#             for layer, _ in flattened_layers:
-#                 # start_time = time.time()
-#                 global_layer = get_global_layer(layer)
-#                 match global_layer.type:
-#                     case "IMAGE":
-#                         # print(f"Creating image graph for {global_layer.name}")
-#                         layer_graph = create_image_graph(node_tree, global_layer.image, f"{layer.name} Graph")
-#                     case _:
-#                         pass
-#                 if not previous_layer_graph:
-#                     channel_graph.link(START, layer_graph, "Color", "Color")
-#                     channel_graph.link(START, layer_graph, "Alpha", "Alpha")
-#                 else:
-#                     channel_graph.link(previous_layer_graph, layer_graph, "Color", "Color")
-#                     channel_graph.link(previous_layer_graph, layer_graph, "Alpha", "Alpha")
-#                 # print(f"Time taken to link {layer.name} graph: {time.time() - start_time} seconds")
-#                 previous_layer_graph = layer_graph
-#             channel_graph.link(previous_layer_graph, END, "Color", "Color")
-#             channel_graph.link(previous_layer_graph, END, "Alpha", "Alpha")
-#         else:
-#             channel_graph.link(START, END, "Color", "Color")
-#             channel_graph.link(START, END, "Alpha", "Alpha")
-#         node_builder.link(channel_graph, "group_output", "Color", channel.name)
-#         node_builder.link(channel_graph, "group_output", "Alpha", c_alpha_name)
-#         print(f"Time taken to link {channel.name} graph: {time.time() - start_time_channel} seconds")
-#         # channel_graph.set_node_offset(Vector((0, len(channel.layers) * 500)))
-#     node_builder.compile()
-#     print(f"Time taken to compile node tree: {time.time() - start_time} seconds")
 class GlobalLayer(PropertyGroup):
             
     def update_node_tree(self, context):
+        self.node_tree.name = f"PS_Layer ({self.name})"
         match self.type:
             case "IMAGE":
                 image_graph = create_image_graph(self.node_tree, self.image)
                 image_graph.compile()
+            case "FOLDER":
+                folder_graph = create_folder_graph(self.node_tree)
+                folder_graph.compile()
+            case "SOLID_COLOR":
+                solid_graph = create_solid_graph(self.node_tree, (1.0, 1.0, 1.0, 1.0))
+                solid_graph.compile()
+            case "ATTRIBUTE":
+                attribute_graph
             case _:
                 pass
             
@@ -246,17 +221,36 @@ class GlobalLayer(PropertyGroup):
     )
     image: PointerProperty(
         name="Image",
-        type=Image
+        type=Image,
+        update=update_node_tree
+    )
+    coord_type: EnumProperty(
+        items=COORDINATE_TYPE_ENUM,
+        name="Coordinate Type",
+        description="Coordinate type",
+        default='AUTO',
+        update=update_node_tree
+    )
+    uv_map_name: StringProperty(
+        name="UV Map",
+        description="Name of the UV map to use",
+        update=update_node_tree
+    )
+    attribute_type: EnumProperty(
+        items=ATTRIBUTE_TYPE_ENUM,
+        name="Attribute Type",
+        description="Attribute type",
+        default='GEOMETRY',
+        update=update_node_tree
+    )
+    attribute_name: StringProperty(
+        name="Attribute Name",
+        description="Name of the attribute to use",
+        update=update_node_tree
     )
     type: EnumProperty(
         items=LAYER_TYPE_ENUM,
         default='IMAGE'
-    )
-    lock_alpha: BoolProperty(
-        name="Lock Alpha",
-        description="Lock the alpha channel",
-        default=False,
-        # update=update_brush_settings
     )
     lock_layer: BoolProperty(
         name="Lock Layer",
@@ -267,27 +261,6 @@ class GlobalLayer(PropertyGroup):
     node_tree: PointerProperty(
         name="Node Tree",
         type=NodeTree
-    )
-    edit_mask: BoolProperty(
-        name="Edit Mask",
-        description="Edit mask",
-        default=False,
-    )
-    mask_image: PointerProperty(
-        name="Mask Image",
-        type=Image,
-        # update=update_node_tree
-    )
-    enable_mask: BoolProperty(
-        name="Enabled Mask",
-        description="Toggle mask visibility",
-        default=False,
-        # update=update_node_tree
-    )
-    mask_uv_map: StringProperty(
-        name="Mask UV Map",
-        default="",
-        # update=update_node_tree
     )
     external_image: PointerProperty(
         name="Edit External Image",
@@ -312,53 +285,81 @@ class Layer(BaseNestedListItem):
         name="Enabled",
         description="Toggle layer visibility",
         default=True,
-        # update=update_node_tree
+        update=update_active_channel
     )
     clip: BoolProperty(
         name="Clip to Below",
         description="Clip the layer to the one below",
         default=False,
-        # update=update_node_tree
+        update=update_active_channel
     )
-    
+    lock_alpha: BoolProperty(
+        name="Lock Alpha",
+        description="Lock the alpha channel",
+        default=False,
+        update=update_brush_settings
+    )
+
+
 class Channel(BaseNestedListManager):
     """Custom data for material layers in the Paint System"""
     
     def update_node_tree(self, context):
-        self.node_tree.name = self.name
-        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", verbose=True)
+        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200)
         node_builder.add_node("group_input", "NodeGroupInput")
         node_builder.add_node("group_output", "NodeGroupOutput")
         flattened_layers = self.flatten_hierarchy()
         if len(flattened_layers) > 0:
-            prev_layer_name = None
-            for layer, _ in flattened_layers:
-                global_layer = get_global_layer(layer)
-                match global_layer.type:
-                    case "IMAGE":
-                        layer_name = layer.name
-                        node_builder.add_node(layer_name, "ShaderNodeGroup", {"node_tree": global_layer.node_tree})
-                    case _:
-                        pass
-                if not prev_layer_name:
-                    if self.type == "VECTOR" and self.normalize:
-                        node_builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
-                        node_builder.link("group_input", "normalize", "Color", "Vector")
-                        node_builder.link("normalize", layer_name, "Vector", "Color")
-                    else:
-                        node_builder.link("group_input", layer_name, "Color", "Color")
-                    node_builder.link("group_input", layer_name, "Alpha", "Alpha")
-                else:
-                    node_builder.link(prev_layer_name, layer_name, "Color", "Color")
-                    node_builder.link(prev_layer_name, layer_name, "Alpha", "Alpha")
-                prev_layer_name = layer_name
+            # prev_layer_name = None
+            
+            @dataclass
+            class PreviousLayer:
+                color_name: str
+                color_socket: str
+                alpha_name: str
+                alpha_socket: str
+                
+            previous_dict: Dict[int, PreviousLayer] = {}
             if self.type == "VECTOR" and self.normalize:
+                previous_dict[-1] = PreviousLayer(color_name="unnormalize", color_socket="Vector", alpha_name="group_output", alpha_socket="Alpha")
+                node_builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
                 node_builder.add_node("unnormalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (2, 2, 2), 2: (-1, -1, -1)})
-                node_builder.link(prev_layer_name, "unnormalize", "Color", "Vector")
                 node_builder.link("unnormalize", "group_output", "Vector", "Color")
             else:
-                node_builder.link(prev_layer_name, "group_output", "Color", "Color")
-            node_builder.link(prev_layer_name, "group_output", "Alpha", "Alpha")
+                previous_dict[-1] = PreviousLayer(color_name="group_output", color_socket="Color", alpha_name="group_output", alpha_socket="Alpha")
+            for layer, _ in flattened_layers:
+                previous_data = previous_dict.get(layer.parent_id, None)
+                global_layer = get_global_layer(layer)
+                layer_name = layer.name
+                node_builder.add_node(layer_name, "ShaderNodeGroup", {"node_tree": global_layer.node_tree, "mute": not layer.enabled})
+                # match global_layer.type:
+                #     case "IMAGE":
+                #         layer_name = layer.name
+                #         node_builder.add_node(layer_name, "ShaderNodeGroup", {"node_tree": global_layer.node_tree})
+                #     case _:
+                #         pass
+                node_builder.link(layer_name, previous_data.color_name, "Color", previous_data.color_socket)
+                node_builder.link(layer_name, previous_data.alpha_name, "Alpha", previous_data.alpha_socket)
+                previous_dict[layer.parent_id] = PreviousLayer(
+                    color_name=layer_name,
+                    color_socket="Color",
+                    alpha_name=layer_name,
+                    alpha_socket="Alpha"
+                )
+                if global_layer.type == "FOLDER":
+                    previous_dict[layer.id] = PreviousLayer(
+                        color_name=layer_name,
+                        color_socket="Over Color",
+                        alpha_name=layer_name,
+                        alpha_socket="Over Alpha"
+                    )
+            prev_layer = previous_dict[-1]
+            if self.type == "VECTOR" and self.normalize:
+                node_builder.link("normalize", prev_layer.color_name, "Vector", prev_layer.color_socket)
+                node_builder.link("group_input", "normalize", "Color", "Vector")
+            else:
+                node_builder.link("group_input", prev_layer.color_name, "Color", "Color")
+            node_builder.link("group_input", prev_layer.color_name, "Alpha", "Alpha")
         else:
             node_builder.link("group_input", "group_output", "Color", "Color")
             node_builder.link("group_input", "group_output", "Alpha", "Alpha")
@@ -368,8 +369,9 @@ class Channel(BaseNestedListManager):
         """Update the channel name to ensure uniqueness."""
         if self.updating_name_flag:
             return
+        self.node_tree.name = f"PS_Channel ({self.name})"
         self.updating_name_flag = True
-        parsed_context = parse_context(context)
+        parsed_context = _parse_context(context)
         active_group = parsed_context.get("active_group")
         new_name = get_next_unique_name(self.name, [channel.name for channel in active_group.channels if channel != self])
         if new_name != self.name:
@@ -404,7 +406,7 @@ class Channel(BaseNestedListManager):
         name="Material Layers",
         description="Collection of material layers in the Paint System"
     )
-    active_index: IntProperty(name="Active Material Layer Index")
+    active_index: IntProperty(name="Active Material Layer Index", update=update_active_image)
     type: EnumProperty(
         items=CHANNEL_TYPE_ENUM,
         name="Channel Type",
@@ -424,6 +426,12 @@ class Channel(BaseNestedListManager):
         default=False,
         update=update_node_tree
     )
+    coord_type: EnumProperty(
+        items=COORDINATE_TYPE_ENUM,
+        name="Coordinate Type",
+        description="Coordinate type",
+        default='AUTO'
+    )
     bake_image: PointerProperty(
         name="Bake Image",
         type=Image
@@ -438,6 +446,29 @@ class Channel(BaseNestedListManager):
         default=False,
         # update=update_node_tree
     )
+    
+    def get_movement_menu_items(self, item_id, direction):
+        """
+        Get menu items for movement options.
+        Returns list of tuples (identifier, label, description)
+        """
+        options = self.get_movement_options(item_id, direction)
+        menu_items = []
+
+        # Map option identifiers to their operators
+        operator_map = {
+            'UP': 'paint_system.move_up',
+            'DOWN': 'paint_system.move_down'
+        }
+
+        for identifier, description in options:
+            menu_items.append((
+                operator_map[direction],
+                description,
+                {'action': identifier}
+            ))
+
+        return menu_items
 
 
 class Group(PropertyGroup):
@@ -478,9 +509,9 @@ class Group(PropertyGroup):
         nt_sockets = nt_interface.items_tree
         expected_sockets = []
         for channel in self.channels:
-            expected_sockets.append((channel.name, f"NodeSocket{channel.type.title()}"))
+            expected_sockets.append((channel.name, f"NodeSocket{channel.type.title()}", "NONE"))
             if channel.use_alpha:
-                expected_sockets.append((f"{channel.name} Alpha", "NodeSocketFloat"))
+                expected_sockets.append((f"{channel.name} Alpha", "NodeSocketFloat", "FACTOR"))
         
         def ensure_sockets(expected_sockets, in_out = "OUTPUT"):
             if in_out == "INPUT":
@@ -496,8 +527,12 @@ class Group(PropertyGroup):
                     break
                 match change:
                     case "ADD":
-                        socket_name, socket_type = expected_sockets[idx]
+                        socket_name, socket_type, subtype = expected_sockets[idx]
                         socket = nt_interface.new_socket(name=socket_name, socket_type=socket_type, in_out=in_out)
+                        if subtype == "FACTOR":
+                            socket.subtype = "FACTOR"
+                            socket.min_value = 0
+                            socket.max_value = 1
                         nt_interface.move(socket, idx + offset_idx)
                     case "REMOVE":
                         socket = output_sockets[idx]
@@ -596,28 +631,33 @@ class PSContext:
     active_layer: Layer | None = None
     active_global_layer: GlobalLayer | None = None
 
+
+def parse_context(context: bpy.types.Context) -> PSContext:
+    """Parse the context and return a PSContext object."""
+    parsed_context = _parse_context(context)
+    return PSContext(
+        ps_scene_data=parsed_context.get("ps_scene_data"),
+        active_object=parsed_context.get("active_object"),
+        active_material=parsed_context.get("active_material"),
+        ps_mat_data=parsed_context.get("ps_mat_data"),
+        active_group=parsed_context.get("active_group"),
+        active_channel=parsed_context.get("active_channel"),
+        active_layer=parsed_context.get("active_layer"),
+        active_global_layer=parsed_context.get("active_global_layer")
+    )
+
 class PSContextMixin:
     """A mixin for classes that need access to the paint system context."""
 
     @staticmethod
     def ensure_context(context: bpy.types.Context) -> PSContext:
         """Return a PSContext parsed from Blender context. Safe to call from class or instance methods."""
-        parsed_context = parse_context(context)
-        return PSContext(
-            ps_scene_data=parsed_context.get("ps_scene_data"),
-            active_object=parsed_context.get("active_object"),
-            active_material=parsed_context.get("active_material"),
-            ps_mat_data=parsed_context.get("ps_mat_data"),
-            active_group=parsed_context.get("active_group"),
-            active_channel=parsed_context.get("active_channel"),
-            active_layer=parsed_context.get("active_layer"),
-            active_global_layer=parsed_context.get("active_global_layer"),
-        )
+        return parse_context(context)
 
     @staticmethod
     def parse_context(context: bpy.types.Context) -> dict:
         """Parse the context and return a plain dict. Provided for convenience."""
-        return parse_context(context)
+        return _parse_context(context)
 
     # @classmethod
     # def poll(cls, context):
@@ -647,4 +687,57 @@ classes = (
     MaterialData,
     )
 
-register, unregister = register_classes_factory(classes)
+@persistent
+def save_handler(scene: bpy.types.Scene):
+    print("Saving Paint System data...")
+    images = []
+    ps_ctx = parse_context(bpy.context)
+    for layer in ps_ctx.ps_scene_data.layers:
+        image = layer.image
+        if image and (image.is_dirty):
+            images.append(image)
+        mask_image = layer.mask_image
+        if mask_image and (mask_image.is_dirty):
+            images.append(mask_image)
+            
+    for image in images:
+        if not image.is_dirty:
+            continue
+        if image.packed_file or image.filepath == '':
+            image.pack()
+        else:
+            image.save()
+
+
+@persistent
+def refresh_image(scene: bpy.types.Scene):
+    ps_ctx = parse_context(bpy.context)
+    active_layer = ps_ctx.active_layer
+    if active_layer and active_layer.image:
+        active_layer.image.reload()
+
+_register, _unregister = register_classes_factory(classes)
+
+def register():
+    """Register the Paint System data module."""
+    _register()
+    bpy.types.Scene.ps_scene_data = PointerProperty(
+        type=PaintSystemGlobalData,
+        name="Paint System Data",
+        description="Data for the Paint System"
+    )
+    bpy.types.Material.ps_mat_data = PointerProperty(
+        type=MaterialData,
+        name="Paint System Material Data",
+        description="Material Data for the Paint System"
+    )
+    bpy.app.handlers.save_pre.append(save_handler)
+    bpy.app.handlers.load_post.append(refresh_image)
+    
+def unregister():
+    """Unregister the Paint System data module."""
+    bpy.app.handlers.save_pre.remove(save_handler)
+    bpy.app.handlers.load_post.remove(refresh_image)
+    del bpy.types.Material.ps_mat_data
+    del bpy.types.Scene.ps_scene_data
+    _unregister()

@@ -14,8 +14,8 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
     
     def get_unique_channel_name(self, context):
         """Set a unique name for the new channel."""
-        parsed_context = PSContextMixin.parse_context(context)
-        active_group = parsed_context.get("active_group")
+        ps_ctx = PSContextMixin.ensure_context(context)
+        active_group = ps_ctx.active_group
         return get_next_unique_name(self.channel_name, [channel.name for channel in active_group.channels])
 
     channel_name: bpy.props.StringProperty(
@@ -38,7 +38,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, Operator):
     def execute(self, context):
         ps_ctx = self.ensure_context(context)
         channels = ps_ctx.active_group.channels
-        node_tree = bpy.data.node_groups.new(name=self.channel_name, type='ShaderNodeTree')
+        node_tree = bpy.data.node_groups.new(name=f"PS_Channel ({self.channel_name})", type='ShaderNodeTree')
         node_tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
         node_tree.interface.new_socket("Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
         node_tree.interface.new_socket("Color", in_out="INPUT", socket_type="NodeSocketColor")
@@ -118,6 +118,7 @@ class PAINTSYSTEM_OT_MoveChannelUp(PSContextMixin, Operator):
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
         lm.move_active_up()
         ps_ctx.active_group.update_node_tree(context)
+        redraw_panel(context)
         return {'FINISHED'}
 
 class PAINTSYSTEM_OT_MoveChannelDown(PSContextMixin, Operator):
@@ -139,6 +140,7 @@ class PAINTSYSTEM_OT_MoveChannelDown(PSContextMixin, Operator):
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
         lm.move_active_down()
         ps_ctx.active_group.update_node_tree(context)
+        redraw_panel(context)
         return {'FINISHED'}
 
 classes = (

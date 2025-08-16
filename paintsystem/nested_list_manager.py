@@ -1,7 +1,7 @@
 import bpy
 from bpy.props import StringProperty, IntProperty, CollectionProperty, PointerProperty, EnumProperty
 from bpy.types import (PropertyGroup, UIList, Operator, Panel)
-
+from bpy.utils import register_classes_factory
 
 class BaseNestedListItem(PropertyGroup):
     """Base class for nested list items. Extend this class to add custom properties."""
@@ -72,7 +72,7 @@ class BaseNestedListManager(PropertyGroup):
 
         return parent_id, insert_order
 
-    def add_item(self, name, item_type='ITEM', parent_id=-1, **kwargs):
+    def add_item(self, name, item_type='ITEM', parent_id=-1, **kwargs) -> item_type:
         """Add a new item to the list"""
         if item_type == 'ITEM' and parent_id != -1:
             parent = self.get_item_by_id(parent_id)
@@ -425,3 +425,136 @@ class BaseNestedListManager(PropertyGroup):
                     return self.skip_over_item(item, siblings, direction)
 
         return False
+
+
+class NLM_OT_MoveUp(Operator):
+    bl_idname = "nested_list.move_up"
+    bl_label = "Move Item Up"
+
+    action: EnumProperty(
+        items=[
+            ('MOVE_INTO', "Move Into", "Move into folder"),
+            ('MOVE_ADJACENT', "Move Adjacent", "Move as sibling"),
+            ('MOVE_OUT', "Move Out", "Move out of folder"),
+            ('SKIP', "Skip", "Skip over item"),
+        ]
+    )
+
+    def invoke(self, context, event):
+        manager = context.scene.nested_list_manager
+        item_id = manager.get_id_from_flattened_index(manager.active_index)
+
+        options = manager.get_movement_options(item_id, 'UP')
+        if not options:
+            return {'CANCELLED'}
+
+        if len(options) == 1 and options[0][0] == 'SKIP':
+            self.action = 'SKIP'
+            return self.execute(context)
+
+        context.window_manager.popup_menu(
+            self.draw_menu,
+            title="Move Options"
+        )
+        return {'FINISHED'}
+
+    def draw_menu(self, self_menu, context):
+        manager = context.scene.nested_list_manager
+        item_id = manager.get_id_from_flattened_index(manager.active_index)
+
+        for op_id, label, props in manager.get_movement_menu_items(item_id, 'UP'):
+            op = self_menu.layout.operator(op_id, text=label)
+            for key, value in props.items():
+                setattr(op, key, value)
+
+    def execute(self, context):
+        manager = context.scene.nested_list_manager
+        item_id = manager.get_id_from_flattened_index(manager.active_index)
+
+        if manager.execute_movement(item_id, 'UP', self.action):
+            # Update active_index to follow the moved item
+            flattened = manager.flatten_hierarchy()
+            for i, (item, _) in enumerate(flattened):
+                if item.id == item_id:
+                    manager.active_index = i
+                    break
+            manager.normalize_orders()
+            return {'FINISHED'}
+
+        return {'CANCELLED'}
+
+
+class NLM_OT_MoveDown(Operator):
+    bl_idname = "nested_list.move_down"
+    bl_label = "Move Item Down"
+
+    action: EnumProperty(
+        items=[
+            ('MOVE_OUT_BOTTOM', "Move Out Bottom", "Move out of folder"),
+            ('MOVE_INTO_TOP', "Move Into Top", "Move to top of folder"),
+            ('MOVE_ADJACENT', "Move Adjacent", "Move as sibling"),
+            ('SKIP', "Skip", "Skip over item"),
+        ]
+    )
+
+    def invoke(self, context, event):
+        manager = context.scene.nested_list_manager
+        item_id = manager.get_id_from_flattened_index(manager.active_index)
+
+        options = manager.get_movement_options(item_id, 'DOWN')
+        if not options:
+            return {'CANCELLED'}
+
+        if len(options) == 1 and options[0][0] == 'SKIP':
+            self.action = 'SKIP'
+            return self.execute(context)
+
+        context.window_manager.popup_menu(
+            self.draw_menu,
+            title="Move Options"
+        )
+        return {'FINISHED'}
+
+    def draw_menu(self, self_menu, context):
+        manager = context.scene.nested_list_manager
+        item_id = manager.get_id_from_flattened_index(manager.active_index)
+
+        for op_id, label, props in manager.get_movement_menu_items(item_id, 'DOWN'):
+            op = self_menu.layout.operator(op_id, text=label)
+            for key, value in props.items():
+                setattr(op, key, value)
+
+    def execute(self, context):
+        manager = context.scene.nested_list_manager
+        item_id = manager.get_id_from_flattened_index(manager.active_index)
+
+        if manager.execute_movement(item_id, 'DOWN', self.action):
+            # Update active_index to follow the moved item
+            flattened = manager.flatten_hierarchy()
+            for i, (item, _) in enumerate(flattened):
+                if item.id == item_id:
+                    manager.active_index = i
+                    break
+            manager.normalize_orders()
+            return {'FINISHED'}
+
+        return {'CANCELLED'}
+
+
+class NLM_OT_NormalizeOrders(Operator):
+    bl_idname = "nested_list.normalize_orders"
+    bl_label = "Normalize Orders"
+
+    def execute(self, context):
+        manager = context.scene.nested_list_manager
+        manager.normalize_orders()
+        return {'FINISHED'}
+
+
+classes = (
+    NLM_OT_MoveUp,
+    NLM_OT_MoveDown,
+    NLM_OT_NormalizeOrders,
+)
+
+register, unregister = register_classes_factory(classes)

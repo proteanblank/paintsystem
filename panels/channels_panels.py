@@ -55,12 +55,7 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
     
     # def draw_header(self, context):
     #     layout = self.layout
-    #     type_to_icon = {
-    #         'COLOR': 'color_socket',
-    #         'VECTOR': 'vector_socket',
-    #         'VALUE': 'value_socket',
-    #     }
-    #     layout.label(icon_value=get_icon(type_to_icon.get(self.active_channel.type, 'color_socket')))
+    #     layout.label(icon_value=get_icon('channel'))
         
     def draw_header_preset(self, context):
         layout = self.layout
@@ -104,6 +99,12 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
     bl_label = "Channels Settings"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_ChannelsPanel'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None and len(ps_ctx.active_group.channels) > 0
     
     def draw(self, context):
         layout = self.layout
