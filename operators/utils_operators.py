@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import Operator
-from bpy.props import IntProperty
+from bpy.props import IntProperty, StringProperty
 from .common import PSContextMixin, MultiMaterialOperator
 from bpy.utils import register_classes_factory
 from .brushes import get_brushes_from_library
@@ -8,6 +8,7 @@ from ..utils.nodes import find_node, get_material_output
 from bpy_extras.node_utils import connect_sockets
 from mathutils import Vector
 import pathlib
+import math
 
 
 
@@ -23,6 +24,9 @@ class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
+        
+        if ps_ctx.ps_mat_data.preview_channel and context.object.mode == 'TEXTURE_PAINT':
+            bpy.ops.paint_system.preview_active_channel('EXEC_DEFAULT')
 
         bpy.ops.object.mode_set(mode='TEXTURE_PAINT', toggle=True)
         is_cycles = bpy.context.scene.render.engine == 'CYCLES'
@@ -70,54 +74,7 @@ class PAINTSYSTEM_OT_SelectMaterialIndex(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_QuickEdit(Operator):
-    bl_idname = "paint_system.quick_edit"
-    bl_label = "Quick Edit"
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Quickly edit the active image"
 
-    def execute(self, context):
-        current_image_editor = context.preferences.filepaths.image_editor
-        if not current_image_editor:
-            self.report({'ERROR'}, "No image editor set")
-            return {'CANCELLED'}
-        bpy.ops.paint_system.project_edit('INVOKE_DEFAULT')
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self)
-
-    def draw(self, context):
-        layout = self.layout
-        current_image_editor = context.preferences.filepaths.image_editor
-        image_paint = context.scene.tool_settings.image_paint
-        if not current_image_editor:
-            layout.prop(context.preferences.filepaths, "image_editor")
-        else:
-            editor_path = pathlib.Path(current_image_editor)
-            app_name = editor_path.name
-            layout.label(text=f"Open {app_name}", icon="EXPORT")
-        box = layout.box()
-        row = box.row()
-        row.alignment = "CENTER"
-        row.label(text="External Settings:", icon="TOOL_SETTINGS")
-        row = box.row()
-        row.prop(image_paint, "seam_bleed", text="Bleed")
-        row.prop(image_paint, "dither", text="Dither")
-        split = box.split()
-        split.label(text="Screen Grab Size:")
-        split.prop(image_paint, "screen_grab_size", text="")
-
-
-class PAINTSYSTEM_OT_ApplyEdit(Operator):
-    bl_idname = "paint_system.apply_edit"
-    bl_label = "Apply Edit"
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Apply the edit to the active image"
-
-    def execute(self, context):
-        bpy.ops.image.project_apply('INVOKE_DEFAULT')
-        return {'FINISHED'}
 
 
 class PAINTSYSTEM_OT_NewMaterial(MultiMaterialOperator):
@@ -163,6 +120,10 @@ class PAINTSYSTEM_OT_PreviewActiveChannel(PSContextMixin, Operator):
             if node:
                 # Connect node tree to material output
                 connect_sockets(mat_output.inputs[0], node.outputs[active_channel.name])
+            
+            # Force toggle paint mode
+            if bpy.context.object.mode != 'TEXTURE_PAINT':
+                bpy.ops.paint_system.toggle_paint_mode('EXEC_DEFAULT')
         else:
             ps_mat_data.preview_channel = False
             # Find node by name
@@ -172,13 +133,54 @@ class PAINTSYSTEM_OT_PreviewActiveChannel(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_CreatePaintSystemUVMap(Operator):
+    bl_idname = "paint_system.create_paint_system_uv_map"
+    bl_label = "Create Paint System UV Map"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Create a new UV Map"
+
+    def execute(self, context):
+        # Get all objects in selection
+        selection = context.selected_objects
+
+        # Get the active object
+        active_object = context.active_object
+        
+        if active_object.data.uv_layers.get("PS_UVMap"):
+            return {'FINISHED'}
+
+        # Deselect all objects
+        for obj in selection:
+            if obj != active_object:
+                obj.select_set(False)
+        # Make it active
+        context.view_layer.objects.active = active_object
+        original_mode = str(active_object.mode)
+        bpy.ops.object.mode_set(mode='EDIT')
+        obj.update_from_editmode()
+        bpy.ops.mesh.select_all(action='SELECT')
+        # Apply to only the active object
+        bpy.ops.uv.smart_project(angle_limit=30/180*math.pi, island_margin=0.005)
+        uv_layers = active_object.data.uv_layers
+        uvmap = uv_layers.new(name="PS_UVMap")
+        # Set active UV Map
+        uv_layers.active = uv_layers.get(uvmap.name)
+        bpy.ops.object.mode_set(mode=original_mode)
+        # Deselect the object
+        active_object.select_set(False)
+        # Restore the selection
+        for obj in selection:
+            obj.select_set(True)
+        context.view_layer.objects.active = active_object
+        return {'FINISHED'}
+
+
 classes = (
     PAINTSYSTEM_OT_TogglePaintMode,
     PAINTSYSTEM_OT_AddPresetBrushes,
     PAINTSYSTEM_OT_SelectMaterialIndex,
-    PAINTSYSTEM_OT_QuickEdit,
-    PAINTSYSTEM_OT_ApplyEdit,
     PAINTSYSTEM_OT_NewMaterial,
     PAINTSYSTEM_OT_PreviewActiveChannel,
+    PAINTSYSTEM_OT_CreatePaintSystemUVMap,
 )
 register, unregister = register_classes_factory(classes)

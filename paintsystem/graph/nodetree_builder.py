@@ -71,6 +71,7 @@ class Add_Node:
     node_type: str
     properties: dict = None
     default_values: dict = None  # Default values for input sockets, if any
+    default_outputs: dict = None  # Default values for output sockets, if any
     
 
 @dataclass
@@ -201,7 +202,7 @@ class NodeTreeBuilder:
         self._log("Hydrating existing nodes from frame")
         for node in self.tree.nodes:
             if getattr(node, 'parent', None) == self.frame and node.type != 'FRAME':
-                
+                self._log(f"Hydrating node: {node.name}")
                 # If the graph is adjustable, add all nodes in the frame to add commands which can be overridden with add_node commands
                 if self.adjustable:
                     # Ensure node name is in this format identifier<number of appearances>
@@ -299,7 +300,7 @@ class NodeTreeBuilder:
         
         self.compiled = False  # Reset compiled state
 
-    def add_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None) -> None:
+    def add_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None) -> None:
         # Store the command to add a node
         """
         Adds a node to the graph definition.
@@ -326,9 +327,9 @@ class NodeTreeBuilder:
         
         self._log(f"Adding node '{identifier}' of type '{node_type}' with properties '{properties}' and default values '{default_values}'")
         self.__add_nodes_commands[identifier] = Add_Node(
-            identifier=identifier, node_type=node_type, properties=properties, default_values=default_values)
+            identifier=identifier, node_type=node_type, properties=properties, default_values=default_values, default_outputs=default_outputs)
 
-    def _create_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None) -> None:
+    def _create_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None) -> None:
         """
         Creates a node in the graph.
 
@@ -393,6 +394,13 @@ class NodeTreeBuilder:
                     self._log(f"Warning: Could not set default value for input '{input_name}' to '{value}'. Error: {e}")
                 # else:
                 #     self._log(f"Warning: Input socket '{input_name}' not found on node type '{node_type}'.")
+                
+        if default_outputs:
+            for output_name, value in default_outputs.items():
+                try:
+                    node.outputs[output_name].default_value = value
+                except Exception as e:
+                    self._log(f"Warning: Could not set default value for output '{output_name}' to '{value}'. Error: {e}")
 
     def link(
         self,
@@ -767,7 +775,7 @@ class NodeTreeBuilder:
         self._log("Adding nodes to the tree")
         start_time_add_nodes = time.time()
         for identifier, command in self.__add_nodes_commands.items():
-            self._create_node(identifier, command.node_type, command.properties, command.default_values)
+            self._create_node(identifier, command.node_type, command.properties, command.default_values, command.default_outputs)
         self._log(f"Time taken to add nodes: {time.time() - start_time_add_nodes} seconds")
 
         # Re-apply previously captured state (node-level props and input defaults)
@@ -827,6 +835,7 @@ class NodeTreeBuilder:
 
         Returns a mapping: identifier -> { 'properties': {...}, 'inputs': {...} }
         """
+        self._log("Capturing node state")
         captured: Dict[str, dict] = {}
         for identifier, node in list(self.nodes.items()):
             # Skip subgraphs and special reroutes
@@ -862,38 +871,48 @@ class NodeTreeBuilder:
                 # If introspection fails on this node type, skip silently
                 pass
 
-            input_defaults: Dict[str, object] = {}
-            try:
-                for sock in getattr(node, 'inputs', []):
-                    if sock.enabled and hasattr(sock, 'default_value'):
-                        try:
-                            val = sock.default_value
-                            # Convert vector/color/array types to tuple for safe storage
+            
+            def capture_defaults(node: bpy.types.Node, property_name: str= 'inputs'):
+                defaults: Dict[str, object] = {}
+                try:
+                    for sock in getattr(node, property_name, []):
+                        if sock.enabled and hasattr(sock, 'default_value'):
                             try:
-                                # Avoid treating scalars as iterables
-                                if isinstance(val, (str, bytes)):
-                                    input_defaults[sock.name] = val
-                                else:
-                                    iter(val)
-                                    input_defaults[sock.name] = tuple(val)
-                            except TypeError:
-                                input_defaults[sock.name] = val
-                        except Exception as e:
-                            self._log(f"Warning: Could not set default value for input '{sock.name}' to '{val}'. Error: {e}")
-                            pass
-            except Exception as e:
-                self._log(f"Warning: Could not capture node state for '{identifier}'. Error: {e}")
-                pass
+                                val = sock.default_value
+                                # Convert vector/color/array types to tuple for safe storage
+                                try:
+                                    # Avoid treating scalars as iterables
+                                    if isinstance(val, (str, bytes)):
+                                        defaults[sock.name] = val
+                                    else:
+                                        iter(val)
+                                        defaults[sock.name] = tuple(val)
+                                except TypeError:
+                                    defaults[sock.name] = val
+                            except Exception as e:
+                                self._log(f"Warning: Could not set default value for input '{sock.name}' to '{val}'. Error: {e}")
+                                pass
+                except Exception as e:
+                    self._log(f"Warning: Could not capture node state for '{identifier}'. Error: {e}")
+                    pass
+                return defaults
+                
+            input_defaults = capture_defaults(node, 'inputs')
+            output_defaults = capture_defaults(node, 'outputs')
 
             if node_props or input_defaults:
                 captured[identifier] = {
                     'properties': node_props,
                     'inputs': input_defaults,
+                    'outputs': output_defaults,
                 }
+        self._log("Captured node state")
+        self._log(captured)
         return captured
 
     def _apply_node_state(self, saved_state: Dict[str, dict]) -> None:
         """Apply captured properties and input defaults to current nodes by identifier."""
+        self._log("Applying node state")
         for identifier, state in saved_state.items():
             node = next((n for n in self.nodes.values() if self.get_node_identifier(n) == identifier.split('.')[0]), None)
             if node is None or isinstance(node, NodeTreeBuilder):
@@ -905,18 +924,28 @@ class NodeTreeBuilder:
                 try:
                     if hasattr(node, pid):
                         setattr(node, pid, value)
-                except Exception:
+                except Exception as e:
                     # Some properties may be invalid for the new node type or context
-                    pass
+                    self._log(f"Warning: Could not apply property '{pid}' for '{identifier}'. Error: {e}")
 
-            inputs = state.get('inputs', {})
+            inputs = state.get('inputs', dict())
+            outputs = state.get('outputs', dict())
             for input_name, value in inputs.items():
                 try:
-                    if input_name in node.inputs and hasattr(node.inputs[input_name], 'default_value'):
+                    if input_name in node.inputs and hasattr(node.inputs[input_name], 'default_value') and value != node.inputs[input_name].default_value:
                         node.inputs[input_name].default_value = value
-                except Exception:
+                        self._log(f"Applied input '{input_name}' for '{identifier}'")
+                except Exception as e:
                     # Socket types or arity may differ; best-effort only
-                    pass
+                    self._log(f"Warning: Could not apply input '{input_name}' for '{identifier}'. Error: {e}")
+            for output_name, value in outputs.items():
+                try:
+                    if output_name in node.outputs and hasattr(node.outputs[output_name], 'default_value') and value != node.outputs[output_name].default_value:
+                        node.outputs[output_name].default_value = value
+                        self._log(f"Applied output '{output_name}' for '{identifier}'")
+                except Exception as e:
+                    self._log(f"Warning: Could not apply output '{output_name}' for '{identifier}'. Error: {e}")
+        self._log("Applied node state")
 
     def _arrange_nodes(self):
         """A simple node arrangement algorithm."""

@@ -4,6 +4,7 @@ from .list_manager import ListManager
 from bpy.utils import register_classes_factory
 from bpy.types import NodeTree
 from .common import PSContextMixin, scale_content, MultiMaterialOperator, get_icon
+from .utils import redraw_panel
 from mathutils import Vector
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output, transfer_connection
 from bpy_extras.node_utils import find_base_socket_type, connect_sockets
@@ -101,7 +102,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
         if not context.active_object.active_material:
             bpy.data.materials.new(name="New Material")
             context.active_object.active_material = bpy.data.materials[-1]
-        
+            
         ps_ctx = self.ensure_context(context)
         mat = ps_ctx.active_material
         mat.use_nodes = True
@@ -222,7 +223,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
             case _:
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                 # bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
-        
+        redraw_panel(context)
         return {'FINISHED'}
     
     def invoke(self, context, event):
@@ -254,7 +255,15 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
         split.label(text="Group Name:")
         split.prop(self, "group_name", text="", icon='NODETREE')
         if self.template in ['BASIC']:
-            box.prop(self, "use_alpha_blend", text="Use Alpha Blend")
+            box.prop(self, "use_alpha_blend", text="Use Smooth Alpha")
+            if self.use_alpha_blend:
+                warning_box = box.box()
+                warning_box.alert = True
+                row = warning_box.row()
+                row.label(icon='ERROR')
+                col = row.column(align=True)
+                col.label(text="Warning: Smooth Alpha (Alpha Blend) may cause")
+                col.label(text="sorting artifacts.")
             box.prop(self, "disable_show_backface",
                      text="Use Backface Culling")
         if context.scene.view_settings.view_transform != 'Standard':
@@ -278,6 +287,7 @@ class PAINTSYSTEM_OT_DeleteGroup(PSContextMixin, MultiMaterialOperator):
         ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         lm.remove_active_item()
+        redraw_panel(context)
         return {'FINISHED'}
     
     def invoke(self, context, event):
@@ -314,6 +324,7 @@ class PAINTSYSTEM_OT_MoveGroup(PSContextMixin, MultiMaterialOperator):
         ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         lm.move_active_down() if self.direction == 'DOWN' else lm.move_active_up()
+        redraw_panel(context)
         return {'FINISHED'}
 
 

@@ -43,7 +43,7 @@ class MultiMaterialOperator(Operator):
     def execute(self, context: Context):
         error_count = 0
         objects = set()
-        objects.add(context.object)
+        objects.add(context.active_object)
         if self.multiple_objects:
             objects.update(context.selected_objects)
         
@@ -57,17 +57,17 @@ class MultiMaterialOperator(Operator):
                     for mat in object_mats:
                         if mat in seen_materials:
                             continue
-                        with context.temp_override(active_object=object, selected_objects=[object], active_material=mat):
+                        with context.temp_override(object=object, active_object=object, selected_objects=[object], active_material=mat):
                             error_count += not bool(self.process_material(bpy.context))
                         seen_materials.add(mat)
                 else:
                     if object.active_material in seen_materials:
                         continue
-                    with context.temp_override(active_object=object, selected_objects=[object], active_material=object.active_material):
+                    with context.temp_override(object=object, active_object=object, selected_objects=[object], active_material=object.active_material):
                         error_count += not bool(self.process_material(bpy.context))
                     seen_materials.add(object.active_material)
             else:
-                with context.temp_override(active_object=object, selected_objects=[object]):
+                with context.temp_override(object=object, active_object=object, selected_objects=[object]):
                     error_count += not bool(self.process_material(bpy.context))
         
         if error_count > 0:

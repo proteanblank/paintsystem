@@ -73,7 +73,7 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
         layout.prop(self, "invert_a", text="Alpha")
 
 
-class PAINTSYSTEM_OT_ExportActiveLayer(Operator):
+class PAINTSYSTEM_OT_ExportActiveLayer(PSContextMixin, Operator):
     bl_idname = "paint_system.export_active_layer"
     bl_label = "Save Image"
     bl_options = {'REGISTER', 'UNDO'}

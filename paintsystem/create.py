@@ -21,7 +21,7 @@ def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLa
         node_tree.interface.new_socket("Over Color", in_out="INPUT", socket_type="NodeSocketColor")
         node_tree.interface.new_socket("Over Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
     global_layer = bpy.context.scene.ps_scene_data.layers.add()
-    global_layer.id = str(uuid4())
+    global_layer.uid = str(uuid4())
     global_layer.type = layer_type
     global_layer.node_tree = node_tree
     # Ensure we set the declared property name
@@ -38,7 +38,7 @@ def add_global_layer_to_channel(channel: Channel, global_layer: GlobalLayer, lay
             parent_id=parent_id,
             order=insert_order
         )
-    layer.ref_layer_id = global_layer.id
+    layer.ref_layer_id = global_layer.uid
     layer.name = layer_name
     # Update active index
     new_id = layer.id

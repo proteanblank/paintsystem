@@ -47,6 +47,10 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
     #     row.operator("paint_system.new_group", text="Add", icon="ADD")
     #     row.operator("paint_system.delete_group", text="", icon="REMOVE")
     
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None and context.active_object.type == 'MESH'
+    
     def draw_header(self, context):
         layout = self.layout
         layout.label(icon_value=get_icon("sunflower"))

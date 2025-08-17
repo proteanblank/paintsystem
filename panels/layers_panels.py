@@ -3,7 +3,8 @@ from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTre
 from bpy.utils import register_classes_factory
 from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
-from ..paintsystem.data import is_valid_ps_nodetree
+from ..paintsystem.data import is_valid_ps_nodetree, GlobalLayer
+import time
 
 
 def is_image_painted(image: Image | ImagePreview) -> bool:
@@ -36,6 +37,19 @@ def is_basic_setup(node_tree: NodeTree) -> bool:
             break
     return is_basic_setup
 
+
+def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
+    """Check if the global layer is linked"""
+    # Check all material in the scene and count the number of times the global layer is used
+    count = 0
+    for material in bpy.data.materials:
+        if hasattr(material, 'ps_mat_data'):
+            for group in material.ps_mat_data.groups:
+                for channel in group.channels:
+                    for layer in channel.layers:
+                        if layer.ref_layer_id == global_layer.uid:
+                            count += 1
+    return count > 1
 
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
@@ -93,6 +107,8 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                 row.label(icon="SELECT_INTERSECT")
             if global_item.lock_layer:
                 row.label(icon="VIEW_LOCKED")
+            if is_global_layer_linked(global_item):
+                row.label(icon="LINKED")
             row.prop(item, "enabled", text="",
                      icon="HIDE_OFF" if item.enabled else "HIDE_ON", emboss=False)
             self.draw_custom_properties(row, global_item)
@@ -530,7 +546,10 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator("paint_system.copy_layer", text="Copy Layer", icon="COPYDOWN")
-        layout.operator("paint_system.paste_layer", text="Paste Layer", icon="PASTEDOWN")
+        layout.operator("paint_system.copy_all_layers", text="Copy All Layers", icon="COPYDOWN")
+        layout.operator("paint_system.paste_layer", text="Paste Layer(s)", icon="PASTEDOWN").linked = False
+        layout.operator("paint_system.paste_layer", text="Paste Linked Layer(s)", icon="LINKED").linked = True
+        layout.separator()
         layout.operator("paint_system.delete_item", text="Delete Layer", icon="TRASH")
 
 class MAT_MT_AddLayerMenu(Menu):

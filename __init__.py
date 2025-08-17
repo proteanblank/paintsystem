@@ -35,6 +35,8 @@ bl_info_copy = bl_info.copy()
 
 print("Paint System: Registering...")
 
+owner = object()
+
 submodules = [
     # "properties",
     # "operators_layers",

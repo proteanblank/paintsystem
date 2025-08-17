@@ -204,16 +204,16 @@ def is_valid_ps_nodetree(node_tree: NodeTree) -> bool:
 class GlobalLayer(PropertyGroup):
             
     def update_node_tree(self, context):
-        self.node_tree.name = f".PS_Layer ({self.id})"
+        self.node_tree.name = f".PS_Layer ({self.uid})"
         match self.type:
             case "IMAGE":
-                image_graph = create_image_graph(self.node_tree, self.image)
+                image_graph = create_image_graph(self.node_tree, self.image, self.coord_type, self.uv_map_name)
                 image_graph.compile()
             case "FOLDER":
                 folder_graph = create_folder_graph(self.node_tree)
                 folder_graph.compile()
             case "SOLID_COLOR":
-                solid_graph = create_solid_graph(self.node_tree, (1.0, 1.0, 1.0, 1.0))
+                solid_graph = create_solid_graph(self.node_tree)
                 solid_graph.compile()
             case "ATTRIBUTE":
                 attribute_graph = create_attribute_graph(self.node_tree)
@@ -263,7 +263,7 @@ class GlobalLayer(PropertyGroup):
             return self.post_mix_node.inputs["Factor"].default_value
         return 1.0
     
-    id: StringProperty()
+    uid: StringProperty()
     
     # name: StringProperty(
     #     name="Name",
@@ -321,6 +321,10 @@ class Layer(BaseNestedListItem):
     """Base class for material layers in the Paint System"""
     def update_node_tree(self, context):
         global_layer = get_global_layer(self)
+        if global_layer == None:
+            return
+        if global_layer.type == "IMAGE" and global_layer.coord_type == "AUTO":
+            bpy.ops.paint_system.create_paint_system_uv_map('EXEC_DEFAULT')
         if global_layer:
             global_layer.update_node_tree(context)
     
@@ -358,7 +362,7 @@ class Channel(BaseNestedListManager):
     def update_node_tree(self, context):
         if not self.node_tree:
             return
-        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200, verbose=True)
+        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200)
         node_builder.add_node("group_input", "NodeGroupInput")
         node_builder.add_node("group_output", "NodeGroupOutput")
         flattened_layers = self.flatten_hierarchy()
@@ -378,7 +382,7 @@ class Channel(BaseNestedListManager):
             for layer, _ in flattened_layers:
                 previous_data = previous_dict.get(layer.parent_id, None)
                 global_layer = get_global_layer(layer)
-                layer_identifier = global_layer.id
+                layer_identifier = global_layer.uid
                 node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree, "mute": not layer.enabled})
                 # match global_layer.type:
                 #     case "IMAGE":
@@ -529,11 +533,9 @@ class Group(PropertyGroup):
     def update_node_tree(self, context):
         if not self.node_tree:
             return
-        print("update_node_tree")
         node_tree = self.node_tree
         node_tree.name = f"Paint System ({self.name})"
         if not isinstance(node_tree, bpy.types.NodeTree):
-            print("Node tree is not a NodeTree")
             return
         
         # Ensure node sockets are in the correct order
@@ -575,8 +577,6 @@ class Group(PropertyGroup):
             if channel.use_alpha:
                 expected_sockets.append(ExpectedSocket(f"{channel.name} Alpha", "NodeSocketFloat", "FACTOR"))
         
-        print(expected_sockets)
-        
         def ensure_sockets(expected_sockets, in_out = "OUTPUT"):
             if in_out == "INPUT":
                 offset_idx = len(expected_sockets)
@@ -586,14 +586,13 @@ class Group(PropertyGroup):
                 output_sockets = [socket for socket in nt_sockets if socket.item_type == "SOCKET" and socket.in_out == in_out]
                 output_sockets_names = [socket.name for socket in output_sockets]
                 change, idx = detect_change(output_sockets_names, [socket.name for socket in expected_sockets])
-                print(change, idx)
                 if change is None:
                     break
                 match change:
                     case "ADD":
                         socket_name, socket_type, subtype = expected_sockets[idx].name, expected_sockets[idx].socket_type, expected_sockets[idx].subtype
                         socket = nt_interface.new_socket(name=socket_name, socket_type=socket_type, in_out=in_out)
-                        if subtype:
+                        if hasattr(socket, "subtype") and subtype:
                             socket.subtype = subtype
                             if subtype == "FACTOR":
                                 socket.min_value = 0
@@ -605,7 +604,6 @@ class Group(PropertyGroup):
                     case "MOVE":
                         socket = output_sockets[idx]
                         expected_socket_idx = [socket.name for socket in expected_sockets].index(socket.name)
-                        print("move", socket.name, expected_socket_idx, offset_idx)
                         nt_interface.move(socket, expected_socket_idx + offset_idx + 1)
                     case "RENAME":
                         socket = output_sockets[idx]
@@ -708,7 +706,7 @@ def get_global_layer(layer: Layer) -> GlobalLayer | None:
     if not layer or not bpy.context.scene or not bpy.context.scene.get("ps_scene_data"):
         return None
     for global_layer in bpy.context.scene.ps_scene_data.layers:
-        if global_layer.id == layer.ref_layer_id:
+        if global_layer.uid == layer.ref_layer_id:
             return global_layer
     return None
 

@@ -11,12 +11,13 @@ class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
     def draw_item(self, context, layout: bpy.types.UILayout, data, item, icon, active_data, active_propname, index):
         channel = item
         ps_ctx = self.ensure_context(context)
-        row = layout.row(align=True)
+        split = layout.split(factor=0.6)
         group_node = find_node(ps_ctx.active_material.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
-        row.prop(channel, "type", text="", icon_only=True, emboss=False)
-        row.prop(channel, "name", text="", emboss=False)
+        icon_row = split.row(align=True)
+        icon_row.prop(channel, "type", text="", icon_only=True, emboss=False)
+        icon_row.prop(channel, "name", text="", emboss=False)
         if group_node and channel.type == "FLOAT":
-            row.prop(group_node.inputs[channel.name], "default_value", text="", slider=channel.use_factor)
+            split.prop(group_node.inputs[channel.name], "default_value", text="", slider=channel.use_factor)
 
     # def filter_items(self, context, data, propname):
     #     channels = getattr(data, propname)
@@ -29,7 +30,7 @@ class MAT_PT_ChannelsSelect(PSContextMixin, Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_label = "Channels"
-    bl_ui_units_x = 12
+    bl_ui_units_x = 10
     
     def draw(self, context):
         layout = self.layout
@@ -56,7 +57,8 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
-        return ps_ctx.ps_mat_data and ps_ctx.active_group is not None
+        ob = context.object
+        return ps_ctx.ps_mat_data and ps_ctx.active_group is not None and ob.mode == 'OBJECT'
     
     # def draw_header(self, context):
     #     layout = self.layout

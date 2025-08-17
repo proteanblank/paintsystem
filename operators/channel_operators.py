@@ -46,7 +46,6 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
     )
     
     def process_material(self, context):
-        print(self.channel_name, self.use_factor)
         ps_ctx = self.ensure_context(context)
         channels = ps_ctx.active_group.channels
         node_tree = bpy.data.node_groups.new(name=f"PS_Channel ({self.channel_name})", type='ShaderNodeTree')
@@ -108,7 +107,6 @@ class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, MultiMaterialOperator):
         
         ps_ctx.active_group.channels.remove(active_index)
         ps_ctx.active_group.active_index = max(0, active_index - 1)
-        print(ps_ctx.active_group.active_index)
         ps_ctx.active_group.update_node_tree(context)
         redraw_panel(context)
         return {'FINISHED'}

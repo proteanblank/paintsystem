@@ -7,7 +7,7 @@ from ..paintsystem.create import (
     add_global_layer,
     add_global_layer_to_channel,
 )
-from ..paintsystem.data import GRADIENT_ENUM, ADJUSTMENT_ENUM, COORDINATE_TYPE_ENUM, ATTRIBUTE_TYPE_ENUM
+from ..paintsystem.data import GRADIENT_ENUM, ADJUSTMENT_ENUM, COORDINATE_TYPE_ENUM, ATTRIBUTE_TYPE_ENUM, get_global_layer
 from ..utils import get_next_unique_name
 from .common import PSContextMixin, scale_content, get_icon, MultiMaterialOperator
 
@@ -176,7 +176,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
     """Create a new image layer"""
     bl_idname = "paint_system.new_image_layer"
     bl_label = "New Image Layer"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     
     @classmethod
     def poll(cls, context):
@@ -209,7 +209,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
             ('8192', "8192", "8192x8192"),
             ('CUSTOM', "Custom", "Custom Resolution"),
         ],
-        default='1024'
+        default='2048'
     )
     image_width: IntProperty(
         name="Width",
@@ -333,7 +333,7 @@ class PAINTSYSTEM_OT_NewFolder(PSContextMixin, MultiMaterialOperator):
     """Create a new folder layer"""
     bl_idname = "paint_system.new_folder_layer"
     bl_label = "New Folder"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -359,7 +359,7 @@ class PAINTSYSTEM_OT_NewSolidColor(PSContextMixin, MultiMaterialOperator):
     """Create a new solid color layer"""
     bl_idname = "paint_system.new_solid_color_layer"
     bl_label = "New Solid Color Layer"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -385,7 +385,7 @@ class PAINTSYSTEM_OT_NewAttribute(PSContextMixin, MultiMaterialOperator):
     """Create a new attribute layer"""
     bl_idname = "paint_system.new_attribute_layer"
     bl_label = "New Attribute Layer"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -421,7 +421,7 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
     """Create a new adjustment layer"""
     bl_idname = "paint_system.new_adjustment_layer"
     bl_label = "New Adjustment Layer"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -447,7 +447,7 @@ class PAINTSYSTEM_OT_NewShader(PSContextMixin, MultiMaterialOperator):
     """Create a new shader layer"""
     bl_idname = "paint_system.new_shader_layer"
     bl_label = "New Shader Layer"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -473,7 +473,7 @@ class PAINTSYSTEM_OT_NewNodeGroup(PSContextMixin, MultiMaterialOperator):
     """Create a new node group layer"""
     bl_idname = "paint_system.new_node_group_layer"
     bl_label = "New Node Group Layer"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -499,7 +499,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
     """Create a new gradient layer"""
     bl_idname = "paint_system.new_gradient_layer"
     bl_label = "New Gradient Layer"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context):
@@ -767,12 +767,41 @@ class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
         if not ps_scene_data:
             print("No ps_scene_data found")
             return {'CANCELLED'}
-        clipboard_layer = ps_scene_data.clipboard_layers.add()
+        clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
+        clipboard_layers.clear()
+        clipboard_layer = clipboard_layers.add()
         clipboard_layer.name = active_layer.name
         clipboard_layer.type = active_layer.type
         clipboard_layer.ref_layer_id = active_layer.ref_layer_id
         clipboard_layer.enabled = active_layer.enabled
         clipboard_layer.lock_alpha = active_layer.lock_alpha
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_CopyAllLayers(PSContextMixin, Operator):
+    """Copy all layers"""
+    bl_idname = "paint_system.copy_all_layers"
+    bl_label = "Copy All Layers"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Copy all layers"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        active_channel = ps_ctx.active_channel
+        clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
+        clipboard_layers.clear()
+        for layer in active_channel.layers:
+            clipboard_layer = clipboard_layers.add()
+            clipboard_layer.name = layer.name
+            clipboard_layer.type = layer.type
+            clipboard_layer.ref_layer_id = layer.ref_layer_id
+            clipboard_layer.enabled = layer.enabled
+            clipboard_layer.lock_alpha = layer.lock_alpha
         return {'FINISHED'}
 
 
@@ -783,17 +812,36 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     bl_description = "Paste the copied layer"
     
+    linked: BoolProperty(
+        name="Linked",
+        description="Paste the copied layer as linked",
+        default=False
+    )
+    
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
-        return len(ps_ctx.ps_scene_data.clipboard_layers) > 0
+        return len(bpy.context.scene.ps_scene_data.clipboard_layers) > 0
     
     def execute(self, context):
         ps_ctx = self.ensure_context(context)
-        clipboard_layers = ps_ctx.ps_scene_data.clipboard_layers
+        clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         for layer in clipboard_layers:
-            add_global_layer_to_channel(ps_ctx.active_channel, layer, layer.name)
-        clipboard_layers.clear()
+            global_layer = get_global_layer(layer)
+            if self.linked:
+                add_global_layer_to_channel(ps_ctx.active_channel, global_layer, layer.name)
+            else:
+                # Create a new global layer and copy everything except the uid
+                new_global_layer = add_global_layer(global_layer.type, layer.name)
+                for prop in global_layer.bl_rna.properties:
+                    print(prop)
+                    pid = getattr(prop, 'identifier', '')
+                    if not pid or getattr(prop, 'is_readonly', False):
+                        continue
+                    if pid in {"uid", "node_tree"}:
+                        continue
+                    setattr(new_global_layer, pid, getattr(global_layer, pid))
+                layer = add_global_layer_to_channel(ps_ctx.active_channel, new_global_layer, layer.name)
+        ps_ctx.active_channel.update_node_tree(context)
         
         return {'FINISHED'}
 
@@ -811,6 +859,7 @@ classes = (
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,
     PAINTSYSTEM_OT_CopyLayer,
+    PAINTSYSTEM_OT_CopyAllLayers,
     PAINTSYSTEM_OT_PasteLayer,
 )
 
