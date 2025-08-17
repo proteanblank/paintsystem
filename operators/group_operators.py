@@ -128,7 +128,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
             case 'BASIC':
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                 bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
-                bpy.ops.paint_system.new_image_layer('EXE_DEFAULT')
+                bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
                 
                 right_most_node = None
                 for node in mat_node_tree.nodes:
