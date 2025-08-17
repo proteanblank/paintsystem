@@ -80,18 +80,27 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             
             # row.operator("object.material_slot_add", icon='ADD', text="")
             col = row.row(align=True)
-            col.operator("paint_system.new_material", icon='ADD', text="")
-            col.operator("object.material_slot_remove", icon='REMOVE', text="")
+            # col.operator("paint_system.new_material", icon='ADD', text="")
+            col.operator("paint_system.delete_group", icon='REMOVE', text="")
             if ob.mode == 'EDIT':
                 row = layout.row(align=True)
                 row.operator("object.material_slot_assign", text="Assign")
                 row.operator("object.material_slot_select", text="Select")
                 row.operator("object.material_slot_deselect", text="Deselect")
+
         if not ps_ctx.active_group:
             row = layout.row()
             row.scale_x = 2
             row.scale_y = 2
             row.operator("paint_system.new_group", text="Add Paint System", icon="ADD")
+            return
+        brush_imported = False
+        for brush in bpy.data.brushes:
+            if brush.name.startswith("PS_"):
+                brush_imported = True
+                break
+        if not brush_imported:
+            layout.operator('paint_system.add_preset_brushes')
         # layout.label(text="Welcome to the Paint System!")
         # layout.operator("paint_system.new_image_layer", text="Create New Image Layer")
 

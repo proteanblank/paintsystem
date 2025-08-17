@@ -662,16 +662,18 @@ class Group(PropertyGroup):
 
 class PaintSystemGlobalData(PropertyGroup):
     """Custom data for the Paint System"""
+    clipboard_layers: CollectionProperty(
+        type=Layer,
+        name="Clipboard Layers",
+        description="Collection of layers in the clipboard"
+    )
     layers: CollectionProperty(
         type=GlobalLayer,
         name="Paint System Layers",
         description="Collection of layers in the Paint System"
     )
     active_index: IntProperty(name="Active Layer Index")
-    clipboard_layer_ids: StringProperty(
-        name="Clipboard Layer",
-        description="Store the layer id to be pasted"
-    )
+    active_clipboard_index: IntProperty(name="Active Clipboard Layer Index")
 
 class MaterialData(PropertyGroup):
     """Custom data for channels in the Paint System"""

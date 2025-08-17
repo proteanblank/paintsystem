@@ -1,7 +1,8 @@
 import bpy
-from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel
+from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTree
 from bpy.utils import register_classes_factory
 from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
+from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
 from ..paintsystem.data import is_valid_ps_nodetree
 
 
@@ -22,6 +23,18 @@ def is_image_painted(image: Image | ImagePreview) -> bool:
         # print("ImagePreview", image.image_pixels, image.image_size[0], image.image_size[1], len(list(image.icon_pixels)[3::4]))
         return any([pixel > 0 for pixel in list(image.image_pixels_float)[3::4]])
     return False
+
+
+def is_basic_setup(node_tree: NodeTree) -> bool:
+    material_output = get_material_output(node_tree)
+    nodes = traverse_connected_nodes(material_output)
+    is_basic_setup = True
+    # Only first 3 nodes
+    for check in ('ShaderNodeGroup', 'ShaderNodeMixShader', 'ShaderNodeBsdfTransparent'):
+        if not any(node.bl_idname == check for node in nodes):
+            is_basic_setup = False
+            break
+    return is_basic_setup
 
 
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
@@ -172,6 +185,13 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         # Toggle paint mode (switch between object and texture paint mode)
         current_mode = context.mode
         box = layout.box()
+        group_node = find_node(mat.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
+        if not group_node:
+            warning_box = box.box()
+            warning_box.alert = True
+            col = warning_box.column(align=True)
+            col.label(text="Paint System not connected", icon='ERROR')
+            col.label(text="to material output!", icon='BLANK1')
         col = box.column(align=True)
         row = col.row(align=True)
         row.scale_y = 1.7
@@ -184,8 +204,9 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         #     row.operator("paint_system.create_template_setup",
         #                  text="Setup Material", icon="ERROR")
         #     row.alert = False
-        row.operator("paint_system.preview_active_channel",
-                        text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
+        if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
+            row.operator("paint_system.preview_active_channel",
+                            text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
         row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK")
         # Baking and Exporting
@@ -508,7 +529,8 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
     
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        layout.operator("paint_system.copy_layer", text="Copy Layer", icon="COPYDOWN")
+        layout.operator("paint_system.paste_layer", text="Paste Layer", icon="PASTEDOWN")
         layout.operator("paint_system.delete_item", text="Delete Layer", icon="TRASH")
 
 class MAT_MT_AddLayerMenu(Menu):

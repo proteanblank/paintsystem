@@ -1,10 +1,10 @@
 import bpy
 from bpy.types import Operator
-from bpy.props import EnumProperty, BoolProperty, IntProperty
-from .common import PSContextMixin, get_icon, MultiMaterialOperator
+from bpy.props import IntProperty
+from .common import PSContextMixin, MultiMaterialOperator
 from bpy.utils import register_classes_factory
 from .brushes import get_brushes_from_library
-from .utils.nodes import find_node, traverse_connected_nodes, get_material_output, transfer_connection
+from ..utils.nodes import find_node, get_material_output
 from bpy_extras.node_utils import connect_sockets
 from mathutils import Vector
 import pathlib
@@ -47,7 +47,6 @@ class PAINTSYSTEM_OT_AddPresetBrushes(Operator):
 
     def execute(self, context):
         get_brushes_from_library()
-
         return {'FINISHED'}
 
 
@@ -159,12 +158,8 @@ class PAINTSYSTEM_OT_PreviewActiveChannel(PSContextMixin, Operator):
             ps_ctx.ps_mat_data.original_node_name = connected_link.from_node.name
             ps_ctx.ps_mat_data.original_socket_name = connected_link.from_socket.name
             
-            print(f"Store {connected_link.from_node.name} and {connected_link.from_socket.name}")
-            print(f"Connect {active_channel.name} to {mat_output.name}")
-            
             # Find channel node tree
-            node = find_node([mat_output], {'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
-            print(f"Find node {node}")
+            node = find_node(mat.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
             if node:
                 # Connect node tree to material output
                 connect_sockets(mat_output.inputs[0], node.outputs[active_channel.name])

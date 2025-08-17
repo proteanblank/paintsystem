@@ -748,6 +748,56 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, MultiMaterialOperator):
         return {'CANCELLED'}
 
 
+class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
+    """Copy the active layer"""
+    bl_idname = "paint_system.copy_layer"
+    bl_label = "Copy Layer"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Copy the active layer"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_layer is not None
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        active_layer = ps_ctx.active_layer
+        ps_scene_data = ps_ctx.ps_scene_data
+        if not ps_scene_data:
+            print("No ps_scene_data found")
+            return {'CANCELLED'}
+        clipboard_layer = ps_scene_data.clipboard_layers.add()
+        clipboard_layer.name = active_layer.name
+        clipboard_layer.type = active_layer.type
+        clipboard_layer.ref_layer_id = active_layer.ref_layer_id
+        clipboard_layer.enabled = active_layer.enabled
+        clipboard_layer.lock_alpha = active_layer.lock_alpha
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
+    """Paste the copied layer"""
+    bl_idname = "paint_system.paste_layer"
+    bl_label = "Paste Layer"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Paste the copied layer"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return len(ps_ctx.ps_scene_data.clipboard_layers) > 0
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        clipboard_layers = ps_ctx.ps_scene_data.clipboard_layers
+        for layer in clipboard_layers:
+            add_global_layer_to_channel(ps_ctx.active_channel, layer, layer.name)
+        clipboard_layers.clear()
+        
+        return {'FINISHED'}
+
+
 classes = (
     PAINTSYSTEM_OT_NewImage,
     PAINTSYSTEM_OT_NewFolder,
@@ -760,6 +810,8 @@ classes = (
     PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,
+    PAINTSYSTEM_OT_CopyLayer,
+    PAINTSYSTEM_OT_PasteLayer,
 )
 
 register, unregister = register_classes_factory(classes)

@@ -1,21 +1,6 @@
 import bpy
 from bpy.types import Node, NodeTree, NodeSocket
 
-def find_node(node_list: list[Node], properties: dict) -> Node | None:
-    for node in node_list:
-        print(f"Find node {node.bl_idname}")
-        has_all_properties_and_values = all(
-            hasattr(node, prop) and getattr(node, prop) == value
-            for prop, value in properties.items()
-        )
-        if has_all_properties_and_values:
-            return node
-        for input_socket in node.inputs:
-            nodes = [link.from_node for link in input_socket.links]
-            if len(nodes) > 0:
-                return find_node(nodes, properties)
-    return None
-
 def traverse_connected_nodes(node: Node, input: bool = True, output: bool = False) -> set[Node]:
     nodes = set()
     if input:
@@ -44,3 +29,15 @@ def transfer_connection(node_tree: NodeTree, source_socket: NodeSocket, target_s
     if source_socket.is_linked:
         original_socket = source_socket.links[0].from_socket
         node_tree.links.new(original_socket, target_socket)
+    else:
+        # Copy the value from source socket to target socket
+        target_socket.default_value = source_socket.default_value
+
+def find_nodes(node_tree: NodeTree, properties: dict) -> list[Node]:
+    node = get_material_output(node_tree)
+    nodes = traverse_connected_nodes(node)
+    return [node for node in nodes if all(hasattr(node, prop) and getattr(node, prop) == value for prop, value in properties.items())]
+
+def find_node(node_tree: NodeTree, properties: dict) -> Node | None:
+    nodes = find_nodes(node_tree, properties)
+    return nodes[0] if nodes else None

@@ -3,6 +3,7 @@ from bpy.utils import register_classes_factory
 from mathutils import Vector, Color
 from typing import Dict, List, Union, Sequence, Set, Optional, Tuple
 from dataclasses import dataclass, field
+from ...utils.version import is_newer_than
 from uuid import uuid4
 import re
 import time
@@ -1000,7 +1001,10 @@ class NodeTreeBuilder:
             if isinstance(node, NodeTreeBuilder):
                 node.set_node_offset(pos, arrange_nodes=True)
             else:
-                node.location_absolute = pos
+                if hasattr(node, 'location_absolute'):
+                    node.location_absolute = pos
+                else:
+                    node.location = pos
         self.width = self.__max_x_pos - self.__min_x_pos + 35*2
     
     def set_node_offset(self, offset: Vector, arrange_nodes: bool = False):

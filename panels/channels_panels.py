@@ -3,15 +3,20 @@ from bpy.types import UIList
 from bpy.utils import register_classes_factory
 from bpy.types import Panel
 from .common import PSContextMixin, get_icon, get_icon_from_channel
+from ..utils.nodes import find_node
 
-class PAINTSYSTEM_UL_channels(UIList):
+class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
     """UIList for displaying paint channels."""
 
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+    def draw_item(self, context, layout: bpy.types.UILayout, data, item, icon, active_data, active_propname, index):
         channel = item
+        ps_ctx = self.ensure_context(context)
         row = layout.row(align=True)
+        group_node = find_node(ps_ctx.active_material.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
         row.prop(channel, "type", text="", icon_only=True, emboss=False)
         row.prop(channel, "name", text="", emboss=False)
+        if group_node and channel.type == "FLOAT":
+            row.prop(group_node.inputs[channel.name], "default_value", text="", slider=channel.use_factor)
 
     # def filter_items(self, context, data, propname):
     #     channels = getattr(data, propname)
@@ -24,7 +29,7 @@ class MAT_PT_ChannelsSelect(PSContextMixin, Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_label = "Channels"
-    bl_ui_units_x = 8
+    bl_ui_units_x = 12
     
     def draw(self, context):
         layout = self.layout

@@ -1,12 +1,12 @@
 import bpy
 from bpy.props import EnumProperty, BoolProperty
-from bpy.types import NodeTree, Node, NodeSocket
 from .list_manager import ListManager
 from bpy.utils import register_classes_factory
+from bpy.types import NodeTree
 from .common import PSContextMixin, scale_content, MultiMaterialOperator, get_icon
 from mathutils import Vector
-from .utils.nodes import find_node, traverse_connected_nodes, get_material_output, transfer_connection
-from typing import Union
+from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output, transfer_connection
+from bpy_extras.node_utils import find_base_socket_type, connect_sockets
 
 
 TEMPLATE_ENUM = [
@@ -16,6 +16,21 @@ TEMPLATE_ENUM = [
     ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 3),
     ('NONE', "None", "Just add node group to material", "NONE", 4),
 ]
+
+
+def create_basic_setup(mat_node_tree: NodeTree, group_node_tree: NodeTree, offset: Vector):
+        node_group = mat_node_tree.nodes.new(type='ShaderNodeGroup')
+        node_group.node_tree = group_node_tree
+        node_group.location = offset + Vector((200, 0))
+        mix_shader = mat_node_tree.nodes.new(type='ShaderNodeMixShader')
+        mix_shader.location = node_group.location + Vector((200, 0))
+        transparent_node = mat_node_tree.nodes.new(type='ShaderNodeBsdfTransparent')
+        transparent_node.location = node_group.location + Vector((0, 100))
+        connect_sockets(node_group.outputs[0], mix_shader.inputs[2])
+        connect_sockets(node_group.outputs[1], mix_shader.inputs[0])
+        connect_sockets(transparent_node.outputs[0], mix_shader.inputs[1])
+        return node_group, mix_shader
+    
 
 class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
     """Create a new group in the Paint System"""
@@ -113,6 +128,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
             case 'BASIC':
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                 bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
+                bpy.ops.paint_system.new_image_layer('EXE_DEFAULT')
                 
                 right_most_node = None
                 for node in mat_node_tree.nodes:
@@ -120,74 +136,92 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                         right_most_node = node
                     elif node.location.x > right_most_node.location.x:
                         right_most_node = node
-                node_group = mat_node_tree.nodes.new(type='ShaderNodeGroup')
-                node_group.node_tree = node_tree
-                node_group.location = right_most_node.location + Vector((200, 0))
-                mix_shader = mat_node_tree.nodes.new(type='ShaderNodeMixShader')
-                mix_shader.location = node_group.location + Vector((200, 0))
-                transparent_node = mat_node_tree.nodes.new(type='ShaderNodeBsdfTransparent')
-                transparent_node.location = node_group.location + Vector((0, 100))
+                node_group, mix_shader = create_basic_setup(mat_node_tree, node_tree, right_most_node.location)
                 mat_output = mat_node_tree.nodes.new(type='ShaderNodeOutputMaterial')
                 mat_output.location = mix_shader.location + Vector((200, 0))
                 mat_output.is_active_output = True
-                mat_node_tree.links.new(node_group.outputs[0], mix_shader.inputs[2])
-                mat_node_tree.links.new(node_group.outputs[1], mix_shader.inputs[0])
-                mat_node_tree.links.new(transparent_node.outputs[0], mix_shader.inputs[1])
-                mat_node_tree.links.new(mix_shader.outputs[0], mat_output.inputs[0])
+                connect_sockets(mix_shader.outputs[0], mat_output.inputs[0])
             case 'PBR':
                 material_output = get_material_output(mat_node_tree)
-                principled_node = find_node([material_output], {'bl_idname': 'ShaderNodeBsdfPrincipled'})
+                principled_node = find_node(mat_node_tree, {'bl_idname': 'ShaderNodeBsdfPrincipled'})
                 if principled_node is None:
-                    print("No principled node found")
                     principled_node = mat_node_tree.nodes.new(type='ShaderNodeBsdfPrincipled')
                     principled_node.location = material_output.location + Vector((-200, 0))
                 nodes = traverse_connected_nodes(principled_node)
                 for node in nodes:
-                    node.location = node.location + Vector((-200, -200))
+                    node.location = node.location + Vector((-200, 0))
                 node_group = mat_node_tree.nodes.new(type='ShaderNodeGroup')
                 node_group.node_tree = node_tree
                 node_group.location = principled_node.location + Vector((-200, 0))
-                mat_node_tree.links.new(principled_node.outputs[0], material_output.inputs[0])
+                connect_sockets(principled_node.outputs[0], material_output.inputs[0])
 
                 if self.pbr_add_color:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                     bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
+                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
                     transfer_connection(mat_node_tree, principled_node.inputs['Base Color'], node_group.inputs['Color'])
                     transfer_connection(mat_node_tree, principled_node.inputs['Alpha'], node_group.inputs['Color Alpha'])
-                    mat_node_tree.links.new(node_group.outputs['Color'], principled_node.inputs['Base Color'])
-                    mat_node_tree.links.new(node_group.outputs['Color Alpha'], principled_node.inputs['Alpha'])
+                    connect_sockets(node_group.outputs['Color'], principled_node.inputs['Base Color'])
+                    connect_sockets(node_group.outputs['Color Alpha'], principled_node.inputs['Alpha'])
 
                 if self.pbr_add_metallic:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Metallic', channel_type='FLOAT', use_alpha=False, use_factor=True)
                     transfer_connection(mat_node_tree, principled_node.inputs['Metallic'], node_group.inputs['Metallic'])
-                    mat_node_tree.links.new(node_group.outputs['Metallic'], principled_node.inputs['Metallic'])
+                    connect_sockets(node_group.outputs['Metallic'], principled_node.inputs['Metallic'])
                 if self.pbr_add_roughness:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Roughness', channel_type='FLOAT', use_alpha=False, use_factor=True)
                     transfer_connection(mat_node_tree, principled_node.inputs['Roughness'], node_group.inputs['Roughness'])
-                    mat_node_tree.links.new(node_group.outputs['Roughness'], principled_node.inputs['Roughness'])
+                    connect_sockets(node_group.outputs['Roughness'], principled_node.inputs['Roughness'])
                 if self.pbr_add_normal:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, normalize=True)
                     transfer_connection(mat_node_tree, principled_node.inputs['Normal'], node_group.inputs['Normal'])
-                    mat_node_tree.links.new(node_group.outputs['Normal'], principled_node.inputs['Normal'])
+                    connect_sockets(node_group.outputs['Normal'], principled_node.inputs['Normal'])
                     tex_coord = mat_node_tree.nodes.new(type='ShaderNodeTexCoord')
                     tex_coord.location = node_group.location + Vector((-200, 0))
-                    mat_node_tree.links.new(tex_coord.outputs['Normal'], node_group.inputs['Normal'])
+                    connect_sockets(tex_coord.outputs['Normal'], node_group.inputs['Normal'])
                     norm_map_node = mat_node_tree.nodes.new(type='ShaderNodeNormalMap')
                     norm_map_node.location = node_group.location + Vector((0, -300))
                     norm_map_node.space = 'OBJECT'
-                    mat_node_tree.links.new(node_group.outputs['Normal'], norm_map_node.inputs[1])
-                    mat_node_tree.links.new(norm_map_node.outputs[0], principled_node.inputs['Normal'])
+                    connect_sockets(node_group.outputs['Normal'], norm_map_node.inputs[1])
+                    connect_sockets(norm_map_node.outputs[0], principled_node.inputs['Normal'])
                 ps_ctx = self.ensure_context(context)
                 ps_ctx.active_group.active_index = 0
 
             case 'PAINT_OVER':
+                # Check if Engine is EEVEE
+                if 'EEVEE' not in bpy.context.scene.render.engine:
+                    self.report({'ERROR'}, "Paint Over is only supported in EEVEE")
+                    return {'CANCELLED'}
+                
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
-                bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
+                bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
+                
+                mat_output = get_material_output(mat_node_tree)
+                
+                node_links = mat_output.inputs[0].links
+                if len(node_links) > 0:
+                    link = node_links[0]
+                    from_node = link.from_node
+                    socket_type = find_base_socket_type(link.from_socket)
+                    if socket_type == 'NodeSocketShader':
+                        node_group, mix_shader = create_basic_setup(mat_node_tree, node_tree, from_node.location + Vector((from_node.width + 50, 0)))
+                        shader_to_rgb = mat_node_tree.nodes.new(type='ShaderNodeShaderToRGB')
+                        shader_to_rgb.location = from_node.location + Vector((from_node.width + 50, 0))
+                        connect_sockets(shader_to_rgb.inputs[0], link.from_socket)
+                        connect_sockets(node_group.inputs['Color'], shader_to_rgb.outputs[0])
+                        connect_sockets(node_group.inputs['Color Alpha'], shader_to_rgb.outputs[1])
+                        mat_output.location = mix_shader.location + Vector((200, 0))
+                        mat_output.is_active_output = True
+                        connect_sockets(mix_shader.outputs[0], mat_output.inputs[0])
+                    else:
+                        print("No shader node found")
+                        
             case 'NORMAL':
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=True)
+                bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
             case _:
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
-                bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
+                # bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
         
         return {'FINISHED'}
     
@@ -231,7 +265,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
 class PAINTSYSTEM_OT_DeleteGroup(PSContextMixin, MultiMaterialOperator):
     """Delete the selected group in the Paint System"""
     bl_idname = "paint_system.delete_group"
-    bl_label = "Delete Group"
+    bl_label = "Delete Paint System"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -245,6 +279,14 @@ class PAINTSYSTEM_OT_DeleteGroup(PSContextMixin, MultiMaterialOperator):
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         lm.remove_active_item()
         return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        # return context.window_manager.invoke_confirm(self, event, title="Delete Group", icon='ERROR', message="Are you sure you want to delete Paint System?")
+        return context.window_manager.invoke_props_dialog(self, title="Delete Group", width=300, cancel_default=True)
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Are you sure you want to delete Paint System?")
 
 
 class PAINTSYSTEM_OT_MoveGroup(PSContextMixin, MultiMaterialOperator):

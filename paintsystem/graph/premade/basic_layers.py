@@ -3,7 +3,7 @@ from .common import create_mixing_graph
 
 def create_image_graph(node_tree: bpy.types.NodeTree, img: bpy.types.Image):
     builder = create_mixing_graph(node_tree, "image", "Color", "image", "Alpha")
-    builder.add_node("image", "ShaderNodeTexImage", {"image": img})
+    builder.add_node("image", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest"})
     return builder
 
 def create_folder_graph(node_tree: bpy.types.NodeTree):
