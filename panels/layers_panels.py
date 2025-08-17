@@ -1,7 +1,7 @@
 import bpy
 from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel
 from bpy.utils import register_classes_factory
-from .common import PSContextMixin, scale_content, get_global_layer, icon_parser,  get_icon
+from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
 from ..paintsystem.data import is_valid_ps_nodetree
 
 
@@ -174,8 +174,8 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         box = layout.box()
         col = box.column(align=True)
         row = col.row(align=True)
-        row.scale_y = 1.5
-        row.scale_x = 1.5
+        row.scale_y = 1.7
+        row.scale_x = 1.7
         # if contains_mat_setup:
         row.operator("paint_system.toggle_paint_mode",
                         text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE', icon_value=get_icon('paintbrush'))
@@ -184,6 +184,8 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         #     row.operator("paint_system.create_template_setup",
         #                  text="Setup Material", icon="ERROR")
         #     row.alert = False
+        row.operator("paint_system.preview_active_channel",
+                        text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
         row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK")
         # Baking and Exporting

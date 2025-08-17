@@ -5,6 +5,7 @@ from .list_manager import ListManager
 from bpy.utils import register_classes_factory
 from .common import PSContextMixin, scale_content, MultiMaterialOperator, get_icon
 from mathutils import Vector
+from .utils.nodes import find_node, traverse_connected_nodes, get_material_output, transfer_connection
 from typing import Union
 
 
@@ -15,30 +16,6 @@ TEMPLATE_ENUM = [
     ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 3),
     ('NONE', "None", "Just add node group to material", "NONE", 4),
 ]
-
-def get_material_output(mat_node_tree: NodeTree) -> Node:
-    node = None
-    for node in mat_node_tree.nodes:
-        if node.type == 'ShaderNodeOutputMaterial' and node.is_active_output:
-            return node
-    if node is None:
-        node = mat_node_tree.nodes.new(type='ShaderNodeOutputMaterial')
-        node.is_active_output = True
-    return node
-
-def traverse_connected_nodes(node: Node) -> set[Node]:
-    nodes = set()
-    for input_socket in node.inputs:
-        for link in input_socket.links:
-            nodes.append(link.from_node)
-            nodes.update(traverse_connected_nodes(link.from_node))
-    return nodes
-
-def transfer_connection(source_socket: NodeSocket, target_socket: NodeSocket):
-    if source_socket.is_linked:
-        original_socket = source_socket.links[0].from_socket
-        target_socket.links.new(original_socket)
-        source_socket.links.clear()
 
 class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
     """Create a new group in the Paint System"""
@@ -159,19 +136,14 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                 mat_node_tree.links.new(mix_shader.outputs[0], mat_output.inputs[0])
             case 'PBR':
                 material_output = get_material_output(mat_node_tree)
-                def find_principled_node(node_list: list[Node]) -> Node | None:
-                    for node in node_list:
-                        if node.bl_idname == 'ShaderNodeBsdfPrincipled':
-                            return node
-                        for input_socket in node.inputs:
-                            nodes = [link.from_node for link in input_socket.links]
-                            if len(nodes) > 0:
-                                return find_principled_node(nodes)
-                    return None
-                principled_node = find_principled_node([material_output])
+                principled_node = find_node([material_output], {'bl_idname': 'ShaderNodeBsdfPrincipled'})
                 if principled_node is None:
+                    print("No principled node found")
                     principled_node = mat_node_tree.nodes.new(type='ShaderNodeBsdfPrincipled')
                     principled_node.location = material_output.location + Vector((-200, 0))
+                nodes = traverse_connected_nodes(principled_node)
+                for node in nodes:
+                    node.location = node.location + Vector((-200, -200))
                 node_group = mat_node_tree.nodes.new(type='ShaderNodeGroup')
                 node_group.node_tree = node_tree
                 node_group.location = principled_node.location + Vector((-200, 0))
@@ -180,19 +152,22 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                 if self.pbr_add_color:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                     bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
-                    transfer_connection(principled_node.inputs['Base Color'], node_group.inputs['Color'])
-                    transfer_connection(principled_node.inputs['Alpha'], node_group.inputs['Color Alpha'])
+                    transfer_connection(mat_node_tree, principled_node.inputs['Base Color'], node_group.inputs['Color'])
+                    transfer_connection(mat_node_tree, principled_node.inputs['Alpha'], node_group.inputs['Color Alpha'])
                     mat_node_tree.links.new(node_group.outputs['Color'], principled_node.inputs['Base Color'])
                     mat_node_tree.links.new(node_group.outputs['Color Alpha'], principled_node.inputs['Alpha'])
 
                 if self.pbr_add_metallic:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Metallic', channel_type='FLOAT', use_alpha=False, use_factor=True)
+                    transfer_connection(mat_node_tree, principled_node.inputs['Metallic'], node_group.inputs['Metallic'])
                     mat_node_tree.links.new(node_group.outputs['Metallic'], principled_node.inputs['Metallic'])
                 if self.pbr_add_roughness:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Roughness', channel_type='FLOAT', use_alpha=False, use_factor=True)
+                    transfer_connection(mat_node_tree, principled_node.inputs['Roughness'], node_group.inputs['Roughness'])
                     mat_node_tree.links.new(node_group.outputs['Roughness'], principled_node.inputs['Roughness'])
                 if self.pbr_add_normal:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, normalize=True)
+                    transfer_connection(mat_node_tree, principled_node.inputs['Normal'], node_group.inputs['Normal'])
                     mat_node_tree.links.new(node_group.outputs['Normal'], principled_node.inputs['Normal'])
                     tex_coord = mat_node_tree.nodes.new(type='ShaderNodeTexCoord')
                     tex_coord.location = node_group.location + Vector((-200, 0))
@@ -204,10 +179,6 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                     mat_node_tree.links.new(norm_map_node.outputs[0], principled_node.inputs['Normal'])
                 ps_ctx = self.ensure_context(context)
                 ps_ctx.active_group.active_index = 0
-
-                nodes = traverse_connected_nodes(principled_node)
-                for node in nodes:
-                    node.location = node.location + Vector((0, -200))
 
             case 'PAINT_OVER':
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)

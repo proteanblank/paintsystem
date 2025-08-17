@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import bpy
 from bpy.props import PointerProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty, StringProperty
-from bpy.types import PropertyGroup, Image, NodeTree, Node
+from bpy.types import PropertyGroup, Image, NodeTree, Node, NodeSocket
 from bpy.utils import register_classes_factory
 from bpy.app.handlers import persistent
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
@@ -685,6 +685,19 @@ class MaterialData(PropertyGroup):
         name="Use Alpha",
         description="Use alpha channel in the Paint System",
         default=True
+    )
+    preview_channel: BoolProperty(
+        name="Preview Channel",
+        description="Preview the channel",
+        default=False
+    )
+    original_node_name: StringProperty(
+        name="Original Node Name",
+        description="Original node name of the channel"
+    )
+    original_socket_name: StringProperty(
+        name="Original Socket Name",
+        description="Original socket name of the channel"
     )
 
 

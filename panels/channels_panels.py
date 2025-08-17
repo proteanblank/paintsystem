@@ -2,7 +2,7 @@ import bpy
 from bpy.types import UIList
 from bpy.utils import register_classes_factory
 from bpy.types import Panel
-from .common import PSContextMixin, get_icon
+from .common import PSContextMixin, get_icon, get_icon_from_channel
 
 class PAINTSYSTEM_UL_channels(UIList):
     """UIList for displaying paint channels."""
@@ -59,17 +59,12 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
         
     def draw_header_preset(self, context):
         layout = self.layout
-        type_to_icon = {
-            'COLOR': 'color_socket',
-            'VECTOR': 'vector_socket',
-            'FLOAT': 'float_socket',
-        }
         ps_ctx = self.ensure_context(context)
         if ps_ctx.active_channel:
             layout.popover(
                 panel="MAT_PT_ChannelsSelect",
                 text=ps_ctx.active_channel.name if ps_ctx.active_channel else "No Channel",
-                icon_value=get_icon(type_to_icon.get(ps_ctx.active_channel.type, 'color_socket'))
+                icon_value=get_icon_from_channel(ps_ctx.active_channel)
             )
 
     def draw(self, context):
