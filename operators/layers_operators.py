@@ -7,7 +7,7 @@ from ..paintsystem.create import (
     add_global_layer,
     add_global_layer_to_channel,
 )
-from ..paintsystem.data import GRADIENT_ENUM, ADJUSTMENT_ENUM, COORDINATE_TYPE_ENUM, ATTRIBUTE_TYPE_ENUM, get_global_layer
+from ..paintsystem.data import GRADIENT_TYPE_ENUM, ADJUSTMENT_TYPE_ENUM, COORDINATE_TYPE_ENUM, ATTRIBUTE_TYPE_ENUM, get_global_layer, is_global_layer_linked
 from ..utils import get_next_unique_name
 from .common import PSContextMixin, scale_content, get_icon, MultiMaterialOperator
 
@@ -427,17 +427,19 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
         return ps_ctx.active_channel is not None
-
-    layer_name: StringProperty(
-        name="Layer Name",
-        description="Name of the new adjustment layer",
-        default="Adjustment Layer"
+    
+    adjustment_type: EnumProperty(
+        name="Adjustment Type",
+        items=ADJUSTMENT_TYPE_ENUM,
+        default='ShaderNodeBrightContrast'
     )
 
     def process_material(self, context):
         ps_ctx = self.ensure_context(context)
         global_layer = add_global_layer("ADJUSTMENT")
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        global_layer.adjustment_type = self.adjustment_type
+        layer_name = next(name for adjustment_type, name, description in ADJUSTMENT_TYPE_ENUM if adjustment_type == self.adjustment_type)
+        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -511,10 +513,33 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
         description="Name of the new gradient layer",
         default="Gradient Layer"
     )
+    
+    gradient_type: EnumProperty(
+        name="Gradient Type",
+        items=GRADIENT_TYPE_ENUM,
+        default='LINEAR'
+    )
 
     def process_material(self, context):
         ps_ctx = self.ensure_context(context)
-        global_layer = add_global_layer("GRADIENT")
+        view_layer = bpy.context.view_layer
+        with bpy.context.temp_override():
+            if "Paint System Collection" not in view_layer.layer_collection.collection.children:
+                collection = bpy.data.collections.new("Paint System Collection")
+                view_layer.layer_collection.collection.children.link(collection)
+            else:
+                collection = view_layer.layer_collection.collection.children["Paint System Collection"]
+            empty_object = bpy.data.objects.new(f"{ps_ctx.active_group.name} {self.layer_name}", None)
+            empty_object.parent = ps_ctx.ps_object
+            collection.objects.link(empty_object)
+        empty_object.location = ps_ctx.active_object.location
+        if self.gradient_type == 'LINEAR':
+            empty_object.empty_display_type = 'SINGLE_ARROW'
+        elif self.gradient_type == 'RADIAL':
+            empty_object.empty_display_type = 'SPHERE'
+        global_layer = add_global_layer("GRADIENT", self.layer_name)
+        global_layer.gradient_type = self.gradient_type
+        global_layer.empty_object = empty_object
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
@@ -561,6 +586,16 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
             active_channel.update_node_tree(context)
         active_channel.active_index = min(
             active_channel.active_index, len(active_channel.layers) - 1)
+        
+        if not is_global_layer_linked(global_layer):
+            # Delete the global layer
+            if global_layer.empty_object:
+                bpy.data.objects.remove(global_layer.empty_object, do_unlink=True)
+            if global_layer.image:
+                bpy.data.images.remove(global_layer.image)
+            if global_layer.node_tree:
+                bpy.data.node_groups.remove(global_layer.node_tree)
+            bpy.data.global_layers.remove(global_layer)
         
         redraw_panel(context)
         return {'FINISHED'}

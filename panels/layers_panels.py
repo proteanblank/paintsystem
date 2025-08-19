@@ -3,8 +3,7 @@ from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTre
 from bpy.utils import register_classes_factory
 from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
-from ..paintsystem.data import is_valid_ps_nodetree, GlobalLayer
-import time
+from ..paintsystem.data import is_valid_ps_nodetree, GlobalLayer, ADJUSTMENT_TYPE_ENUM, GRADIENT_TYPE_ENUM, is_global_layer_linked
 
 
 def is_image_painted(image: Image | ImagePreview) -> bool:
@@ -38,18 +37,7 @@ def is_basic_setup(node_tree: NodeTree) -> bool:
     return is_basic_setup
 
 
-def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
-    """Check if the global layer is linked"""
-    # Check all material in the scene and count the number of times the global layer is used
-    count = 0
-    for material in bpy.data.materials:
-        if hasattr(material, 'ps_mat_data'):
-            for group in material.ps_mat_data.groups:
-                for channel in group.channels:
-                    for layer in channel.layers:
-                        if layer.ref_layer_id == global_layer.uid:
-                            count += 1
-    return count > 1
+
 
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
@@ -370,6 +358,11 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                          text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
                 row.prop(global_layer.pre_mix_node.inputs[0], "default_value",
                          text="Opacity", slider=True)
+                adjustment_node = global_layer.find_node("adjustment")
+                if adjustment_node:
+                    col = box.column()
+                    col.label(text="Adjustment Settings:", icon='SHADERFX')
+                    col.template_node_inputs(adjustment_node)
             case 'NODE_GROUP':
                 row = box.row(align=True)
                 row.scale_y = 1.2
@@ -435,6 +428,12 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 # box.prop(layer_node_group.inputs['Use Steps'], "default_value",
                 #          text="Use Steps")
                 # box.prop(layer_node_group.inputs['Steps'], "default_value", text="Steps")
+            case 'GRADIENT':
+                gradient_node = global_layer.find_node("gradient")
+                if gradient_node:
+                    col = box.column()
+                    col.label(text="Gradient Settings:", icon='SHADERFX')
+                    col.template_node_inputs(gradient_node)
             case _:
                 col = box.column(align=True)
                 row = col.row(align=True)
@@ -593,9 +592,9 @@ class MAT_MT_AddLayerMenu(Menu):
                      text="Attribute Color", icon='MESH_DATA')
         col.separator()
         col.label(text="--- GRADIENT ---")
-        # for idx, (node_type, name, description) in enumerate(GRADIENT_ENUM):
-        #     col.operator("paint_system.new_gradient_layer",
-        #                  text=name, icon='COLOR' if idx == 0 else 'NONE').gradient_type = node_type
+        for idx, (node_type, name, description) in enumerate(GRADIENT_TYPE_ENUM):
+            col.operator("paint_system.new_gradient_layer",
+                         text=name, icon='COLOR' if idx == 0 else 'NONE').gradient_type = node_type
 
         # col.separator()
         # col.label(text="--- SHADER ---")
@@ -603,11 +602,11 @@ class MAT_MT_AddLayerMenu(Menu):
         #     col.operator("paint_system.new_shader_layer",
         #                  text=name, icon='SHADING_RENDERED' if idx == 0 else 'NONE').shader_type = node_type
 
-        # col = row.column()
+        col = row.column()
         # col.label(text="--- ADJUSTMENT ---")
-        # for idx, (node_type, name, description) in enumerate(ADJUSTMENT_ENUM):
-        #     col.operator("paint_system.new_adjustment_layer",
-        #                  text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
+        for idx, (node_type, name, description) in enumerate(ADJUSTMENT_TYPE_ENUM):
+            col.operator("paint_system.new_adjustment_layer",
+                         text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
         col.separator()
         col.label(text="--- CUSTOM ---")
         col.operator("paint_system.new_node_group_layer",

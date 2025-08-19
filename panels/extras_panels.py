@@ -57,6 +57,7 @@ class MAT_PT_BrushTooltips(Panel):
             self.draw_shortcut(col, kmi, "Scale Brush Size")
         # col.label(text="Scale Brush Size", icon='EVENT_F')
         layout.separator()
+        layout.operator('paint_system.open_paint_system_preferences', text="Preferences", icon='PREFERENCES')
         layout.operator('wm.url_open', text="Suggest more!",
                         icon='URL').url = "https://github.com/natapol2547/paintsystem/issues"
         # layout.operator("paint_system.disable_tool_tips",

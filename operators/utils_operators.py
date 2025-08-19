@@ -5,12 +5,13 @@ from .common import PSContextMixin, MultiMaterialOperator
 from bpy.utils import register_classes_factory
 from .brushes import get_brushes_from_library
 from ..utils.nodes import find_node, get_material_output
-from ..preferences import addon_package
+from ..preferences import addon_package, get_preferences
 from bpy_extras.node_utils import connect_sockets
 from mathutils import Vector
 import pathlib
 import math
 import gpu
+import addon_utils
 
 
 
@@ -75,16 +76,17 @@ class PAINTSYSTEM_OT_SelectMaterialIndex(PSContextMixin, Operator):
 
 
 
-class PAINTSYSTEM_OT_NewMaterial(MultiMaterialOperator):
+class PAINTSYSTEM_OT_NewMaterial(PSContextMixin, MultiMaterialOperator):
     bl_idname = "paint_system.new_material"
     bl_label = "New Material"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Create a new material"
     
     def process_material(self, context):
+        ps_ctx = self.ensure_context(context)
         bpy.ops.object.material_slot_add()
         bpy.data.materials.new(name="New Material")
-        context.active_object.active_material = bpy.data.materials[-1]
+        ps_ctx.active_object.active_material = bpy.data.materials[-1]
         return {'FINISHED'}
 
 
@@ -237,10 +239,23 @@ class PAINTSYSTEM_OT_OpenPaintSystemPreferences(Operator):
     
     
     def execute(self, context):
-        bpy.ops.screen.user_preferences_show()
+        bpy.ops.screen.userpref_show()
         bpy.context.preferences.active_section = 'ADDONS'
         bpy.context.window_manager.addon_search = 'Paint System'
-        bpy.ops.preferences.addon_expand(module=addon_package())
+        modules = addon_utils.modules()
+        mod = None
+        for mod in modules:
+            if mod.bl_info.get("name") == "Paint System":
+                mod = mod
+                break
+        if mod is None:
+            print("Paint System not found")
+            return {'FINISHED'}
+        bl_info = addon_utils.module_bl_info(mod)
+        show_expanded = bl_info["show_expanded"]
+        if not show_expanded:
+            bpy.ops.preferences.addon_expand(module=addon_package())
+        return {'FINISHED'}
 
 classes = (
     PAINTSYSTEM_OT_TogglePaintMode,

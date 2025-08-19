@@ -91,19 +91,19 @@ def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str, color_so
     return builder
 
 
-def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: str) -> NodeTreeBuilder:
+def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: str, node_name: str, socket_name: str) -> NodeTreeBuilder:
     if coord_type == "AUTO":
         builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": "PS_UVMap"})
-        builder.link("uvmap", "image", "UV", "Vector")
+        builder.link("uvmap", node_name, "UV", socket_name)
     elif coord_type == "UV":
         builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": uv_map_name})
-        builder.link("uvmap", "image", "UV", "Vector")
+        builder.link("uvmap", node_name, "UV", socket_name)
     elif coord_type in ["OBJECT", "CAMERA", "WINDOW", "REFLECTION"]:
         builder.add_node("tex_coord", "ShaderNodeTexCoord")
-        builder.link("tex_coord", "image", coord_type.title(), "Vector")
+        builder.link("tex_coord", node_name, coord_type.title(), socket_name)
     elif coord_type == "POSITION":
         builder.add_node("geometry", "ShaderNodeGeometry")
-        builder.link("geometry", "image", "Position", "Vector")
+        builder.link("geometry", node_name, "Position", socket_name)
     return builder
 
 

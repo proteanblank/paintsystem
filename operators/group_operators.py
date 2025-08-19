@@ -95,14 +95,15 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
     
     @classmethod
     def poll(cls, context):
-        return context.active_object is not None
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_object is not None
 
     def process_material(self, context):
+        ps_ctx = self.ensure_context(context)
         # See if there is any material slot on the active object
-        if not context.active_object.active_material:
+        if not ps_ctx.active_object.active_material:
             bpy.data.materials.new(name="New Material")
-            context.active_object.active_material = bpy.data.materials[-1]
-            
+            ps_ctx.active_object.active_material = bpy.data.materials[-1]
         ps_ctx = self.ensure_context(context)
         mat = ps_ctx.active_material
         mat.use_nodes = True
@@ -137,7 +138,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                         right_most_node = node
                     elif node.location.x > right_most_node.location.x:
                         right_most_node = node
-                node_group, mix_shader = create_basic_setup(mat_node_tree, node_tree, right_most_node.location)
+                node_group, mix_shader = create_basic_setup(mat_node_tree, node_tree, right_most_node.location if right_most_node else Vector((0, 0)))
                 mat_output = mat_node_tree.nodes.new(type='ShaderNodeOutputMaterial')
                 mat_output.location = mix_shader.location + Vector((200, 0))
                 mat_output.is_active_output = True

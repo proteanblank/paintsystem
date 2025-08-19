@@ -21,10 +21,10 @@ class PaintSystemPreferences(AddonPreferences):
         default=False
     )
 
-    name_layers_group: BoolProperty(
-        name="Name Layers According to Group Name",
-        default=False
-    )
+    # name_layers_group: BoolProperty(
+    #     name="Name Layers According to Group Name",
+    #     default=False
+    # )
 
     def draw_shortcut(self, layout, kmi, text):
         row = layout.row(align=True)
@@ -55,8 +55,8 @@ class PaintSystemPreferences(AddonPreferences):
 
         layout.prop(self, "show_tooltips", text="Show Tooltips")
         layout.prop(self, "use_compact_design", text="Use Compact Design")
-        layout.prop(self, "name_layers_group",
-                    text="Name Layers According to Group Name")
+        # layout.prop(self, "name_layers_group",
+        #             text="Name Layers According to Group Name")
 
         box = layout.box()
         box.label(text="Paint System Shortcuts:")

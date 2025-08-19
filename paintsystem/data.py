@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import bpy
 from bpy.props import PointerProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty, StringProperty, FloatProperty
-from bpy.types import PropertyGroup, Image, NodeTree, Node, NodeSocket
+from bpy.types import PropertyGroup, Image, NodeTree, Node, NodeSocket, Object
 from bpy.utils import register_classes_factory
 from bpy.app.handlers import persistent
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
@@ -10,7 +10,14 @@ from ..utils import get_next_unique_name
 from ..preferences import get_preferences
 from ..paintsystem.common import PaintSystemPreferences
 from .graph import NodeTreeBuilder, START, END
-from .graph.premade import create_image_graph, create_folder_graph, create_solid_graph, create_attribute_graph
+from .graph.premade import (
+    create_image_graph, 
+    create_folder_graph, 
+    create_solid_graph, 
+    create_attribute_graph, 
+    create_adjustment_graph, 
+    create_gradient_graph
+    )
 from mathutils import Vector
 from typing import Dict, List
 
@@ -31,12 +38,13 @@ CHANNEL_TYPE_ENUM = [
     ('FLOAT', "Value", "Value channel", get_icon('float_socket'), 3),
 ]
 
-GRADIENT_ENUM = [
+GRADIENT_TYPE_ENUM = [
     ('LINEAR', "Linear Gradient", "Linear gradient"),
     ('RADIAL', "Radial Gradient", "Radial gradient"),
+    ('DISTANCE', "Distance Gradient", "Distance gradient"),
 ]
 
-ADJUSTMENT_ENUM = [
+ADJUSTMENT_TYPE_ENUM = [
     ('ShaderNodeBrightContrast', "Brightness and Contrast", ""),
     ('ShaderNodeGamma', "Gamma", ""),
     ('ShaderNodeHueSaturation', "Hue Saturation Value", ""),
@@ -82,9 +90,16 @@ def _parse_context(context: bpy.types.Context) -> dict:
         
         ps_scene_data = context.scene.get("ps_scene_data", None)
         
+        ps_object = None
         obj = context.active_object
-        if not obj or obj.type != 'MESH':
+        if obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+            ps_object = obj.parent
+        elif obj and obj.type == 'MESH' and hasattr(obj.active_material, 'ps_mat_data'):
+            ps_object = obj
+            
+        if not obj or obj.type != 'MESH' or not ps_object:
             obj = None
+
         mat = obj.active_material if obj else None
         
         mat_data = None
@@ -114,6 +129,7 @@ def _parse_context(context: bpy.types.Context) -> dict:
             "ps_settings": ps_settings,
             "ps_scene_data": ps_scene_data,
             "active_object": obj,
+            "ps_object": ps_object,
             "active_material": mat,
             "ps_mat_data": mat_data,
             "groups": groups,
@@ -139,6 +155,7 @@ def update_active_image(self=None, context: bpy.types.Context = None):
     context = context or bpy.context
     ps_ctx = _parse_context(context)
     image_paint = context.tool_settings.image_paint
+    obj = ps_ctx["active_object"]
     mat = ps_ctx["active_material"]
     active_channel = ps_ctx["active_channel"]
     if not mat or not active_channel:
@@ -159,7 +176,7 @@ def update_active_image(self=None, context: bpy.types.Context = None):
         # print("Selected image: ", selected_image)
         image_paint.canvas = selected_image
         if global_layer.uv_map_name:
-            context.active_object.data.uv_layers[global_layer.uv_map_name].active = True
+            obj.data.uv_layers[global_layer.uv_map_name].active = True
 
 def update_active_layer(self, context):
     ps_ctx = _parse_context(context)
@@ -223,6 +240,12 @@ class GlobalLayer(PropertyGroup):
             case "ATTRIBUTE":
                 attribute_graph = create_attribute_graph(self.node_tree)
                 attribute_graph.compile()
+            case "ADJUSTMENT":
+                adjustment_graph = create_adjustment_graph(self.node_tree, self.adjustment_type)
+                adjustment_graph.compile()
+            case "GRADIENT":
+                gradient_graph = create_gradient_graph(self.node_tree, self.gradient_type, self.empty_object)
+                gradient_graph.compile()
             case _:
                 pass
             
@@ -295,6 +318,25 @@ class GlobalLayer(PropertyGroup):
     uv_map_name: StringProperty(
         name="UV Map",
         description="Name of the UV map to use",
+        update=update_node_tree
+    )
+    adjustment_type: EnumProperty(
+        items=ADJUSTMENT_TYPE_ENUM,
+        name="Adjustment Type",
+        description="Adjustment type",
+        default='ShaderNodeBrightContrast',
+        update=update_node_tree
+    )
+    empty_object: PointerProperty(
+        name="Empty Object",
+        type=Object,
+        update=update_node_tree
+    )
+    gradient_type: EnumProperty(
+        items=GRADIENT_TYPE_ENUM,
+        name="Gradient Type",
+        description="Gradient type",
+        default='LINEAR',
         update=update_node_tree
     )
     type: EnumProperty(
@@ -729,7 +771,18 @@ def get_global_layer(layer: Layer) -> GlobalLayer | None:
             return global_layer
     return None
 
-
+def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
+    """Check if the global layer is linked"""
+    # Check all material in the scene and count the number of times the global layer is used
+    count = 0
+    for material in bpy.data.materials:
+        if hasattr(material, 'ps_mat_data'):
+            for group in material.ps_mat_data.groups:
+                for channel in group.channels:
+                    for layer in channel.layers:
+                        if layer.ref_layer_id == global_layer.uid:
+                            count += 1
+    return count > 1
 @dataclass
 class PSContext:
     ps_settings: PaintSystemPreferences | None = None

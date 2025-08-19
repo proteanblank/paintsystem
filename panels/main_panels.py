@@ -49,7 +49,8 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
     
     @classmethod
     def poll(cls, context):
-        return context.active_object is not None and context.active_object.type == 'MESH'
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_object is not None and ps_ctx.active_object.type == 'MESH'
     
     def draw_header(self, context):
         layout = self.layout

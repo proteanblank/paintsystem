@@ -724,6 +724,17 @@ class NodeTreeBuilder:
             pass
         # Fallback to Blender internal name
         return getattr(node, 'name', '')
+    
+    def _remove_unused_nodes(self) -> None:
+        """Remove nodes that are not connected to any other nodes."""
+        used_node_identifiers = self.__add_nodes_commands.keys()
+        to_remove = set()
+        for node in self.nodes.values():
+            if node not in to_remove and node.type != 'REROUTE' and self.get_node_identifier(node) not in used_node_identifiers:
+                to_remove.add(node)
+        for node in to_remove:
+            del self.nodes[self.get_node_identifier(node)]
+            self.tree.nodes.remove(node)
 
     # @timing_decorator("Node Tree Compilation")
     def compile(self, arrange_nodes: bool = True) -> 'NodeTreeBuilder':
@@ -751,6 +762,10 @@ class NodeTreeBuilder:
         for identifier, command in self.__add_nodes_commands.items():
             self._create_node(identifier, command.node_type, command.properties, command.default_values, command.default_outputs)
         self._log(f"Time taken to add nodes: {time.time() - start_time_add_nodes} seconds")
+        
+        # Remove unused nodes
+        if not self.adjustable:
+            self._remove_unused_nodes()
 
         # Re-apply previously captured state (node-level props and input defaults)
         if saved_state:
