@@ -169,18 +169,30 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
         return ps_ctx.active_channel is not None
-
+    
     def draw_header_preset(self, context):
         layout = self.layout
         ps_ctx = self.ensure_context(context)
-        active_channel = ps_ctx.active_channel
-        flattened = active_channel.flatten_hierarchy()
-        has_dirty_images = any(
-            [layer.image and layer.image.is_dirty for layer, _ in flattened if layer.type == 'IMAGE'])
-        if has_dirty_images:
-            row = layout.row(align=True)
-            row.operator("wm.save_mainfile",
-                         text="Click to Save!", icon="FUND")
+        if ps_ctx.active_object.mode != 'TEXTURE_PAINT':
+            return
+        if ps_ctx.active_channel:
+            layout.popover(
+                panel="MAT_PT_ChannelsSelect",
+                text=ps_ctx.active_channel.name if ps_ctx.active_channel else "No Channel",
+                icon_value=get_icon_from_channel(ps_ctx.active_channel)
+            )
+
+    # def draw_header_preset(self, context):
+    #     layout = self.layout
+    #     ps_ctx = self.ensure_context(context)
+    #     active_channel = ps_ctx.active_channel
+    #     global_layers = [get_global_layer(layer) for layer, _ in active_channel.flatten_hierarchy()]
+    #     has_dirty_images = any(
+    #         [layer.image and layer.image.is_dirty for layer in global_layers if layer.type == 'IMAGE'])
+    #     if has_dirty_images:
+    #         row = layout.row(align=True)
+    #         row.operator("wm.save_mainfile",
+    #                      text="Click to Save!", icon="FUND")
 
     def draw_header(self, context):
         layout = self.layout

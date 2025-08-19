@@ -68,10 +68,9 @@ def get_library_nodetree(tree_name: str, library_filename: str = "library2.blend
             )
     return appended_tree
 
-def create_mixing_graph(node_tree: bpy.types.NodeTree, color_node_name: str, color_socket: str, alpha_node_name: str = None, alpha_socket: str = None) -> NodeTreeBuilder:
+def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str, color_socket: str, alpha_node_name: str = None, alpha_socket: str = None) -> NodeTreeBuilder:
     pre_mix = get_library_nodetree(".PS Pre Mix")
     post_mix = get_library_nodetree(".PS Post Mix")
-    builder = NodeTreeBuilder(node_tree, "Image Layer")
     builder.add_node("group_input", "NodeGroupInput")
     builder.add_node("group_output", "NodeGroupOutput")
     builder.add_node("pre_mix", "ShaderNodeGroup", {"node_tree": pre_mix}, {"Over Alpha": 1.0})
@@ -92,6 +91,19 @@ def create_mixing_graph(node_tree: bpy.types.NodeTree, color_node_name: str, col
     return builder
 
 
-__all__ = ["get_library_nodetree"]
+def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: str) -> NodeTreeBuilder:
+    if coord_type == "AUTO":
+        builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": "PS_UVMap"})
+        builder.link("uvmap", "image", "UV", "Vector")
+    elif coord_type == "UV":
+        builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": uv_map_name})
+        builder.link("uvmap", "image", "UV", "Vector")
+    elif coord_type in ["OBJECT", "CAMERA", "WINDOW", "REFLECTION"]:
+        builder.add_node("tex_coord", "ShaderNodeTexCoord")
+        builder.link("tex_coord", "image", coord_type.title(), "Vector")
+    elif coord_type == "POSITION":
+        builder.add_node("geometry", "ShaderNodeGeometry")
+        builder.link("geometry", "image", "Position", "Vector")
+    return builder
 
 

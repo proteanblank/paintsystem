@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 import bpy
-from bpy.props import PointerProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty, StringProperty
+from bpy.props import PointerProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty, StringProperty, FloatProperty
 from bpy.types import PropertyGroup, Image, NodeTree, Node, NodeSocket
 from bpy.utils import register_classes_factory
 from bpy.app.handlers import persistent
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 from ..custom_icons import get_icon
 from ..utils import get_next_unique_name
+from ..preferences import get_preferences
+from ..paintsystem.common import PaintSystemPreferences
 from .graph import NodeTreeBuilder, START, END
 from .graph.premade import create_image_graph, create_folder_graph, create_solid_graph, create_attribute_graph
 from mathutils import Vector
@@ -76,6 +78,8 @@ def _parse_context(context: bpy.types.Context) -> dict:
         if not isinstance(context, bpy.types.Context):
             raise TypeError("context must be of type bpy.types.Context")
         
+        ps_settings = get_preferences(context)
+        
         ps_scene_data = context.scene.get("ps_scene_data", None)
         
         obj = context.active_object
@@ -107,6 +111,7 @@ def _parse_context(context: bpy.types.Context) -> dict:
                 active_layer = layers[active_channel.active_index]
         
         return {
+            "ps_settings": ps_settings,
             "ps_scene_data": ps_scene_data,
             "active_object": obj,
             "active_material": mat,
@@ -374,7 +379,7 @@ class Channel(BaseNestedListManager):
             alpha_socket: str
             
         previous_dict: Dict[int, PreviousLayer] = {}
-        if self.type == "VECTOR" and self.normalize:
+        if self.type == "VECTOR" and self.use_normalize:
             node_builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
         previous_dict[-1] = PreviousLayer(color_name="group_output", color_socket="Color", alpha_name="group_output", alpha_socket="Alpha")
             
@@ -406,7 +411,7 @@ class Channel(BaseNestedListManager):
                         alpha_socket="Over Alpha"
                     )
         prev_layer = previous_dict[-1]
-        if self.type == "VECTOR" and self.normalize:
+        if self.type == "VECTOR" and self.use_normalize:
             node_builder.link("normalize", prev_layer.color_name, "Vector", prev_layer.color_socket)
             node_builder.link("group_input", "normalize", "Color", "Vector")
         else:
@@ -477,7 +482,19 @@ class Channel(BaseNestedListManager):
         default=False,
         update=update_node_tree
     )
-    normalize: BoolProperty(
+    factor_min: FloatProperty(
+        name="Factor Min",
+        description="Minimum factor value",
+        default=0,
+        update=update_node_tree
+    )
+    factor_max: FloatProperty(
+        name="Factor Max",
+        description="Maximum factor value",
+        default=1,
+        update=update_node_tree
+    )
+    use_normalize: BoolProperty(
         name="Normalize",
         description="Normalize the channel",
         default=False,
@@ -570,12 +587,14 @@ class Group(PropertyGroup):
             name: str
             socket_type: str
             subtype: str = "NONE"
+            min_value: float = 0
+            max_value: float = 1
         
         expected_sockets: List[ExpectedSocket] = []
         for channel in self.channels:
-            expected_sockets.append(ExpectedSocket(channel.name, f"NodeSocket{channel.type.title()}", "FACTOR" if channel.use_factor else "NONE"))
+            expected_sockets.append(ExpectedSocket(channel.name, f"NodeSocket{channel.type.title()}", "FACTOR" if channel.use_factor else "NONE", channel.factor_min, channel.factor_max))
             if channel.use_alpha:
-                expected_sockets.append(ExpectedSocket(f"{channel.name} Alpha", "NodeSocketFloat", "FACTOR"))
+                expected_sockets.append(ExpectedSocket(f"{channel.name} Alpha", "NodeSocketFloat", "FACTOR", 0, 1))
         
         def ensure_sockets(expected_sockets, in_out = "OUTPUT"):
             if in_out == "INPUT":
@@ -595,8 +614,8 @@ class Group(PropertyGroup):
                         if hasattr(socket, "subtype") and subtype:
                             socket.subtype = subtype
                             if subtype == "FACTOR":
-                                socket.min_value = 0
-                                socket.max_value = 1
+                                socket.min_value = expected_sockets[idx].min_value
+                                socket.max_value = expected_sockets[idx].max_value
                         nt_interface.move(socket, idx + offset_idx)
                     case "REMOVE":
                         socket = output_sockets[idx]
@@ -616,9 +635,9 @@ class Group(PropertyGroup):
                 if hasattr(socket, "subtype") and socket.subtype != expected_sockets[idx].subtype and expected_sockets[idx].subtype:
                     socket.subtype = expected_sockets[idx].subtype
                     if expected_sockets[idx].subtype == "FACTOR":
-                        socket.min_value = 0
-                        socket.max_value = 1
-                    socket.default_value = 1
+                        socket.min_value = expected_sockets[idx].min_value
+                        socket.max_value = expected_sockets[idx].max_value
+                    socket.default_value = expected_sockets[idx].max_value
         
         ensure_sockets(expected_sockets, "OUTPUT")
         ensure_sockets(expected_sockets, "INPUT")
@@ -652,7 +671,7 @@ class Group(PropertyGroup):
         name="Channels",
         description="Collection of channels in the Paint System"
     )
-    active_index: IntProperty(name="Active Channel Index")
+    active_index: IntProperty(name="Active Channel Index", update=update_active_image)
     node_tree: PointerProperty(
         name="Node Tree",
         type=NodeTree
@@ -713,6 +732,7 @@ def get_global_layer(layer: Layer) -> GlobalLayer | None:
 
 @dataclass
 class PSContext:
+    ps_settings: PaintSystemPreferences | None = None
     ps_scene_data: PaintSystemGlobalData | None = None
     active_object: bpy.types.Object | None = None
     active_material: bpy.types.Material | None = None
@@ -727,6 +747,7 @@ def parse_context(context: bpy.types.Context) -> PSContext:
     """Parse the context and return a PSContext object."""
     parsed_context = _parse_context(context)
     return PSContext(
+        ps_settings=parsed_context.get("ps_settings"),
         ps_scene_data=parsed_context.get("ps_scene_data"),
         active_object=parsed_context.get("active_object"),
         active_material=parsed_context.get("active_material"),

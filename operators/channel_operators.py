@@ -34,7 +34,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         description="Use alpha for the new channel",
         default=True
     )
-    normalize: bpy.props.BoolProperty(
+    use_normalize: bpy.props.BoolProperty(
         name="Normalize Channel",
         description="Normalize the channel",
         default=False
@@ -43,6 +43,16 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         name="Use Factor",
         description="Use factor for the channel",
         default=False
+    )
+    factor_min: bpy.props.FloatProperty(
+        name="Factor Value Min",
+        description="Minimum value for the factor",
+        default=0
+    )
+    factor_max: bpy.props.FloatProperty(
+        name="Factor Value Max",
+        description="Maximum value for the factor",
+        default=1
     )
     
     def process_material(self, context):
@@ -59,8 +69,11 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         new_channel.name = unique_name
         new_channel.type = self.channel_type
         new_channel.use_alpha = self.use_alpha
-        new_channel.normalize = self.normalize
+        new_channel.use_normalize = self.use_normalize
         new_channel.use_factor = self.use_factor
+        if self.channel_type == "FACTOR":
+            new_channel.factor_min = self.factor_min
+            new_channel.factor_max = self.factor_max
         new_channel.node_tree = node_tree
         new_channel.update_node_tree(context)
         ps_ctx.active_group.update_node_tree(context)
@@ -78,13 +91,17 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         layout.prop(self, "channel_type", text="Type")
         layout.prop(self, "use_alpha", text="Use Alpha")
         if self.channel_type == "VECTOR":
-            layout.prop(self, "normalize", text="Normalize")
+            layout.prop(self, "use_normalize", text="Normalize")
         unique_name = self.get_unique_channel_name(context)
         if unique_name != self.channel_name:
             box = layout.box()
             box.alert = True
             box.alignment = 'CENTER'
             box.label(text=f"Name will be changed to '{unique_name}'", icon='ERROR')
+        if self.channel_type == "FACTOR":
+            box = layout.box()
+            box.prop(self, "factor_min", text="Factor Min")
+            box.prop(self, "factor_max", text="Factor Max")
 
 class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, MultiMaterialOperator):
     """Delete the selected channel in the Paint System"""

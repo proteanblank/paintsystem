@@ -174,7 +174,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                     transfer_connection(mat_node_tree, principled_node.inputs['Roughness'], node_group.inputs['Roughness'])
                     connect_sockets(node_group.outputs['Roughness'], principled_node.inputs['Roughness'])
                 if self.pbr_add_normal:
-                    bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, normalize=True)
+                    bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, use_normalize=True)
                     transfer_connection(mat_node_tree, principled_node.inputs['Normal'], node_group.inputs['Normal'])
                     connect_sockets(node_group.outputs['Normal'], principled_node.inputs['Normal'])
                     tex_coord = mat_node_tree.nodes.new(type='ShaderNodeTexCoord')
@@ -262,8 +262,8 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                 row = warning_box.row()
                 row.label(icon='ERROR')
                 col = row.column(align=True)
-                col.label(text="Warning: Smooth Alpha (Alpha Blend) may cause")
-                col.label(text="sorting artifacts.")
+                col.label(text="Warning: Smooth Alpha (Alpha Blend)")
+                col.label(text="may cause sorting artifacts.")
             box.prop(self, "disable_show_backface",
                      text="Use Backface Culling")
         if context.scene.view_settings.view_transform != 'Standard':

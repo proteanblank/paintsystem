@@ -2,6 +2,7 @@ import bpy
 from ..paintsystem.data import PSContextMixin, get_global_layer
 from ..custom_icons import get_icon
 from ..preferences import get_preferences
+from ..utils.unified_brushes import get_unified_settings
 from bpy.types import Operator, Context
 from bpy.props import BoolProperty
 
@@ -19,15 +20,6 @@ def scale_content(context, layout, scale_x=1.2, scale_y=1.2):
         layout.scale_x = scale_x
         layout.scale_y = scale_y
     return layout
-
-def get_unified_settings(context: bpy.types.Context, unified_name=None):
-    ups = context.tool_settings.unified_paint_settings
-    tool_settings = context.tool_settings.image_paint
-    brush = tool_settings.brush
-    prop_owner = brush
-    if unified_name and getattr(ups, unified_name):
-        prop_owner = ups
-    return prop_owner
 
 class MultiMaterialOperator(Operator):
     multiple_objects: BoolProperty(

@@ -5,6 +5,7 @@ from .common import PSContextMixin, MultiMaterialOperator
 from bpy.utils import register_classes_factory
 from .brushes import get_brushes_from_library
 from ..utils.nodes import find_node, get_material_output
+from ..preferences import addon_package
 from bpy_extras.node_utils import connect_sockets
 from mathutils import Vector
 import pathlib
@@ -24,9 +25,6 @@ class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
-        
-        if ps_ctx.ps_mat_data.preview_channel and context.object.mode == 'TEXTURE_PAINT':
-            bpy.ops.paint_system.preview_active_channel('EXEC_DEFAULT')
 
         bpy.ops.object.mode_set(mode='TEXTURE_PAINT', toggle=True)
         is_cycles = bpy.context.scene.render.engine == 'CYCLES'
@@ -120,16 +118,16 @@ class PAINTSYSTEM_OT_PreviewActiveChannel(PSContextMixin, Operator):
             if node:
                 # Connect node tree to material output
                 connect_sockets(mat_output.inputs[0], node.outputs[active_channel.name])
-            
-            # Force toggle paint mode
-            if bpy.context.object.mode != 'TEXTURE_PAINT':
-                bpy.ops.paint_system.toggle_paint_mode('EXEC_DEFAULT')
         else:
             ps_mat_data.preview_channel = False
             # Find node by name
             node = mat.node_tree.nodes.get(ps_mat_data.original_node_name)
             if node:
                 connect_sockets(node.outputs[ps_mat_data.original_socket_name], mat_output.inputs[0])
+                
+        # Change render mode
+        if bpy.context.space_data.shading.type not in {'RENDERED', 'MATERIAL'}:
+            bpy.context.space_data.shading.type = 'RENDERED'
         return {'FINISHED'}
 
 
@@ -175,6 +173,75 @@ class PAINTSYSTEM_OT_CreatePaintSystemUVMap(Operator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_ToggleBrushEraseAlpha(Operator):
+    bl_idname = "paint_system.toggle_brush_erase_alpha"
+    bl_label = "Toggle Brush Erase Alpha"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Toggle between brush and erase alpha"
+
+    def execute(self, context):
+        tool_settings = context.tool_settings
+        paint = tool_settings.image_paint
+
+        if paint is not None:
+            brush = paint.brush
+            if brush is not None:
+                if brush.blend == 'ERASE_ALPHA':
+                    brush.blend = 'MIX'  # Switch back to normal blending
+                else:
+                    brush.blend = 'ERASE_ALPHA'  # Switch to Erase Alpha mode
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
+    """Sample the color under the mouse cursor"""
+    bl_idname = "paint_system.color_sampler"
+    bl_label = "Color Sampler"
+
+    x: IntProperty()
+    y: IntProperty()
+
+    def execute(self, context):
+        # Get the screen dimensions
+        x, y = self.x, self.y
+
+        buffer = gpu.state.active_framebuffer_get()
+        pixel = buffer.read_color(x, y, 1, 1, 3, 0, 'FLOAT')
+        pixel.dimensions = 1 * 1 * 3
+        pix_value = [float(item) for item in pixel]
+
+        tool_settings = bpy.context.scene.tool_settings
+        unified_settings = tool_settings.unified_paint_settings
+        brush_settings = tool_settings.image_paint.brush
+        unified_settings.color = pix_value
+        brush_settings.color = pix_value
+
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps = cls.ensure_context(context)
+        return context.area.type == 'VIEW_3D' and ps.active_object.mode == 'TEXTURE_PAINT'
+
+    def invoke(self, context, event):
+        self.x = event.mouse_x
+        self.y = event.mouse_y
+        return self.execute(context)
+
+
+class PAINTSYSTEM_OT_OpenPaintSystemPreferences(Operator):
+    bl_idname = "paint_system.open_paint_system_preferences"
+    bl_label = "Open Paint System Preferences"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Open the Paint System preferences"
+    
+    
+    def execute(self, context):
+        bpy.ops.screen.user_preferences_show()
+        bpy.context.preferences.active_section = 'ADDONS'
+        bpy.context.window_manager.addon_search = 'Paint System'
+        bpy.ops.preferences.addon_expand(module=addon_package())
+
 classes = (
     PAINTSYSTEM_OT_TogglePaintMode,
     PAINTSYSTEM_OT_AddPresetBrushes,
@@ -182,5 +249,29 @@ classes = (
     PAINTSYSTEM_OT_NewMaterial,
     PAINTSYSTEM_OT_PreviewActiveChannel,
     PAINTSYSTEM_OT_CreatePaintSystemUVMap,
+    PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
+    PAINTSYSTEM_OT_ColorSampler,
+    PAINTSYSTEM_OT_OpenPaintSystemPreferences,
 )
-register, unregister = register_classes_factory(classes)
+
+addon_keymaps = []
+
+_register, _unregister = register_classes_factory(classes)
+
+def register():
+    _register()
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.new(name="3D View", space_type='VIEW_3D')
+        kmi = km.keymap_items.new(
+            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'I', 'PRESS', repeat=True)
+        kmi = km.keymap_items.new(
+            PAINTSYSTEM_OT_ToggleBrushEraseAlpha.bl_idname, type='E', value='PRESS')
+        addon_keymaps.append((km, kmi))
+
+def unregister():
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
+    _unregister()

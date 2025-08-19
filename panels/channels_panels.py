@@ -2,8 +2,7 @@ import bpy
 from bpy.types import UIList
 from bpy.utils import register_classes_factory
 from bpy.types import Panel
-from .common import PSContextMixin, get_icon, get_icon_from_channel
-from ..utils.nodes import find_node
+from .common import PSContextMixin, get_icon, get_icon_from_channel, get_group_node
 
 class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
     """UIList for displaying paint channels."""
@@ -12,7 +11,7 @@ class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
         channel = item
         ps_ctx = self.ensure_context(context)
         split = layout.split(factor=0.6)
-        group_node = find_node(ps_ctx.active_material.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
+        group_node = get_group_node(context)
         icon_row = split.row(align=True)
         icon_row.prop(channel, "type", text="", icon_only=True, emboss=False)
         icon_row.prop(channel, "name", text="", emboss=False)
@@ -35,7 +34,9 @@ class MAT_PT_ChannelsSelect(PSContextMixin, Panel):
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.ensure_context(context)
-        layout.template_list(
+        col = layout.column(align=True)
+        col.label(text="Channels")
+        col.template_list(
             "PAINTSYSTEM_UL_channels", 
             "",
             ps_ctx.active_group,
@@ -110,11 +111,14 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
     
     def draw(self, context):
         layout = self.layout
+        row = layout.row()
+        row.label(icon="BLANK1")
         ps_ctx = self.ensure_context(context)
         active_channel = ps_ctx.active_channel
-        layout.prop(active_channel, "use_alpha")
+        col = row.column(align=True)
+        col.prop(active_channel, "use_alpha")
         if active_channel.type == "VECTOR":
-            layout.prop(active_channel, "normalize")
+            col.prop(active_channel, "use_normalize")
 
 
 classes = (

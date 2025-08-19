@@ -6,6 +6,7 @@ submodules = [
     "preferences_panels",
     "main_panels",
     "channels_panels",
+    "extras_panels",
     "layers_panels",
 ]
 

@@ -38,16 +38,9 @@ print("Paint System: Registering...")
 owner = object()
 
 submodules = [
-    # "properties",
-    # "operators_layers",
-    # "operators_utils",
-    # "operators_bake",
     "paintsystem",
     "panels",
     "operators",
-    # "tests",
-    # "node_organizer",
-    # "operation/test",
 ]
 
 _register, _unregister = register_submodule_factory(__name__, submodules)
