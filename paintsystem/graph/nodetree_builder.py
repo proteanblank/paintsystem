@@ -7,6 +7,7 @@ from ...utils.version import is_newer_than
 from uuid import uuid4
 import re
 import time
+from bpy_extras.node_utils import connect_sockets
 
 pattern_increment = re.compile(r"^(.+?_)(\d+)\.(\d+)$")
 pattern_normalize = re.compile(r"^(.+?)[._](\d+)$")
@@ -203,30 +204,11 @@ class NodeTreeBuilder:
         for node in self.tree.nodes:
             if getattr(node, 'parent', None) == self.frame and node.type != 'FRAME':
                 self._log(f"Hydrating node: {node.name}")
+                identifier = self.get_node_identifier(node)
+                self.nodes[identifier] = node
+                identifier = self.get_node_identifier(node)
                 # If the graph is adjustable, add all nodes in the frame to add commands which can be overridden with add_node commands
                 if self.adjustable:
-                    # Ensure node name is in this format identifier<number of appearances>
-
-                    # def rename_increment(s):
-                    #     match = pattern_increment.match(s)
-                    #     if match:
-                    #         prefix, num1, _ = match.groups()
-                    #         width = len(num1)  # preserve zero padding
-                    #         new_num = str(int(num1) + 1).zfill(width)
-                    #         return f"{prefix}{new_num}"
-                    #     else:
-                    #         # If it doesn't match the increment case, normalize dot/underscore
-                    #         return pattern_normalize.sub(r"\1_\2", s)
-                    
-                    # identifier = rename_increment(node.name)
-                    # node.name = identifier
-                    
-                    identifier = self.get_node_identifier(node)
-                    # Ensure identifier custom property is set on adjustable hydration
-                    # try:
-                    #     node["identifier"] = identifier
-                    # except Exception:
-                    #     pass
                     self.add_node(identifier, node.bl_idname)
                     
                     for input in node.inputs:
@@ -239,25 +221,9 @@ class NodeTreeBuilder:
                             for link in output.links:
                                 if link.to_node.parent == self.frame:
                                     self.link(identifier, self.get_node_identifier(link.to_node), output, link.to_socket, force=True)
-
-                # Ensure identifier custom property exists for non-adjustable hydration as well
-                if not self.adjustable:
-                    try:
-                        if node.get("identifier") is None:
-                            node["identifier"] = node.name
-                    except Exception:
-                        pass
-
-                # Store by identifier when available, otherwise by name
-                try:
-                    key = self.get_node_identifier(node)
-                except Exception:
-                    key = getattr(node, 'name', None)
-                if key is not None:
-                    self.nodes[key] = node
         # self.tree.links.new
         self._log(f"Time taken to hydrate existing nodes from frame: {time.time() - start_time_hydrate} seconds")
-        
+        self._arrange_nodes()
         
 
     def clear_tree(self, clean: bool = False):
@@ -443,6 +409,10 @@ class NodeTreeBuilder:
             if source == END:
                 raise ValueError(
                     "Cannot connect from END. END is a conceptual exit point, not a node.")
+            if source == START:
+                # Find the START node
+                node, socket = self._get_socket_by_prefix(True, source_socket)
+                source = self.get_node_identifier(node)
         else:
             raise ValueError(
                 "Source must be a NodeTreeBuilder instance or a string representing a node name.")
@@ -454,6 +424,10 @@ class NodeTreeBuilder:
             if target == START:
                 raise ValueError(
                     "Cannot connect to START. START is a conceptual entry point, not a node.")
+            if target == END:
+                # Find the END node
+                node, socket = self._get_socket_by_prefix(False, target_socket)
+                target = self.get_node_identifier(node)
         else:
             raise ValueError(
                 "Target must be a NodeTreeBuilder instance or a string representing a node name.")
@@ -764,8 +738,8 @@ class NodeTreeBuilder:
             self._log("Graph already compiled. Recompiling...")
             # for subgraph in self.sub_graphs:
             #     subgraph.compile()
-            if not self.adjustable:
-                self.clear_tree()  # Clear existing nodes and links
+            # if not self.adjustable:
+            #     self.clear_tree()  # Clear existing nodes and links
             self.compiled = False
         
         # Reset link tracking for a fresh build
@@ -799,7 +773,7 @@ class NodeTreeBuilder:
                 edge.target, edge.target_socket, is_source=False, edge_idx=idx
             )
             # Create the link between the resolved source and target sockets
-            self.node_links.append(self.tree.links.new(source_sock, target_sock))
+            self.node_links.append(connect_sockets(source_sock, target_sock))
             # self._log(f"Linked edge {idx + 1}/{len(self.edges)}")
         self._log(f"Time taken to link edges: {time.time() - start_time_link_edges} seconds")
         # --- Arrange nodes for clarity (simple horizontal layout) ---
@@ -1153,7 +1127,7 @@ class EXAMPLE_OT_BuildMyNodeTree(bpy.types.Operator):
         graph_builder3.link(
             "mix_rgb2", END, source_socket="Result", target_socket="Color")
 
-        main_graph = NodeTreeBuilder(node_tree, frame_name="Main Graph", verbose=True)
+        main_graph = NodeTreeBuilder(node_tree, frame_name="Main Graph")
         main_graph.link(
             graph_builder, graph_builder2, source_socket="Color", target_socket="Color")
         main_graph.link(
@@ -1163,7 +1137,9 @@ class EXAMPLE_OT_BuildMyNodeTree(bpy.types.Operator):
         main_graph.link(
             graph_builder2, graph_builder3, source_socket="Color", target_socket="Color")
 
+        graph_builder.compile()
         main_graph.compile()
+        
         
         # # graph_builder.compile()
         # graph_builder.link("color_ramp2", "color_ramp3",
