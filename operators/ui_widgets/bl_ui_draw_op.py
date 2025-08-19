@@ -83,7 +83,8 @@ class BL_UI_OT_draw_operator(Operator):
     handlers = []
     region_pointer = 0  # Uniquely identifies the region that this (drag_panel) operator instance has been invoked()
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.widgets = []
         self.valid_modes = []
         self.time_step = 0.1  # (float in [0, inf]) – Interval in seconds between timer events

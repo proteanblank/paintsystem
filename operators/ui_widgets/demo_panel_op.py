@@ -121,9 +121,9 @@ class DP_OT_draw_operator(BL_UI_OT_draw_operator):  # in: bl_ui_draw_op.py ##
             return False
         return True
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
 
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
         if __package__.find(".") != -1:
             package = __package__[0:__package__.find(".")]
