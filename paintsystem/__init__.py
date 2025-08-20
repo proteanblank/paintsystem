@@ -4,7 +4,8 @@ from .data import PaintSystemGlobalData, MaterialData, get_global_layer
 
 submodules = [
     "data",
-    "graph",
+    "handlers",
+    # "graph",
     # "nested_list_manager",
     # "move",
 ]

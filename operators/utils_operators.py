@@ -64,7 +64,7 @@ class PAINTSYSTEM_OT_SelectMaterialIndex(PSContextMixin, Operator):
 
     def execute(self, context):
         ps_ctx = self.ensure_context(context)
-        ob = ps_ctx.active_object
+        ob = ps_ctx.ps_object
         if not ob:
             return {'CANCELLED'}
         if ob.type != 'MESH':
@@ -86,7 +86,7 @@ class PAINTSYSTEM_OT_NewMaterial(PSContextMixin, MultiMaterialOperator):
         ps_ctx = self.ensure_context(context)
         bpy.ops.object.material_slot_add()
         bpy.data.materials.new(name="New Material")
-        ps_ctx.active_object.active_material = bpy.data.materials[-1]
+        ps_ctx.ps_object.active_material = bpy.data.materials[-1]
         return {'FINISHED'}
 
 
@@ -99,7 +99,7 @@ class PAINTSYSTEM_OT_PreviewActiveChannel(PSContextMixin, Operator):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
-        return ps_ctx.active_object is not None and ps_ctx.active_material is not None and ps_ctx.active_channel is not None
+        return ps_ctx.ps_object is not None and ps_ctx.active_material is not None and ps_ctx.active_channel is not None
     
     def execute(self, context):
         ps_ctx = self.ensure_context(context)
@@ -133,7 +133,7 @@ class PAINTSYSTEM_OT_PreviewActiveChannel(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_CreatePaintSystemUVMap(Operator):
+class PAINTSYSTEM_OT_CreatePaintSystemUVMap(PSContextMixin, Operator):
     bl_idname = "paint_system.create_paint_system_uv_map"
     bl_label = "Create Paint System UV Map"
     bl_options = {'REGISTER', 'UNDO'}
@@ -144,34 +144,34 @@ class PAINTSYSTEM_OT_CreatePaintSystemUVMap(Operator):
         selection = context.selected_objects
 
         # Get the active object
-        active_object = context.active_object
+        ps_object = self.ensure_context(context).ps_object
         
-        if active_object.data.uv_layers.get("PS_UVMap"):
+        if ps_object.data.uv_layers.get("PS_UVMap"):
             return {'FINISHED'}
 
         # Deselect all objects
         for obj in selection:
-            if obj != active_object:
+            if obj != ps_object:
                 obj.select_set(False)
         # Make it active
-        context.view_layer.objects.active = active_object
-        original_mode = str(active_object.mode)
+        context.view_layer.objects.active = ps_object
+        original_mode = str(ps_object.mode)
         bpy.ops.object.mode_set(mode='EDIT')
         obj.update_from_editmode()
         bpy.ops.mesh.select_all(action='SELECT')
         # Apply to only the active object
         bpy.ops.uv.smart_project(angle_limit=30/180*math.pi, island_margin=0.005)
-        uv_layers = active_object.data.uv_layers
+        uv_layers = ps_object.data.uv_layers
         uvmap = uv_layers.new(name="PS_UVMap")
         # Set active UV Map
         uv_layers.active = uv_layers.get(uvmap.name)
         bpy.ops.object.mode_set(mode=original_mode)
         # Deselect the object
-        active_object.select_set(False)
+        ps_object.select_set(False)
         # Restore the selection
         for obj in selection:
             obj.select_set(True)
-        context.view_layer.objects.active = active_object
+        context.view_layer.objects.active = ps_object
         return {'FINISHED'}
 
 
@@ -222,8 +222,8 @@ class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
 
     @classmethod
     def poll(cls, context):
-        ps = cls.ensure_context(context)
-        return context.area.type == 'VIEW_3D' and ps.active_object.mode == 'TEXTURE_PAINT'
+        ps_ctx = cls.ensure_context(context)
+        return context.area.type == 'VIEW_3D' and ps_ctx.ps_object.mode == 'TEXTURE_PAINT'
 
     def invoke(self, context, event):
         self.x = event.mouse_x

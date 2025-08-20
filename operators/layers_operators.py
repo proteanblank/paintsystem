@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Operator, Context
+from bpy.types import Operator, Context, NodeTree
 from bpy.props import StringProperty, IntProperty, EnumProperty, BoolProperty, PointerProperty
 from bpy.utils import register_classes_factory
 from .utils import redraw_panel, intern_enum_items
@@ -7,15 +7,34 @@ from ..paintsystem.create import (
     add_global_layer,
     add_global_layer_to_channel,
 )
-from ..paintsystem.data import GRADIENT_TYPE_ENUM, ADJUSTMENT_TYPE_ENUM, COORDINATE_TYPE_ENUM, ATTRIBUTE_TYPE_ENUM, get_global_layer, is_global_layer_linked
+from ..paintsystem.data import (
+    GRADIENT_TYPE_ENUM, 
+    ADJUSTMENT_TYPE_ENUM, 
+    COORDINATE_TYPE_ENUM, 
+    ATTRIBUTE_TYPE_ENUM, 
+    Channel, 
+    get_global_layer, 
+    is_global_layer_linked,
+    ACTION_BIND_ENUM,
+    ACTION_TYPE_ENUM
+    )
 from ..utils import get_next_unique_name
 from .common import PSContextMixin, scale_content, get_icon, MultiMaterialOperator
+from bpy_extras.node_utils import find_base_socket_type
 
 def get_object_uv_maps(self, context: Context):
     items = [
         (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
     ]
     return intern_enum_items(items)
+    
+def get_icon_from_type(type: str) -> int:
+    type_to_icon = {
+        'COLOR': 'color_socket',
+        'VECTOR': 'vector_socket',
+        'FLOAT': 'float_socket',
+    }
+    return get_icon(type_to_icon.get(type, 'color_socket'))
 
 # class PAINTSYSTEM_OT_NewLayer(PSContextMixin, MultiMaterialOperator):
 #     """Create a layer"""
@@ -471,32 +490,6 @@ class PAINTSYSTEM_OT_NewShader(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_NewNodeGroup(PSContextMixin, MultiMaterialOperator):
-    """Create a new node group layer"""
-    bl_idname = "paint_system.new_node_group_layer"
-    bl_label = "New Node Group Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
-
-    @classmethod
-    def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
-        return ps_ctx.active_channel is not None
-
-    layer_name: StringProperty(
-        name="Layer Name",
-        description="Name of the new node group layer",
-        default="Node Group Layer"
-    )
-
-    def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
-        global_layer = add_global_layer("NODE_GROUP")
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
-        return {'FINISHED'}
-
-
 class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
     """Create a new gradient layer"""
     bl_idname = "paint_system.new_gradient_layer"
@@ -532,7 +525,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
             empty_object = bpy.data.objects.new(f"{ps_ctx.active_group.name} {self.layer_name}", None)
             empty_object.parent = ps_ctx.ps_object
             collection.objects.link(empty_object)
-        empty_object.location = ps_ctx.active_object.location
+        empty_object.location = ps_ctx.ps_object.location
         if self.gradient_type == 'LINEAR':
             empty_object.empty_display_type = 'SINGLE_ARROW'
         elif self.gradient_type == 'RADIAL':
@@ -544,6 +537,190 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
+    """Create a new random color layer"""
+    bl_idname = "paint_system.new_random_color_layer"
+    bl_label = "New Random Color Layer"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new random color layer",
+        default="Random Color Layer"
+    )
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+    
+    def process_material(self, context):
+        ps_ctx = self.ensure_context(context)
+        global_layer = add_global_layer("RANDOM")
+        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
+
+    
+def get_inputs(node_tree: NodeTree, context: Context):
+    socket_items = []
+    count = 0
+    for socket in node_tree.interface.items_tree:
+        if socket.item_type == 'SOCKET' and socket.in_out == 'INPUT' and socket.socket_type != 'NodeSocketShader':
+            socket_items.append((str(count), socket.name, "", get_icon_from_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
+            count += 1
+    return socket_items
+
+def get_outputs(node_tree: NodeTree, context: Context):
+    socket_items = []
+    count = 0
+    for socket in node_tree.interface.items_tree:
+        if socket.item_type == 'SOCKET' and socket.in_out == 'OUTPUT' and socket.socket_type != 'NodeSocketShader':
+            socket_items.append((str(count), socket.name, "", get_icon_from_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
+            count += 1
+    return socket_items
+class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
+    """Create a new custom node group layer"""
+    bl_idname = "paint_system.new_custom_node_group_layer"
+    bl_label = "New Custom Node Group Layer"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    
+    def get_node_groups(self, context: Context):
+        node_groups = []
+        for node_group in bpy.data.node_groups:
+            if node_group.bl_idname == 'ShaderNodeTree' and not node_group.name.startswith(".PS") and not node_group.name.startswith("Paint System"):
+                node_groups.append((node_group.name, node_group.name, ""))
+        return node_groups
+    
+    def get_inputs_enum(self, context: Context):
+        if not self.node_tree_name:
+            return []
+        custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        inputs = get_inputs(custom_node_tree, context)
+        inputs.append(('-1', 'None', '', 'BLANK1', len(inputs)))
+        return inputs
+    
+    def get_outputs_enum(self, context: Context):
+        if not self.node_tree_name:
+            return []
+        custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        outputs = get_outputs(custom_node_tree, context)
+        outputs.append(('-1', 'None', '', 'BLANK1', len(outputs)))
+        return outputs
+    
+    def auto_select_sockets(self, context: Context):
+        if not self.node_tree_name:
+            return
+        custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        input_sockets = get_inputs(custom_node_tree, context)
+        output_sockets = get_outputs(custom_node_tree, context)
+        for input_socket in input_sockets:
+            if input_socket[1] == 'Color':
+                self.custom_color_input = input_socket[0]
+            elif input_socket[1] == 'Alpha':
+                self.custom_alpha_input = input_socket[0]
+        for output_socket in output_sockets:
+            if output_socket[1] == 'Color':
+                self.custom_color_output = output_socket[0]
+            elif output_socket[1] == 'Alpha':
+                self.custom_alpha_output = output_socket[0]
+                
+    def has_unsupported_sockets(self, node_tree: NodeTree):
+        for socket in node_tree.interface.items_tree:
+            if socket.item_type == 'SOCKET' and socket.socket_type not in ['NodeSocketColor', 'NodeSocketFloat', 'NodeSocketVector']:
+                return True
+        return False
+    
+    node_tree_name: EnumProperty(
+        name="Node Tree",
+        description="Name of the node tree to use",
+        items=get_node_groups,
+        update=auto_select_sockets
+    )
+    
+    custom_color_input: EnumProperty(
+        name="Custom Color Input",
+        description="Custom color input",
+        items=get_inputs_enum,
+    )
+    custom_alpha_input: EnumProperty(
+        name="Custom Alpha Input",
+        description="Custom alpha input",
+        items=get_inputs_enum,
+        
+    )
+    custom_color_output: EnumProperty(
+        name="Custom Color Output",
+        description="Custom color output",
+        items=get_outputs_enum
+    )
+    custom_alpha_output: EnumProperty(
+        name="Custom Alpha Output",
+        description="Custom alpha output",
+        items=get_outputs_enum
+    )
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_channel is not None
+    
+    def process_material(self, context):
+        ps_ctx = self.ensure_context(context)
+        print("Selected node tree:", self.node_tree_name)
+        custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        print("Custom node tree:", custom_node_tree)
+        global_layer = add_global_layer("NODE_GROUP")
+        global_layer.custom_node_tree = custom_node_tree
+        global_layer.custom_color_input = int(self.custom_color_input)
+        global_layer.custom_alpha_input = int(self.custom_alpha_input if self.custom_alpha_input != "" else "-1")
+        global_layer.custom_color_output = int(self.custom_color_output)
+        global_layer.custom_alpha_output = int(self.custom_alpha_output if self.custom_alpha_output != "" else "-1")
+        print("Sockets:", self.custom_color_input, self.custom_alpha_input, self.custom_color_output, self.custom_alpha_output)
+        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.node_tree_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        self.auto_select_sockets(context)
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Select node tree:", icon='NODETREE')
+        row = layout.row()
+        scale_content(context, row, 1.5, 1.5)
+        row.prop(self, "node_tree_name", text="")
+        if self.has_unsupported_sockets(bpy.data.node_groups.get(self.node_tree_name)):
+            box = layout.box()
+            box.alert = True
+            row = box.row()
+            row.label(icon='ERROR')
+            col = row.column()
+            col.label(text="Node has unsupported sockets (Shader)")
+        if self.node_tree_name:
+            box = layout.box()
+            row = box.row()
+            row.alignment = 'CENTER'
+            row.label(text="Socket Connection", icon='NODETREE')
+            row = box.row()
+            box = row.box()
+            text_row = box.row()
+            text_row.alignment = 'CENTER'
+            text_row.label(text="Input")
+            box.prop(self, "custom_color_input", text="Color")
+            box.prop(self, "custom_alpha_input", text="Alpha")
+            box = row.box()
+            text_row = box.row()
+            text_row.alignment = 'CENTER'
+            text_row.label(text="Output")
+            box.prop(self, "custom_color_output", text="Color")
+            box.prop(self, "custom_alpha_output", text="Alpha")
 
 class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
     """Remove the active item"""
@@ -595,7 +772,11 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
                 bpy.data.images.remove(global_layer.image)
             if global_layer.node_tree:
                 bpy.data.node_groups.remove(global_layer.node_tree)
-            bpy.data.global_layers.remove(global_layer)
+            global_layers = context.scene.ps_scene_data.layers
+            for i, layer in enumerate(global_layers):
+                if layer == global_layer:
+                    global_layers.remove(i)
+                    break
         
         redraw_panel(context)
         return {'FINISHED'}
@@ -808,8 +989,6 @@ class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
         clipboard_layer.name = active_layer.name
         clipboard_layer.type = active_layer.type
         clipboard_layer.ref_layer_id = active_layer.ref_layer_id
-        clipboard_layer.enabled = active_layer.enabled
-        clipboard_layer.lock_alpha = active_layer.lock_alpha
         return {'FINISHED'}
 
 
@@ -835,8 +1014,6 @@ class PAINTSYSTEM_OT_CopyAllLayers(PSContextMixin, Operator):
             clipboard_layer.name = layer.name
             clipboard_layer.type = layer.type
             clipboard_layer.ref_layer_id = layer.ref_layer_id
-            clipboard_layer.enabled = layer.enabled
-            clipboard_layer.lock_alpha = layer.lock_alpha
         return {'FINISHED'}
 
 
@@ -881,6 +1058,93 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_AddAction(PSContextMixin, Operator):
+    """Add an action to the active layer"""
+    bl_idname = "paint_system.add_action"
+    bl_label = "Add Action"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Add an action to the active layer"
+    
+    action_bind: EnumProperty(
+        name="Action Type",
+        description="Action type",
+        items=ACTION_BIND_ENUM
+    )
+    action_type: EnumProperty(
+        name="Action Type",
+        description="Action type",
+        items=ACTION_TYPE_ENUM
+    )
+    frame: IntProperty(
+        name="Frame",
+        description="Frame to enable/disable the layer",
+        default=0
+    )
+    marker_name: StringProperty(
+        name="Marker Name",
+        description="Marker name",
+        default=""
+    )
+    
+    def get_next_action_name(self, context):
+        ps_ctx = self.ensure_context(context)
+        global_layer = ps_ctx.active_global_layer
+        return get_next_unique_name("Action", [action.name for action in global_layer.actions])
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_layer is not None
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.prop(self, "action_bind", text="Bind to")
+        layout.prop(self, "action_type", text="Once reached")
+        if self.action_bind == 'FRAME':
+            layout.prop(self, "frame", text="Frame")
+        elif self.action_bind == 'MARKER':
+            layout.prop_search(self, "marker_name", context.scene, "timeline_markers", text="Marker", icon="MARKER_HLT")
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        global_layer = ps_ctx.active_global_layer
+        action = global_layer.actions.add()
+        action.name = self.name
+        action.action_bind = self.action_bind
+        action.action_type = self.action_type
+        if self.action_bind == 'FRAME':
+            action.frame = self.frame
+        elif self.action_bind == 'MARKER':
+            action.marker_name = self.marker_name
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        # Get current frame
+        self.frame = bpy.context.scene.frame_current
+        return context.window_manager.invoke_props_dialog(self)
+
+
+class PAINTSYSTEM_OT_DeleteAction(PSContextMixin, Operator):
+    """Delete the active action"""
+    bl_idname = "paint_system.delete_action"
+    bl_label = "Delete Action"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Delete the active action"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_layer is not None
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        global_layer = ps_ctx.active_global_layer
+        global_layer.actions.remove(global_layer.active_action_index)
+        global_layer.active_action_index = min(global_layer.active_action_index, len(global_layer.actions) - 1)
+        return {'FINISHED'}
+
+
 classes = (
     PAINTSYSTEM_OT_NewImage,
     PAINTSYSTEM_OT_NewFolder,
@@ -888,14 +1152,17 @@ classes = (
     PAINTSYSTEM_OT_NewAttribute,
     PAINTSYSTEM_OT_NewAdjustment,
     PAINTSYSTEM_OT_NewShader,
-    PAINTSYSTEM_OT_NewNodeGroup,
     PAINTSYSTEM_OT_NewGradient,
+    PAINTSYSTEM_OT_NewRandomColor,
+    PAINTSYSTEM_OT_NewCustomNodeGroup,
     PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,
     PAINTSYSTEM_OT_CopyLayer,
     PAINTSYSTEM_OT_CopyAllLayers,
     PAINTSYSTEM_OT_PasteLayer,
+    PAINTSYSTEM_OT_AddAction,
+    PAINTSYSTEM_OT_DeleteAction,
 )
 
 register, unregister = register_classes_factory(classes)

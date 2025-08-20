@@ -3,7 +3,14 @@ from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTre
 from bpy.utils import register_classes_factory
 from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
-from ..paintsystem.data import is_valid_ps_nodetree, GlobalLayer, ADJUSTMENT_TYPE_ENUM, GRADIENT_TYPE_ENUM, is_global_layer_linked
+from ..paintsystem.data import (
+    is_valid_ps_nodetree, 
+    GlobalLayer,
+    ADJUSTMENT_TYPE_ENUM, 
+    GRADIENT_TYPE_ENUM, 
+    is_global_layer_linked,
+    sort_actions
+    )
 
 
 def is_image_painted(image: Image | ImagePreview) -> bool:
@@ -37,8 +44,6 @@ def is_basic_setup(node_tree: NodeTree) -> bool:
     return is_basic_setup
 
 
-
-
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
         # The UIList passes channel as 'data'
@@ -51,7 +56,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             # Check if parent of the current item is enabled
             parent_item = active_channel.get_item_by_id(
                 item.parent_id)
-            if parent_item and not parent_item.enabled:
+            if parent_item and not global_item.enabled:
                 main_row.enabled = False
 
             row = main_row.row(align=True)
@@ -67,7 +72,8 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                     else:
                         row.label(icon_value=get_icon('image'))
                 case 'FOLDER':
-                    row.prop(global_item, "is_expanded", text="", icon_only=True, icon_value=get_icon('folder_open') if global_item.is_expanded else get_icon('folder'), emboss=False)
+                    row.prop(global_item, "is_expanded", text="", icon_only=True, icon_value=get_icon(
+                        'folder_open') if global_item.is_expanded else get_icon('folder'), emboss=False)
                 case 'SOLID_COLOR':
                     rgb_node = global_item.find_node("rgb")
                     if rgb_node:
@@ -83,9 +89,11 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                     row.label(icon='MESH_DATA')
                 case 'GRADIENT':
                     row.label(icon='COLOR')
+                case 'RANDOM':
+                    row.label(icon='SEQ_HISTOGRAM')
                 case _:
                     row.label(icon='BLANK1')
-            
+
             row = main_row.row(align=True)
             row.prop(item, "name", text="", emboss=False)
             # if global_item.mask_image:
@@ -95,10 +103,12 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                 row.label(icon="SELECT_INTERSECT")
             if global_item.lock_layer:
                 row.label(icon="VIEW_LOCKED")
+            if len(global_item.actions) > 0:
+                row.label(icon="KEYTYPE_KEYFRAME_VEC")
             if is_global_layer_linked(global_item):
                 row.label(icon="LINKED")
-            row.prop(item, "enabled", text="",
-                     icon="HIDE_OFF" if item.enabled else "HIDE_ON", emboss=False)
+            row.prop(global_item, "enabled", text="",
+                     icon="HIDE_OFF" if global_item.enabled else "HIDE_ON", emboss=False)
             self.draw_custom_properties(row, global_item)
 
     def filter_items(self, context, data, propname):
@@ -136,6 +146,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
         if hasattr(item, 'custom_int'):
             layout.label(text=str(item.order))
 
+
 class MAT_PT_Layers(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_Layers'
     bl_space_type = "VIEW_3D"
@@ -144,24 +155,15 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_PaintSystemMainPanel'
 
-    # def draw_header_preset(self, context):
-    #     layout = self.layout
-    #     ps = PaintSystem(context)
-    #     obj = ps.active_object
-
-    #     if obj and obj.mode == 'TEXTURE_PAINT':
-    #         layout.prop(ps.settings, "allow_image_overwrite",
-    #                     text="Auto Select", icon='CHECKBOX_HLT' if ps.settings.allow_image_overwrite else 'CHECKBOX_DEHLT')
-
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
         return ps_ctx.active_channel is not None
-    
+
     def draw_header_preset(self, context):
         layout = self.layout
         ps_ctx = self.ensure_context(context)
-        if ps_ctx.active_object.mode != 'TEXTURE_PAINT':
+        if ps_ctx.ps_object.mode != 'TEXTURE_PAINT':
             return
         if ps_ctx.active_channel:
             layout.popover(
@@ -182,14 +184,14 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     #         row.operator("wm.save_mainfile",
     #                      text="Click to Save!", icon="FUND")
 
-    def draw_header(self, context):
-        layout = self.layout
-        layout.label(icon="IMAGE_RGB")
+    # def draw_header(self, context):
+    #     layout = self.layout
+    #     layout.label(icon="IMAGE_RGB")
 
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.ensure_context(context)
-        obj = ps_ctx.active_object
+        obj = ps_ctx.ps_object
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_global_layer
         mat = ps_ctx.active_material
@@ -201,7 +203,8 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         # Toggle paint mode (switch between object and texture paint mode)
         current_mode = context.mode
         box = layout.box()
-        group_node = find_node(mat.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
+        group_node = find_node(mat.node_tree, {
+                               'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
         if not group_node:
             warning_box = box.box()
             warning_box.alert = True
@@ -214,7 +217,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         row.scale_x = 1.7
         # if contains_mat_setup:
         row.operator("paint_system.toggle_paint_mode",
-                        text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE', icon_value=get_icon('paintbrush'))
+                     text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE', icon_value=get_icon('paintbrush'))
         # else:
         #     row.alert = True
         #     row.operator("paint_system.create_template_setup",
@@ -222,7 +225,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         #     row.alert = False
         if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
             row.operator("paint_system.preview_active_channel",
-                            text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
+                         text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
         row.operator("wm.save_mainfile",
                      text="", icon="FILE_TICK")
         # Baking and Exporting
@@ -263,29 +266,36 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         #     split.alert = True
         #     split.label(text="Editing Mask!", icon="INFO")
         #     split.prop(active_layer, "edit_mask", text="Disable", icon='X', emboss=False)
-        
+
         row = box.row()
         scale_content(context, row, scale_x=1, scale_y=1.5)
         row.template_list(
             "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
-            rows=max(5, len(flattened))
+            rows=min(max(4, len(flattened)), 7)
         )
 
         col = row.column(align=True)
         col.scale_x = 1.2
         col.menu("MAT_MT_AddLayer", icon_value=get_icon('layer_add'), text="")
         col.menu("MAT_MT_LayerMenu",
-                     text="", icon='COLLAPSEMENU')
+                 text="", icon='COLLAPSEMENU')
         col.separator()
         # col.operator("paint_system.delete_item", icon="TRASH", text="")
         # col.separator()
         col.operator("paint_system.move_up", icon="TRIA_UP", text="")
         col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
+        # col.separator()
+        # col.popover(
+        #     panel="MAT_PT_Actions",
+        #     text="",
+        #     icon='KEYTYPE_KEYFRAME_VEC',
+        # )
 
         active_layer = ps_ctx.active_layer
         if not active_layer:
             return
-        
+
+
 class MAT_PT_LayerSettings(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_LayerSettings'
     bl_space_type = "VIEW_3D"
@@ -293,16 +303,26 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
     bl_label = "Layer Settings"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_Layers'
-    
+
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
         active_layer = ps_ctx.active_layer
         return active_layer is not None
 
-    def draw_header(self, context):
-        layout = self.layout
-        layout.label(icon="SETTINGS")
+    # def draw_header(self, context):
+    #     layout = self.layout
+    #     layout.label(icon="SETTINGS")
+        
+    # def draw_header_preset(self, context):
+    #     layout = self.layout
+    #     ps_ctx = self.ensure_context(context)
+    #     global_layer = ps_ctx.active_global_layer
+    #     layout.popover(
+    #         panel="MAT_PT_Actions",
+    #         text=f"Actions ({len(global_layer.actions)})" if global_layer.actions else "Actions",
+    #         icon="KEYTYPE_KEYFRAME_VEC"
+    #     )
 
     def draw(self, context):
         layout = self.layout
@@ -312,9 +332,16 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         if not active_layer:
             return
             # Settings
+        row = layout.row(align=True)
+        scale_content(context, row)
+        row.popover(
+            panel="MAT_PT_Actions",
+            text=f"{len(global_layer.actions)} Active Actions" if global_layer.actions else "Add Layer Actions",
+            icon="KEYTYPE_KEYFRAME_VEC"
+        )
         box = layout.box()
-        row = box.row(align=True)
         if global_layer.image:
+            row = box.row(align=True)
             if not global_layer.external_image:
                 row.operator("paint_system.quick_edit", text="Edit Externally")
             else:
@@ -328,240 +355,106 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
 
         # Let user set opacity and blend mode:
         color_mix_node = global_layer.mix_node
+        col = box.column(align=True)
+        row = col.row(align=True)
+        row.scale_y = 1.2
+        row.scale_x = 1.2
+        scale_content(context, row, 1.5, 1.5)
+        clip_row = row.row(align=True)
+        clip_row.enabled = not global_layer.lock_layer
+        clip_row.prop(global_layer.post_mix_node.inputs["Clip"], "default_value", text="",
+                 icon="SELECT_INTERSECT")
+        if global_layer.type == 'IMAGE':
+            clip_row.prop(global_layer, "lock_alpha",
+                     text="", icon='TEXTURE')
+        row.prop(global_layer, "lock_layer",
+                 text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
+        blend_type_row = row.row(align=True)
+        blend_type_row.enabled = not global_layer.lock_layer
+        blend_type_row.prop(color_mix_node, "blend_type", text="")
+        row = col.row(align=True)
+        scale_content(context, row, scale_x=1.2, scale_y=1.5)
+        row.enabled = not global_layer.lock_layer
+        row.prop(global_layer.pre_mix_node.inputs[0], "default_value",
+                 text="Opacity", slider=True)
+        col = box.column()
         match global_layer.type:
             case 'IMAGE':
-                col = box.column(align=True)
-                row = col.row(align=True)
-                row.scale_y = 1.2
-                row.scale_x = 1.2
-                scale_content(context, row, 1.5, 1.5)
-                row.prop(global_layer.post_mix_node.inputs["Clip"], "default_value", text="",
-                         icon="SELECT_INTERSECT")
-                row.prop(active_layer, "lock_alpha",
-                         text="", icon='TEXTURE')
-                row.prop(global_layer, "lock_layer",
-                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
-                row.prop(color_mix_node, "blend_type", text="")
-                row = col.row()
-                scale_content(context, row, scale_x=1.2, scale_y=1.5)
-                row.prop(global_layer.pre_mix_node.inputs[0], "default_value",
-                         text="Opacity", slider=True)
-
+                pass
             case 'ADJUSTMENT':
-                row = box.row(align=True)
-                row.scale_y = 1.2
-                row.scale_x = 1.2
-                scale_content(context, row, 1.5, 1.5)
-                row.prop(global_layer.post_mix_node.inputs["Clip"], "default_value", text="",
-                         icon="SELECT_INTERSECT")
-                row.prop(global_layer, "lock_layer",
-                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
-                row.prop(global_layer.pre_mix_node.inputs[0], "default_value",
-                         text="Opacity", slider=True)
                 adjustment_node = global_layer.find_node("adjustment")
                 if adjustment_node:
-                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     col.label(text="Adjustment Settings:", icon='SHADERFX')
                     col.template_node_inputs(adjustment_node)
             case 'NODE_GROUP':
-                row = box.row(align=True)
-                row.scale_y = 1.2
-                row.scale_x = 1.2
-                scale_content(context, row, 1.5, 1.5)
-                row.prop(global_layer.post_mix_node.inputs["Clip"], "default_value", text="Clip Layer",
-                         icon="SELECT_INTERSECT")
-                if not is_valid_ps_nodetree(global_layer.node_tree):
-                    col = box.column(align=True)
-                    col.label(text="Invalid Node Tree!", icon='ERROR')
-                    col.label(text="Please check the input/output sockets.")
-                    return
-                node_group = global_layer.node_group
+                custom_node_tree = global_layer.custom_node_tree
+                node_group = global_layer.find_node('custom_node_tree')
                 inputs = [i for i in node_group.inputs if not i.is_linked and i.name not in (
                     'Color', 'Alpha')]
                 if not inputs:
                     return
-                box.label(text="Node Group Settings:", icon='NODETREE')
+                col.enabled = not global_layer.lock_layer
+                col.label(text="Node Group Settings:", icon='NODETREE')
                 for socket in inputs:
-                    col = box.column()
                     col.prop(socket, "default_value",
                              text=socket.name)
-                    
+
             case 'ATTRIBUTE':
-                col = box.column(align=True)
-                row = col.row(align=True)
-                row.scale_y = 1.2
-                row.scale_x = 1.2
-                scale_content(context, row, 1.5, 1.5)
-                row.prop(global_layer.post_mix_node.inputs["Clip"], "default_value", text="",
-                         icon="SELECT_INTERSECT")
-                row.prop(global_layer, "lock_layer",
-                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
-                row.prop(color_mix_node, "blend_type", text="")
-                row = col.row()
-                scale_content(context, row, 1, 1.5)
-                row.prop(global_layer.pre_mix_node.inputs[0], "default_value",
-                         text="Opacity", slider=True)
                 attribute_node = global_layer.find_node("attribute")
                 if attribute_node:
-                    box.label(text="Attribute Settings:", icon='MESH_DATA')
-                    box.template_node_inputs(attribute_node)
-            case 'GRADIENT':
-                col = box.column(align=True)
-                row = col.row(align=True)
-                row.scale_y = 1.2
-                row.scale_x = 1.2
-                scale_content(context, row, 1.5, 1.5)
-                row.prop(global_layer.post_mix_node.inputs["Clip"], "default_value", text="",
-                         icon="SELECT_INTERSECT")
-                row.prop(global_layer, "lock_layer",
-                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
-                row.prop(color_mix_node, "blend_type", text="")
-                row = col.row()
-                row.scale_y = 1.2
-                scale_content(context, row, 1, 1.5)
-                row.prop(global_layer.pre_mix_node.inputs[0], "default_value",
-                         text="Opacity", slider=True)
-                # color_ramp_node = global_layer.find_node("color_ramp")
-                #             "label": "Gradient Color Ramp"})
-                # box.template_color_ramp(
-                #     color_ramp_node, "color_ramp")
-                # box.prop(layer_node_group.inputs['Use Steps'], "default_value",
-                #          text="Use Steps")
-                # box.prop(layer_node_group.inputs['Steps'], "default_value", text="Steps")
+                    col.enabled = not global_layer.lock_layer
+                    col.label(text="Attribute Settings:", icon='MESH_DATA')
+                    col.template_node_inputs(attribute_node)
             case 'GRADIENT':
                 gradient_node = global_layer.find_node("gradient")
                 if gradient_node:
-                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     col.label(text="Gradient Settings:", icon='SHADERFX')
                     col.template_node_inputs(gradient_node)
-            case _:
-                col = box.column(align=True)
-                row = col.row(align=True)
-                row.scale_y = 1.2
-                row.scale_x = 1.2
-                scale_content(context, row, 1.5, 1.5)
-                row.prop(global_layer.post_mix_node.inputs["Clip"], "default_value", text="",
-                         icon="SELECT_INTERSECT")
-                row.prop(global_layer, "lock_layer",
-                         text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
-                row.prop(color_mix_node, "blend_type", text="")
-                row = col.row()
-                row.enabled = not global_layer.lock_layer
-                row.scale_y = 1.2
-                scale_content(context, row, 1, 1.5)
-                row.prop(global_layer.pre_mix_node.inputs[0], "default_value",
-                         text="Opacity", slider=True)
-
-                if global_layer.type == 'SOLID_COLOR':
-                    rgb_node = global_layer.find_node("rgb")
-                    col = box.column()
+            case 'SOLID_COLOR':
+                rgb_node = global_layer.find_node("rgb")
+                if rgb_node:
                     col.enabled = not global_layer.lock_layer
-                    if rgb_node:
-                        col.prop(rgb_node.outputs[0], "default_value", text="Color",
-                                icon='IMAGE_RGB_ALPHA')
+                    col.prop(rgb_node.outputs[0], "default_value", text="Color",
+                             icon='IMAGE_RGB_ALPHA')
 
-                if global_layer.type == 'ADJUSTMENT':
-                    adjustment_node = global_layer.find_node("adjustment")
-                    if adjustment_node:
-                        col.label(text="Adjustment Settings:", icon='SHADERFX')
-                        col.template_node_inputs(adjustment_node)
+            case 'ADJUSTMENT':
+                adjustment_node = global_layer.find_node("adjustment")
+                if adjustment_node:
+                    col.enabled = not global_layer.lock_layer
+                    col.label(text="Adjustment Settings:", icon='SHADERFX')
+                    col.template_node_inputs(adjustment_node)
 
-        # if active_layer.type == 'SHADER':
-        #     box = layout.box()
-        #     row = box.row()
-        #     row.label(text="Shader Settings:", icon='SHADING_RENDERED')
-        #     col = box.column()
-        #     match active_layer.sub_type:
-        #         case "_PS_Toon_Shader":
-        #             layer_node_group = ps.get_active_layer_node_group()
-        #             use_color_ramp = layer_node_group.inputs['Use Color Ramp']
-        #             row = col.row()
-        #             row.label(text="Colors:", icon='COLOR')
-        #             row.prop(
-        #                 use_color_ramp, "default_value", text="Color Ramp", icon='CHECKBOX_HLT' if use_color_ramp.default_value else 'CHECKBOX_DEHLT')
-        #             box = col.box()
-        #             colors_col = box.column()
-        #             row = colors_col.row()
-        #             row.label(text="Shadow:")
-        #             if use_color_ramp.default_value:
-        #                 color_ramp_node = ps.find_node(active_layer.node_tree, {
-        #                     "label": "Shading Color Ramp"})
-        #                 if color_ramp_node:
-        #                     colors_col.template_node_inputs(color_ramp_node)
-        #             else:
-
-        #                 colors_col.prop(layer_node_group.inputs['Shadow Color'], "default_value",
-        #                                 text="", icon='IMAGE_RGB_ALPHA')
-        #                 colors_col.separator()
-        #                 row = colors_col.row()
-        #                 row.label(text="Light:")
-        #                 use_clamp_value = layer_node_group.inputs['Clamp Value']
-        #                 intensity_multiplier = layer_node_group.inputs['Intensity Multiplier']
-        #                 light_col_influence = layer_node_group.inputs['Light Color Influence']
-        #                 row.prop(
-        #                     use_clamp_value, "default_value", text="Clamp Value", icon='CHECKBOX_HLT' if use_clamp_value.default_value else 'CHECKBOX_DEHLT')
-        #                 colors_col.prop(layer_node_group.inputs['Light Color'], "default_value",
-        #                                 text="", icon='IMAGE_RGB_ALPHA')
-        #                 colors_col.prop(intensity_multiplier, "default_value",
-        #                                 text="Intensity Multiplier")
-        #                 colors_col.prop(light_col_influence, "default_value",
-        #                                 text="Light Color Influence")
-        #             use_cell_shaded = layer_node_group.inputs['Cel-Shaded']
-        #             col.prop(
-        #                 use_cell_shaded, "default_value", text="Cel-Shaded")
-        #             col = col.column()
-        #             col.enabled = use_cell_shaded.default_value
-        #             col.prop(
-        #                 layer_node_group.inputs['Steps'], "default_value", text="Cel-Shaded Steps")
-        #         case "_PS_Light":
-        #             layer_node_group = ps.get_active_layer_node_group()
-        #             row = col.row()
-        #             row.label(text="Colors:", icon='COLOR')
-        #             box = col.box()
-        #             colors_col = box.column()
-        #             row = colors_col.row()
-        #             row.label(text="Light:")
-        #             use_clamp_value = layer_node_group.inputs['Clamp Value']
-        #             intensity_multiplier = layer_node_group.inputs['Intensity Multiplier']
-        #             light_col_influence = layer_node_group.inputs['Light Color Influence']
-        #             row.prop(
-        #                 use_clamp_value, "default_value", text="Clamp Value", icon='CHECKBOX_HLT' if use_clamp_value.default_value else 'CHECKBOX_DEHLT')
-        #             colors_col.prop(layer_node_group.inputs['Light Color'], "default_value",
-        #                             text="", icon='IMAGE_RGB_ALPHA')
-        #             colors_col.prop(intensity_multiplier, "default_value",
-        #                             text="Intensity Multiplier")
-        #             colors_col.prop(light_col_influence, "default_value",
-        #                             text="Light Color Influence")
-        #             use_cell_shaded = layer_node_group.inputs['Cel-Shaded']
-        #             col.prop(
-        #                 use_cell_shaded, "default_value", text="Cel-Shaded")
-        #             col = col.column()
-        #             col.enabled = use_cell_shaded.default_value
-        #             col.prop(
-        #                 layer_node_group.inputs['Steps'], "default_value", text="Cel-Shaded Steps")
-        #         case _:
-        #             layer_node_group = ps.get_active_layer_node_group()
-        #             inputs = []
-        #             for input in layer_node_group.inputs:
-        #                 if not input.is_linked:
-        #                     inputs.append(input)
-        #             for input in inputs:
-        #                 node_input_prop(col, layer_node_group,
-        #                                 input.name, text=input.name)
+            case 'RANDOM':
+                random_node = global_layer.find_node("add_2")
+                if random_node:
+                    col.enabled = not global_layer.lock_layer
+                    col.label(text="Random Settings:", icon='SHADERFX')
+                    col.prop(
+                        random_node.inputs[1], "default_value", text="Random Seed")
+            case _:
+                pass
 
 
 class MAT_MT_LayerMenu(PSContextMixin, Menu):
     bl_label = "Layer Menu"
     bl_idname = "MAT_MT_LayerMenu"
-    
+
     def draw(self, context):
         layout = self.layout
-        layout.operator("paint_system.copy_layer", text="Copy Layer", icon="COPYDOWN")
-        layout.operator("paint_system.copy_all_layers", text="Copy All Layers", icon="COPYDOWN")
-        layout.operator("paint_system.paste_layer", text="Paste Layer(s)", icon="PASTEDOWN").linked = False
-        layout.operator("paint_system.paste_layer", text="Paste Linked Layer(s)", icon="LINKED").linked = True
+        layout.operator("paint_system.copy_layer",
+                        text="Copy Layer", icon="COPYDOWN")
+        layout.operator("paint_system.copy_all_layers",
+                        text="Copy All Layers", icon="COPYDOWN")
+        layout.operator("paint_system.paste_layer",
+                        text="Paste Layer(s)", icon="PASTEDOWN").linked = False
+        layout.operator("paint_system.paste_layer",
+                        text="Paste Linked Layer(s)", icon="LINKED").linked = True
         layout.separator()
-        layout.operator("paint_system.delete_item", text="Delete Layer", icon="TRASH")
+        layout.operator("paint_system.delete_item",
+                        text="Delete Layer", icon="TRASH")
+
 
 class MAT_MT_AddLayerMenu(Menu):
     bl_label = "Add Layer"
@@ -572,7 +465,8 @@ class MAT_MT_AddLayerMenu(Menu):
         row = layout.row()
         col = row.column()
         # col.label(text="--- IMAGE ---")
-        col.operator("paint_system.new_folder_layer", icon_value=get_icon('folder'), text="Folder")
+        col.operator("paint_system.new_folder_layer",
+                     icon_value=get_icon('folder'), text="Folder")
         col.separator()
         col.operator("paint_system.new_image_layer",
                      text="New Image Layer", icon_value=get_icon('image_plus')).image_add_type = "NEW"
@@ -590,8 +484,10 @@ class MAT_MT_AddLayerMenu(Menu):
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
         col.operator("paint_system.new_attribute_layer",
                      text="Attribute Color", icon='MESH_DATA')
+        col.operator("paint_system.new_random_color_layer",
+                     text="Random Color", icon='SEQ_HISTOGRAM')
         col.separator()
-        col.label(text="--- GRADIENT ---")
+        # col.label(text="--- GRADIENT ---")
         for idx, (node_type, name, description) in enumerate(GRADIENT_TYPE_ENUM):
             col.operator("paint_system.new_gradient_layer",
                          text=name, icon='COLOR' if idx == 0 else 'NONE').gradient_type = node_type
@@ -608,9 +504,105 @@ class MAT_MT_AddLayerMenu(Menu):
             col.operator("paint_system.new_adjustment_layer",
                          text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
         col.separator()
-        col.label(text="--- CUSTOM ---")
-        col.operator("paint_system.new_node_group_layer",
+        # col.label(text="--- CUSTOM ---")
+        col.operator("paint_system.new_custom_node_group_layer",
                      text="Custom Node Tree", icon='NODETREE')
+
+
+class PAINTSYSTEM_UL_Actions(PSContextMixin, UIList):
+    bl_idname = "PAINTSYSTEM_UL_Actions"
+    bl_label = "Actions"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+
+    def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
+        layout.prop(item, "action_bind", text="", icon_only=True, emboss=False)
+        bind_to = 'Marker' if item.action_bind == 'MARKER' else 'Frame'
+        bind_name = (item.marker_name if item.marker_name else "None") if item.action_bind == 'MARKER' else str(item.frame)
+        layout.label(text=f"{bind_to} {bind_name} Action")
+    
+    def filter_items(self, context, data, propname):
+        actions = getattr(data, propname).values()
+        flt_flags = [self.bitflag_filter_item] * len(data.actions)
+        flt_neworder = []
+        sorted_actions = sort_actions(context, data)
+        for action in actions:
+            flt_neworder.append(sorted_actions.index(action))
+        return flt_flags, flt_neworder
+
+
+class MAT_PT_Actions(PSContextMixin, Panel):
+    bl_idname = "MAT_PT_Actions"
+    bl_label = "Actions"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    # bl_category = 'Paint System'
+    # bl_parent_id = 'MAT_PT_LayerSettings'
+    # bl_options = {'DEFAULT_CLOSED'}
+    bl_ui_units_x = 12
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        active_layer = ps_ctx.active_layer
+        return active_layer is not None
+
+    def draw(self, context):
+        ps_ctx = self.ensure_context(context)
+        global_layer = ps_ctx.active_global_layer
+        layout = self.layout
+        layout.use_property_split = True
+        layout.alignment = 'LEFT'
+        layout.use_property_decorate = False
+        layout.label(text="Layer Actions")
+        if not global_layer.actions:
+            box = layout.box()
+            col = box.column(align=True)
+            col.label(text="Actions can control layer visibility", icon='INFO')
+            col.label(text="with frame number or marker", icon='BLANK1')
+        row = layout.row()
+        # row.template_list("PAINTSYSTEM_UL_Actions", "", global_layer,
+        #                   "actions", global_layer, "active_action_index")
+        actions_col = row.column()
+        scale_content(context, actions_col)
+        actions_col.template_list("PAINTSYSTEM_UL_Actions", "", global_layer,
+                          "actions", global_layer, "active_action_index", rows=5)
+        # if global_layer.actions:
+        #     sorted_actions = sort_actions(context, global_layer)
+        #     for action in sorted_actions:
+        #         action_row = box.row()
+        #         action_row.prop(action, "action_bind", text="", icon_only=True)
+        #         split = action_row.split(factor=0.5)
+        #         split.prop(action, "action_type", text="")
+        #         if action.action_bind == 'FRAME':
+        #             split.prop(action, "frame", text="")
+        #         elif action.action_bind == 'MARKER':
+        #             split.prop_search(action, "marker_name", context.scene, "timeline_markers", text="", icon="MARKER_HLT")
+        # else:
+        #     action_row = box.row()
+        #     action_row.label(icon='INFO')
+        #     col = action_row.column(align=True)
+        #     col.label(text="Control the visibility of the layer based on")
+        #     col.label(text="frame or marker")
+        col = row.column(align=True)
+        col.operator("paint_system.add_action", icon="ADD", text="")
+        col.operator("paint_system.delete_action", icon="REMOVE", text="")
+        if not global_layer.actions:
+            # col.label(text="Add Actions to control the layer visibility", icon='INFO')
+            return
+        active_action = global_layer.actions[global_layer.active_action_index]
+        if not active_action:
+            return
+        actions_col.separator()
+        actions_col.prop(active_action, "action_bind", text="Bind to")
+        if active_action.action_bind == 'FRAME':
+            actions_col.prop(active_action, "frame", text="Frame")
+        elif active_action.action_bind == 'MARKER':
+            actions_col.prop_search(active_action, "marker_name", context.scene, "timeline_markers", text="Once reach", icon="MARKER_HLT")
+        actions_col.prop(active_action, "action_type", text="Action")
+
 
 classes = (
     MAT_PT_UL_LayerList,
@@ -618,6 +610,8 @@ classes = (
     MAT_MT_LayerMenu,
     MAT_PT_Layers,
     MAT_PT_LayerSettings,
+    MAT_PT_Actions,
+    PAINTSYSTEM_UL_Actions,
 )
 
 register, unregister = register_classes_factory(classes)

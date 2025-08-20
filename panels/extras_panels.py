@@ -75,7 +75,7 @@ class MAT_PT_Brush(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
-        obj = ps_ctx.active_object
+        obj = ps_ctx.ps_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
     def draw_header(self, context):
@@ -148,7 +148,7 @@ class MAT_PT_BrushSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
-        obj = ps_ctx.active_object
+        obj = ps_ctx.ps_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
     def draw(self, context):
@@ -198,7 +198,7 @@ class MAT_PT_BrushColor(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
-        obj = ps_ctx.active_object
+        obj = ps_ctx.ps_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
     def draw_header(self, context):

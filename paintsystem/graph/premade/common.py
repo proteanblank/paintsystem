@@ -68,7 +68,7 @@ def get_library_nodetree(tree_name: str, library_filename: str = "library2.blend
             )
     return appended_tree
 
-def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str, color_socket: str, alpha_node_name: str = None, alpha_socket: str = None) -> NodeTreeBuilder:
+def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str = None, color_socket: str = None, alpha_node_name: str = None, alpha_socket: str = None) -> NodeTreeBuilder:
     pre_mix = get_library_nodetree(".PS Pre Mix")
     post_mix = get_library_nodetree(".PS Post Mix")
     builder.add_node("group_input", "NodeGroupInput")
@@ -82,7 +82,8 @@ def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str, color_so
     builder.link("group_input", "pre_mix", "Alpha", "Alpha")
     builder.link("pre_mix", "mix_rgb", "Color", "A")
     builder.link("pre_mix", "mix_rgb", "Over Alpha", "Factor")
-    builder.link(color_node_name, "mix_rgb", color_socket, "B")
+    if color_node_name is not None and color_socket is not None:
+        builder.link(color_node_name, "mix_rgb", color_socket, "B")
     builder.link("mix_rgb", "post_mix", "Result", "Color")
     builder.link("pre_mix", "post_mix", "Over Alpha", "Over Alpha")
     builder.link("group_input", "post_mix", "Alpha", "Alpha")

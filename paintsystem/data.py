@@ -16,7 +16,9 @@ from .graph.premade import (
     create_solid_graph, 
     create_attribute_graph, 
     create_adjustment_graph, 
-    create_gradient_graph
+    create_gradient_graph,
+    create_random_graph,
+    create_custom_graph
     )
 from mathutils import Vector
 from typing import Dict, List
@@ -30,6 +32,7 @@ LAYER_TYPE_ENUM = [
     ('SHADER', "Shader", "Shader layer"),
     ('NODE_GROUP', "Node Group", "Node Group layer"),
     ('GRADIENT', "Gradient", "Gradient layer"),
+    ('RANDOM', "Random", "Random Color layer"),
 ]
 
 CHANNEL_TYPE_ENUM = [
@@ -71,6 +74,16 @@ ATTRIBUTE_TYPE_ENUM = [
     ('VIEW_LAYER', "View Layer", "View Layer")
 ]
 
+ACTION_TYPE_ENUM = [
+    ('ENABLE', "Enable Layer", "Enable the layer when reached"),
+    ('DISABLE', "Disable Layer", "Disable the layer when reached"),
+]
+
+ACTION_BIND_ENUM = [
+    ('FRAME', "Frame", "Enable/disable the layer on a frame", "KEYTYPE_KEYFRAME_VEC", 0),
+    ('MARKER', "Marker", "Enable/disable the layer on a marker", "MARKER_HLT", 1),
+]
+
 def _parse_context(context: bpy.types.Context) -> dict:
         """
         Parses the Blender context to extract relevant information for the paint system.
@@ -92,15 +105,15 @@ def _parse_context(context: bpy.types.Context) -> dict:
         
         ps_object = None
         obj = context.active_object
-        if obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-            ps_object = obj.parent
-        elif obj and obj.type == 'MESH' and hasattr(obj.active_material, 'ps_mat_data'):
+        if obj and obj.type == 'MESH' and hasattr(obj.active_material, 'ps_mat_data'):
             ps_object = obj
+        elif obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+            ps_object = obj.parent
             
         if not obj or obj.type != 'MESH' or not ps_object:
             obj = None
 
-        mat = obj.active_material if obj else None
+        mat = ps_object.active_material if ps_object else None
         
         mat_data = None
         groups = None
@@ -155,7 +168,7 @@ def update_active_image(self=None, context: bpy.types.Context = None):
     context = context or bpy.context
     ps_ctx = _parse_context(context)
     image_paint = context.tool_settings.image_paint
-    obj = ps_ctx["active_object"]
+    obj = ps_ctx["ps_object"]
     mat = ps_ctx["active_material"]
     active_channel = ps_ctx["active_channel"]
     if not mat or not active_channel:
@@ -223,6 +236,34 @@ def is_valid_ps_nodetree(node_tree: NodeTree) -> bool:
                         has_alpha_output = True
         return has_color_input and has_alpha_input and has_color_output and has_alpha_output
 
+
+class MarkerAction(PropertyGroup):
+    action_bind: EnumProperty(
+        name="Action Bind",
+        description="Action bind",
+        items=ACTION_BIND_ENUM
+    )
+    action_type: EnumProperty(
+        name="Action Type",
+        description="Action type",
+        items=ACTION_TYPE_ENUM
+    )
+    frame: IntProperty(
+        name="Frame",
+        description="Frame to enable/disable the layer",
+        default=0
+    )
+    marker_name: StringProperty(
+        name="Marker Name",
+        description="Marker name",
+        default=""
+    )
+    enabled: BoolProperty(
+        name="Enabled",
+        description="Enable the layer on a specific frame",
+        default=True
+    )
+
 class GlobalLayer(PropertyGroup):
             
     def update_node_tree(self, context):
@@ -246,6 +287,12 @@ class GlobalLayer(PropertyGroup):
             case "GRADIENT":
                 gradient_graph = create_gradient_graph(self.node_tree, self.gradient_type, self.empty_object)
                 gradient_graph.compile()
+            case "RANDOM":
+                random_graph = create_random_graph(self.node_tree)
+                random_graph.compile()
+            case "NODE_GROUP":
+                custom_graph = create_custom_graph(self.node_tree, self.custom_node_tree, self.custom_color_input, self.custom_alpha_input, self.custom_color_output, self.custom_alpha_output)
+                custom_graph.compile()
             case _:
                 pass
             
@@ -308,6 +355,45 @@ class GlobalLayer(PropertyGroup):
         type=Image,
         update=update_node_tree
     )
+    actions: CollectionProperty(
+        type=MarkerAction,
+        name="Actions",
+        description="Collection of actions for the layer"
+    )
+    active_action_index: IntProperty(
+        name="Active Action Index",
+        description="Active action index",
+        default=0
+    )
+    custom_node_tree: PointerProperty(
+        name="Custom Node Tree",
+        type=NodeTree,
+        update=update_node_tree
+    )
+    custom_color_input: IntProperty(
+        name="Custom Color Input",
+        description="Custom color input",
+        default=-1,
+        update=update_node_tree
+    )
+    custom_alpha_input: IntProperty(
+        name="Custom Alpha Input",
+        description="Custom alpha input",
+        default=-1,
+        update=update_node_tree
+    )
+    custom_color_output: IntProperty(
+        name="Custom Color Output",
+        description="Custom color output",
+        default=-1,
+        update=update_node_tree
+    )
+    custom_alpha_output: IntProperty(
+        name="Custom Alpha Output",
+        description="Custom alpha output",
+        default=-1,
+        update=update_node_tree
+    )
     coord_type: EnumProperty(
         items=COORDINATE_TYPE_ENUM,
         name="Coordinate Type",
@@ -363,6 +449,19 @@ class GlobalLayer(PropertyGroup):
         default=True,
         # update=select_layer
     )
+    enabled: BoolProperty(
+        name="Enabled",
+        description="Toggle layer visibility",
+        default=True,
+        update=update_active_channel,
+        options=set()
+    )
+    lock_alpha: BoolProperty(
+        name="Lock Alpha",
+        description="Lock the alpha channel",
+        default=False,
+        update=update_brush_settings
+    )
 
 class Layer(BaseNestedListItem):
     """Base class for material layers in the Paint System"""
@@ -381,25 +480,6 @@ class Layer(BaseNestedListItem):
         description="Layer name",
         default="Layer",
         update=update_node_tree
-    )
-    enabled: BoolProperty(
-        name="Enabled",
-        description="Toggle layer visibility",
-        default=True,
-        update=update_active_channel,
-        options=set()
-    )
-    # clip: BoolProperty(
-    #     name="Clip to Below",
-    #     description="Clip the layer to the one below",
-    #     default=False,
-    #     update=update_active_channel
-    # )
-    lock_alpha: BoolProperty(
-        name="Lock Alpha",
-        description="Lock the alpha channel",
-        default=False,
-        update=update_brush_settings
     )
 
 
@@ -430,7 +510,7 @@ class Channel(BaseNestedListManager):
                 previous_data = previous_dict.get(layer.parent_id, None)
                 global_layer = get_global_layer(layer)
                 layer_identifier = global_layer.uid
-                node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree, "mute": not layer.enabled})
+                node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree, "mute": not global_layer.enabled})
                 # match global_layer.type:
                 #     case "IMAGE":
                 #         layer_name = layer.name
@@ -783,11 +863,37 @@ def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
                         if layer.ref_layer_id == global_layer.uid:
                             count += 1
     return count > 1
+
+def sort_actions(context: bpy.types.Context, global_layer: GlobalLayer) -> list[MarkerAction]:
+    sorted_actions = []
+    if global_layer.actions:
+        for action in global_layer.actions:
+            if action.action_bind == 'FRAME':
+                sorted_actions.append((action.frame, action))
+            elif action.action_bind == 'MARKER':
+                marker = context.scene.timeline_markers.get(action.marker_name)
+                if marker:
+                    sorted_actions.append((marker.frame, action))
+                else:
+                    sorted_actions.append((0, action))
+        sorted_actions.sort(key=lambda x: x[0])
+    return [x for _, x in sorted_actions]
+
+def get_all_layers(material: bpy.types.Material) -> list[Layer]:
+    layers = []
+    if not material or not material.ps_mat_data:
+        return layers
+    for group in material.ps_mat_data.groups:
+        for channel in group.channels:
+            for layer in channel.layers:
+                layers.append(layer)
+    return layers
 @dataclass
 class PSContext:
     ps_settings: PaintSystemPreferences | None = None
     ps_scene_data: PaintSystemGlobalData | None = None
     active_object: bpy.types.Object | None = None
+    ps_object: bpy.types.Object | None = None
     active_material: bpy.types.Material | None = None
     ps_mat_data: MaterialData | None = None
     active_group: Group | None = None
@@ -803,6 +909,7 @@ def parse_context(context: bpy.types.Context) -> PSContext:
         ps_settings=parsed_context.get("ps_settings"),
         ps_scene_data=parsed_context.get("ps_scene_data"),
         active_object=parsed_context.get("active_object"),
+        ps_object=parsed_context.get("ps_object"),
         active_material=parsed_context.get("active_material"),
         ps_mat_data=parsed_context.get("ps_mat_data"),
         active_group=parsed_context.get("active_group"),
@@ -824,26 +931,8 @@ class PSContextMixin:
         """Parse the context and return a plain dict. Provided for convenience."""
         return _parse_context(context)
 
-    # @classmethod
-    # def poll(cls, context):
-    #     """Poll the context for paint system data."""
-    #     parsed_context = parse_context(context)
-    #     cls.ps_scene_data = parsed_context.get("ps_scene_data")
-    #     cls.active_object = parsed_context.get("active_object")
-    #     cls.active_material = parsed_context.get("active_material")
-    #     cls.ps_mat_data = parsed_context.get("ps_mat_data")
-    #     cls.active_group = parsed_context.get("active_group")
-    #     cls.active_channel = parsed_context.get("active_channel")
-    #     cls.active_layer = parsed_context.get("active_layer")
-    #     cls.active_global_layer = parsed_context.get("active_global_layer")
-    #     return cls._poll(context)
-
-    # @classmethod
-    # def _poll(cls, context):
-    #     """Override this method to implement custom poll logic."""
-    #     return True
-
 classes = (
+    MarkerAction,
     GlobalLayer,
     Layer,
     Channel,

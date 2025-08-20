@@ -60,3 +60,29 @@ def create_gradient_graph(node_tree: bpy.types.NodeTree, gradient_type: str, emp
             raise ValueError(f"Invalid gradient type: {gradient_type}")
     builder.link("map_range", "gradient", "Result", "Fac")
     return builder
+
+def create_random_graph(node_tree: bpy.types.NodeTree):
+    builder = NodeTreeBuilder(node_tree, "Layer")
+    create_mixing_graph(builder, "white_noise", "Color")
+    builder.add_node("object_info", "ShaderNodeObjectInfo")
+    builder.add_node("white_noise", "ShaderNodeTexWhiteNoise", {"noise_dimensions": "1D"})
+    builder.add_node("add", "ShaderNodeMath", {"operation": "ADD"})
+    builder.add_node("add_2", "ShaderNodeMath", {"operation": "ADD"}, {1: 0})
+    builder.link("object_info", "add", "Material Index", 0)
+    builder.link("object_info", "add", "Random", 1)
+    builder.link("add", "add_2", "Value", 0)
+    builder.link("add_2", "white_noise", "Value", "W")
+    return builder
+
+def create_custom_graph(node_tree: bpy.types.NodeTree, custom_node_tree: bpy.types.NodeTree, color_input: str|int, alpha_input: str|int, color_output: str|int = -1, alpha_output: str|int = -1):
+    builder = NodeTreeBuilder(node_tree, "Layer")
+    if alpha_output != -1:
+        create_mixing_graph(builder, "custom_node_tree", color_output, "custom_node_tree", alpha_output)
+        builder.link("group_input", "custom_node_tree", "Alpha", alpha_input)
+    else:
+        create_mixing_graph(builder, "custom_node_tree", color_output)
+    builder.add_node("custom_node_tree", "ShaderNodeGroup", {"node_tree": custom_node_tree})
+    builder.link("group_input", "custom_node_tree", "Color", color_input)
+    if alpha_input != -1:
+        builder.link("group_input", "custom_node_tree", "Alpha", alpha_input)
+    return builder
