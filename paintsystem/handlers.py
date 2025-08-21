@@ -1,6 +1,7 @@
 import bpy
 from .data import parse_context, get_global_layer, sort_actions, get_all_layers
 
+@bpy.app.handlers.persistent
 def frame_change_pre(scene):
     if not hasattr(scene, 'ps_scene_data'):
         return
