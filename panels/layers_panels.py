@@ -362,7 +362,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         scale_content(context, row, 1.5, 1.5)
         clip_row = row.row(align=True)
         clip_row.enabled = not global_layer.lock_layer
-        clip_row.prop(global_layer.post_mix_node.inputs["Clip"], "default_value", text="",
+        clip_row.prop(global_layer, "is_clip", text="",
                  icon="SELECT_INTERSECT")
         if global_layer.type == 'IMAGE':
             clip_row.prop(global_layer, "lock_alpha",
@@ -375,7 +375,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         row = col.row(align=True)
         scale_content(context, row, scale_x=1.2, scale_y=1.5)
         row.enabled = not global_layer.lock_layer
-        row.prop(global_layer.pre_mix_node.inputs[0], "default_value",
+        row.prop(global_layer.pre_mix_node.inputs['Opacity'], "default_value",
                  text="Opacity", slider=True)
         col = box.column()
         match global_layer.type:
@@ -408,10 +408,19 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     col.template_node_inputs(attribute_node)
             case 'GRADIENT':
                 gradient_node = global_layer.find_node("gradient")
-                if gradient_node:
+                map_range_node = global_layer.find_node("map_range")
+                if gradient_node and map_range_node:
+                    col.use_property_split = True
+                    col.use_property_decorate = False
                     col.enabled = not global_layer.lock_layer
                     col.label(text="Gradient Settings:", icon='SHADERFX')
                     col.template_node_inputs(gradient_node)
+                    col.separator()
+                    col.prop(map_range_node, "interpolation_type", text="Interpolation")
+                    if map_range_node.interpolation_type in ('STEPPED'):
+                        col.prop(map_range_node.inputs[5], "default_value", text="Steps")
+                    col.prop(map_range_node.inputs[1], "default_value", text="Start Distance")
+                    col.prop(map_range_node.inputs[2], "default_value", text="End Distance")
             case 'SOLID_COLOR':
                 rgb_node = global_layer.find_node("rgb")
                 if rgb_node:

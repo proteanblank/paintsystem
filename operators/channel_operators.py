@@ -1,7 +1,6 @@
 import bpy
-from bpy.types import Operator
 from ..utils import get_next_unique_name
-from ..paintsystem.data import CHANNEL_TYPE_ENUM
+from ..paintsystem.data import CHANNEL_TYPE_ENUM, COLOR_SPACE_ENUM
 from .utils import redraw_panel
 from .common import PSContextMixin, MultiMaterialOperator
 from .list_manager import ListManager
@@ -29,6 +28,12 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         items=CHANNEL_TYPE_ENUM,
         default='COLOR'
     )
+    color_space: bpy.props.EnumProperty(
+        items=COLOR_SPACE_ENUM,
+        name="Color Space",
+        description="Color space",
+        default='COLOR'
+    )
     use_alpha: bpy.props.BoolProperty(
         name="Use Alpha",
         description="Use alpha for the new channel",
@@ -42,6 +47,11 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
     use_factor: bpy.props.BoolProperty(
         name="Use Factor",
         description="Use factor for the channel",
+        default=False
+    )
+    use_max_min: bpy.props.BoolProperty(
+        name="Use Max Min",
+        description="Use max min for the channel",
         default=False
     )
     factor_min: bpy.props.FloatProperty(
@@ -71,7 +81,9 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         new_channel.use_alpha = self.use_alpha
         new_channel.use_normalize = self.use_normalize
         new_channel.use_factor = self.use_factor
-        if self.channel_type == "FACTOR":
+        new_channel.color_space = self.color_space
+        new_channel.use_max_min = self.use_max_min
+        if self.channel_type == "FLOAT" and new_channel.use_max_min:
             new_channel.factor_min = self.factor_min
             new_channel.factor_max = self.factor_max
         new_channel.node_tree = node_tree
@@ -89,6 +101,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         layout = self.layout
         layout.prop(self, "channel_name", text="Name")
         layout.prop(self, "channel_type", text="Type")
+        layout.prop(self, "color_space", text="Color Space")
         layout.prop(self, "use_alpha", text="Use Alpha")
         if self.channel_type == "VECTOR":
             layout.prop(self, "use_normalize", text="Normalize")
@@ -98,10 +111,11 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
             box.alert = True
             box.alignment = 'CENTER'
             box.label(text=f"Name will be changed to '{unique_name}'", icon='ERROR')
-        if self.channel_type == "FACTOR":
-            box = layout.box()
-            box.prop(self, "factor_min", text="Factor Min")
-            box.prop(self, "factor_max", text="Factor Max")
+        if self.channel_type == "FLOAT":
+            layout.prop(self, "use_max_min", text="Use Max Min")
+            if self.use_max_min:
+                layout.prop(self, "factor_min", text="Factor Min")
+                layout.prop(self, "factor_max", text="Factor Max")
 
 class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, MultiMaterialOperator):
     """Delete the selected channel in the Paint System"""

@@ -15,6 +15,7 @@ def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLa
     node_tree = bpy.data.node_groups.new(name=f"PS_Layer ({layer_name})", type='ShaderNodeTree')
     node_tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
     node_tree.interface.new_socket("Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
+    node_tree.interface.new_socket("Clip", in_out="INPUT", socket_type="NodeSocketBool")
     node_tree.interface.new_socket("Color", in_out="INPUT", socket_type="NodeSocketColor")
     node_tree.interface.new_socket("Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
     if layer_type == "FOLDER":

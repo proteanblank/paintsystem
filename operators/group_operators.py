@@ -2,7 +2,7 @@ import bpy
 from bpy.props import EnumProperty, BoolProperty
 from .list_manager import ListManager
 from bpy.utils import register_classes_factory
-from bpy.types import NodeTree
+from bpy.types import NodeTree, Node
 from .common import PSContextMixin, scale_content, MultiMaterialOperator, get_icon
 from .utils import redraw_panel
 from mathutils import Vector
@@ -31,7 +31,16 @@ def create_basic_setup(mat_node_tree: NodeTree, group_node_tree: NodeTree, offse
         connect_sockets(node_group.outputs[1], mix_shader.inputs[0])
         connect_sockets(transparent_node.outputs[0], mix_shader.inputs[1])
         return node_group, mix_shader
-    
+
+
+def get_right_most_node(mat_node_tree: NodeTree) -> Node:
+    right_most_node = None
+    for node in mat_node_tree.nodes:
+        if right_most_node is None:
+            right_most_node = node
+        elif node.location.x > right_most_node.location.x:
+            right_most_node = node
+    return right_most_node
 
 class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
     """Create a new group in the Paint System"""
@@ -132,12 +141,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                 bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
                 bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
                 
-                right_most_node = None
-                for node in mat_node_tree.nodes:
-                    if right_most_node is None:
-                        right_most_node = node
-                    elif node.location.x > right_most_node.location.x:
-                        right_most_node = node
+                right_most_node = get_right_most_node(mat_node_tree)
                 node_group, mix_shader = create_basic_setup(mat_node_tree, node_tree, right_most_node.location if right_most_node else Vector((0, 0)))
                 mat_output = mat_node_tree.nodes.new(type='ShaderNodeOutputMaterial')
                 mat_output.location = mix_shader.location + Vector((200, 0))
@@ -219,10 +223,33 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                         print("No shader node found")
                         
             case 'NORMAL':
-                bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=True)
+                bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, use_normalize=True)
                 bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
+                right_most_node = get_right_most_node(mat_node_tree)
+                tex_coord = mat_node_tree.nodes.new(type='ShaderNodeTexCoord')
+                tex_coord.location = right_most_node.location + Vector((200, 0))
+                node_group = mat_node_tree.nodes.new(type='ShaderNodeGroup')
+                node_group.node_tree = node_tree
+                node_group.location = tex_coord.location + Vector((200, 0))
+                norm_map_node = mat_node_tree.nodes.new(type='ShaderNodeNormalMap')
+                norm_map_node.location = node_group.location + Vector((200, 0))
+                norm_map_node.space = 'OBJECT'
+                diffuse_node = mat_node_tree.nodes.new(type='ShaderNodeBsdfDiffuse')
+                diffuse_node.location = norm_map_node.location + Vector((200, 0))
+                mat_output = mat_node_tree.nodes.new(type='ShaderNodeOutputMaterial')
+                mat_output.location = diffuse_node.location + Vector((200, 0))
+                mat_output.is_active_output = True
+                connect_sockets(tex_coord.outputs['Normal'], node_group.inputs['Normal'])
+                connect_sockets(node_group.outputs['Normal'], norm_map_node.inputs[1])
+                connect_sockets(norm_map_node.outputs[0], diffuse_node.inputs['Normal'])
+                connect_sockets(diffuse_node.outputs[0], mat_output.inputs[0])
             case _:
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
+                bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
+                right_most_node = get_right_most_node(mat_node_tree)
+                node_group = mat_node_tree.nodes.new(type='ShaderNodeGroup')
+                node_group.node_tree = node_tree
+                node_group.location = right_most_node.location + Vector((200, 0))
                 # bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
         redraw_panel(context)
         return {'FINISHED'}

@@ -87,6 +87,7 @@ def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str = None, c
     builder.link("mix_rgb", "post_mix", "Result", "Color")
     builder.link("pre_mix", "post_mix", "Over Alpha", "Over Alpha")
     builder.link("group_input", "post_mix", "Alpha", "Alpha")
+    builder.link("group_input", "post_mix", "Clip", "Clip")
     builder.link("post_mix", "group_output", "Color", "Color")
     builder.link("post_mix", "group_output", "Alpha", "Alpha")
     return builder

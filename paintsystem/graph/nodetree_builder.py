@@ -773,7 +773,7 @@ class NodeTreeBuilder:
 
         # --- Create the links between nodes ---
         # Remove existing links touching any node in this frame to avoid duplicates
-        self._remove_existing_links_for_frame()
+        self._remove_existing_links_in_frame()
         # self._log("Linking edges")
         start_time_link_edges = time.time()
         for idx, edge in enumerate(self.edges):
@@ -804,9 +804,10 @@ class NodeTreeBuilder:
         self._log("-----------------------------------")
         return self
 
-    def _remove_existing_links_for_frame(self) -> None:
+    def _remove_existing_links_in_frame(self) -> None:
         """Remove links where either end belongs to a node parented to this frame."""
-        nodes_in_frame = {node for node in self.tree.nodes if getattr(node, 'parent', None) is self.frame}
+        self._log(f"Removing existing links in frame {self.frame.label}")
+        nodes_in_frame = {node for node in self.tree.nodes if getattr(node, 'parent', None) == self.frame}
         if not nodes_in_frame:
             return
         try:
