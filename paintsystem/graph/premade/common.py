@@ -95,10 +95,10 @@ def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str = None, c
 
 def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: str, node_name: str, socket_name: str) -> NodeTreeBuilder:
     if coord_type == "AUTO":
-        builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": "PS_UVMap"})
+        builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": "PS_UVMap"}, force_properties=True)
         builder.link("uvmap", node_name, "UV", socket_name)
     elif coord_type == "UV":
-        builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": uv_map_name})
+        builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": uv_map_name}, force_properties=True)
         builder.link("uvmap", node_name, "UV", socket_name)
     elif coord_type in ["OBJECT", "CAMERA", "WINDOW", "REFLECTION"]:
         builder.add_node("tex_coord", "ShaderNodeTexCoord")

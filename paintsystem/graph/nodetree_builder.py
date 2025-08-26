@@ -73,7 +73,8 @@ class Add_Node:
     properties: dict = None
     default_values: dict = None  # Default values for input sockets, if any
     default_outputs: dict = None  # Default values for output sockets, if any
-    
+    force_properties: bool = False
+    force_default_values: bool = False
 
 @dataclass
 class LayerInfo:
@@ -266,7 +267,7 @@ class NodeTreeBuilder:
         
         self.compiled = False  # Reset compiled state
 
-    def add_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None) -> None:
+    def add_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None, force_properties: bool = False, force_default_values: bool = False) -> None:
         # Store the command to add a node
         """
         Adds a node to the graph definition.
@@ -276,6 +277,14 @@ class NodeTreeBuilder:
             node_type (str): The Blender identifier for the node (e.g., 'ShaderNodeTexNoise').
             properties (dict, optional): A dictionary of properties to set on the node after creation.
                                          For example: {'noise_dimensions': '4D'}. Defaults to None.
+            default_values (dict, optional): A dictionary of default values to set on the node after creation.
+                                            For example: {'noise_dimensions': '4D'}. Defaults to None.
+            default_outputs (dict, optional): A dictionary of default outputs to set on the node after creation.
+                                            For example: {'noise_dimensions': '4D'}. Defaults to None.
+            force_properties (bool, optional): If True, the properties will be overridden after recompiling.
+                                            Defaults to False.
+            force_default_values (bool, optional): If True, the default values will be overridden after recompiling.
+                                            Defaults to False.
 
         Returns:
             The created Blender node object.
@@ -293,9 +302,9 @@ class NodeTreeBuilder:
         
         self._log(f"Adding node '{identifier}' of type '{node_type}' with properties '{properties}' and default values '{default_values}'")
         self.__add_nodes_commands[identifier] = Add_Node(
-            identifier=identifier, node_type=node_type, properties=properties, default_values=default_values, default_outputs=default_outputs)
+            identifier=identifier, node_type=node_type, properties=properties, default_values=default_values, default_outputs=default_outputs, force_properties=force_properties, force_default_values=force_default_values)
 
-    def _create_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None) -> None:
+    def _create_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None, force_properties: bool = False, force_default_values: bool = False) -> None:
         """
         Creates a node in the graph.
 
@@ -303,6 +312,12 @@ class NodeTreeBuilder:
             node_type (str): The Blender identifier for the node (e.g., 'ShaderNodeTexNoise').
             properties (dict, optional): A dictionary of properties to set on the node after creation.
                                          For example: {'noise_dimensions': '4D'}. Defaults to None.
+            default_outputs (dict, optional): A dictionary of default outputs to set on the node after creation.
+                                            For example: {'noise_dimensions': '4D'}. Defaults to None.
+            force_properties (bool, optional): If True, the properties will be overridden after recompiling.
+                                            Defaults to False.
+            force_default_values (bool, optional): If True, the default values will be overridden after recompiling.
+                                            Defaults to False.
 
         Returns:
             The created Blender node object.
@@ -908,6 +923,11 @@ class NodeTreeBuilder:
             if node is None or isinstance(node, NodeTreeBuilder):
                 self._log(f"Skipping node {identifier}")
                 continue
+            
+            # Ignore if the node is force_properties
+            # Find node in __add_nodes_commands
+            if self.__add_nodes_commands[identifier].force_properties:
+                continue
 
             props = state.get('properties', {})
             for pid, value in props.items():
@@ -917,6 +937,11 @@ class NodeTreeBuilder:
                 except Exception as e:
                     # Some properties may be invalid for the new node type or context
                     self._log(f"Warning: Could not apply property '{pid}' for '{identifier}'. Error: {e}")
+
+            # Ignore if the node is force_default_values
+            # Find node in __add_nodes_commands
+            if self.__add_nodes_commands[identifier].force_default_values:
+                continue
 
             inputs = state.get('inputs', dict())
             outputs = state.get('outputs', dict())
