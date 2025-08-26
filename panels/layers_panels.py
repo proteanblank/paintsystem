@@ -446,6 +446,46 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 pass
 
 
+class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_PaintSystemLayerSettingsAdvanced'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Advanced Settings"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        global_layer = ps_ctx.active_global_layer
+        return global_layer and global_layer.type == 'IMAGE'
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        ps_ctx = self.ensure_context(context)
+        global_layer = ps_ctx.active_global_layer
+        layout.prop(global_layer, "coord_type", text="Coordinate Type")
+        if global_layer.coord_type == 'UV':
+            layout.prop_search(global_layer, "uv_map_name", text="UV Map",
+                                search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
+
+        image_node = global_layer.find_node("image")
+        if image_node:
+            box = layout.box()
+            box.label(text="Image Settings:")
+            box.template_node_inputs(image_node)
+            box.prop(image_node, "interpolation",
+                     text="")
+            box.prop(image_node, "projection",
+                     text="")
+            box.prop(image_node, "extension",
+                     text="")
+            box.prop(global_layer.image, "source",
+                     text="")
+
 class MAT_MT_LayerMenu(PSContextMixin, Menu):
     bl_label = "Layer Menu"
     bl_idname = "MAT_MT_LayerMenu"
@@ -619,6 +659,7 @@ classes = (
     MAT_MT_LayerMenu,
     MAT_PT_Layers,
     MAT_PT_LayerSettings,
+    MAT_PT_PaintSystemLayerSettingsAdvanced,
     MAT_PT_Actions,
     PAINTSYSTEM_UL_Actions,
 )

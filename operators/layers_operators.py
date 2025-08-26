@@ -305,6 +305,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
             if not img:
                 self.report({'ERROR'}, "No image selected")
                 return False
+        img.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
         global_layer = add_global_layer("IMAGE")
         global_layer.image = img
         global_layer.coord_type = self.coord_type
