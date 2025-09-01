@@ -26,7 +26,7 @@ bl_info = {
     "version": (2, 0, 0),
     "location": "View3D > Sidebar > Paint System",
     "warning": "",
-    "category": "Node",
+    "category": "Paint",
     'support': 'COMMUNITY',
     "tracker_url": "https://github.com/natapol2547/paintsystem"
 }

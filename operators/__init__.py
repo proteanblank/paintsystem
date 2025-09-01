@@ -9,7 +9,6 @@ submodules = [
     "utils_operators",
     "image_operators",
     "quick_edit",
-    # "ui_widgets",
 ]
 
 register, unregister = register_submodule_factory(__name__, submodules)
