@@ -100,13 +100,13 @@ jobs:
                   release_stage: ${{ github.event.inputs.release_stage }}
                   addon_folder_name: paint_system
 
-            - name: Checkout repository
-              uses: actions/checkout@v4
+            # - name: Checkout repository
+            #   uses: actions/checkout@v4
 
-            - name: Release addon (No Updater)
-              uses: natapol2547/blender-addon-release@main
-              with:
-                  artifact_name: paint-system-no-updater
-                  version: ${{ needs.Build.outputs.version }}
-                  release_stage: ${{ github.event.inputs.release_stage }}
-                  addon_folder_name: paint_system
+            # - name: Release addon (No Updater)
+            #   uses: natapol2547/blender-addon-release@main
+            #   with:
+            #       artifact_name: paint-system-no-updater
+            #       version: ${{ needs.Build.outputs.version }}
+            #       release_stage: ${{ github.event.inputs.release_stage }}
+            #       addon_folder_name: paint_system
