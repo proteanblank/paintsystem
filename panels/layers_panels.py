@@ -192,6 +192,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         layout = self.layout
         ps_ctx = self.ensure_context(context)
         obj = ps_ctx.ps_object
+        active_group = ps_ctx.active_group
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_global_layer
         mat = ps_ctx.active_material
@@ -204,14 +205,14 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         current_mode = context.mode
         box = layout.box()
         group_node = find_node(mat.node_tree, {
-                               'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
+                               'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
         if not group_node:
             warning_box = box.box()
             warning_box.alert = True
             col = warning_box.column(align=True)
             col.label(text="Paint System not connected", icon='ERROR')
             col.label(text="to material output!", icon='BLANK1')
-        col = box.column(align=True)
+        col = box.column()
         row = col.row(align=True)
         row.scale_y = 1.7
         row.scale_x = 1.7
@@ -232,6 +233,16 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         row = col.row(align=True)
         row.scale_y = 1.5
         row.scale_x = 1.5
+        if ps_ctx.ps_settings.show_tooltips and not active_group.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
+            tip_box = col.box()
+            tip_box.scale_x = 1.4
+            tip_row = tip_box.row()
+            tip_col = tip_row.column(align=True)
+            tip_col.label(text="The button above will")
+            tip_col.label(text="show object normal")
+            tip_row.label(icon_value=get_icon('arrow_up'))
+            tip_row.operator("paint_system.hide_normal_painting_tips",
+                         text="", icon='X')
 
         # TODO: Bake and Export options
         # if not active_channel.bake_image:
@@ -606,7 +617,7 @@ class MAT_PT_Actions(PSContextMixin, Panel):
         layout.alignment = 'LEFT'
         layout.use_property_decorate = False
         layout.label(text="Layer Actions")
-        if not global_layer.actions:
+        if ps_ctx.ps_settings.show_tooltips and not global_layer.actions:
             box = layout.box()
             col = box.column(align=True)
             col.label(text="Actions can control layer visibility", icon='INFO')

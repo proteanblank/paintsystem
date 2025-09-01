@@ -24,6 +24,14 @@ from .graph.premade.common import get_library_nodetree
 from mathutils import Vector
 from typing import Dict, List
 
+TEMPLATE_ENUM = [
+    ('BASIC', "Basic", "Basic painting setup", "IMAGE", 0),
+    ('PAINT_OVER', "Paint Over", "Paint over the existing material", get_icon('paintbrush'), 1),
+    ('PBR', "PBR", "PBR painting setup", "MATERIAL", 2),
+    ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 3),
+    ('NONE', "None", "Just add node group to material", "NONE", 4),
+]
+
 LAYER_TYPE_ENUM = [
     ('FOLDER', "Folder", "Folder layer"),
     ('IMAGE', "Image", "Image layer"),
@@ -858,6 +866,16 @@ class Group(PropertyGroup):
         name="Channels",
         description="Collection of channels in the Paint System"
     )
+    template: EnumProperty(
+        name="Template",
+        items=TEMPLATE_ENUM,
+        default='BASIC'
+    )
+    hide_norm_paint_tips: BoolProperty(
+        name="Hide Normal Painting Tips",
+        description="Hide the normal painting tips",
+        default=False
+    )
     
     def update_channel(self, context):
         ps_ctx = parse_context(context)
@@ -889,6 +907,7 @@ class PaintSystemGlobalData(PropertyGroup):
     )
     active_index: IntProperty(name="Active Layer Index")
     active_clipboard_index: IntProperty(name="Active Clipboard Layer Index")
+    
 
 class MaterialData(PropertyGroup):
     """Custom data for channels in the Paint System"""

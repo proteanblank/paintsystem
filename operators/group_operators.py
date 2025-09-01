@@ -8,15 +8,7 @@ from .utils import redraw_panel
 from mathutils import Vector
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output, transfer_connection
 from bpy_extras.node_utils import find_base_socket_type, connect_sockets
-
-
-TEMPLATE_ENUM = [
-    ('BASIC', "Basic", "Basic painting setup", "IMAGE", 0),
-    ('PAINT_OVER', "Paint Over", "Paint over the existing material", get_icon('paintbrush'), 1),
-    ('PBR', "PBR", "PBR painting setup", "MATERIAL", 2),
-    ('NORMAL', "Normals Painting", "Start off with a normal painting setup", "NORMALS_VERTEX_FACE", 3),
-    ('NONE', "None", "Just add node group to material", "NONE", 4),
-]
+from ..paintsystem.data import TEMPLATE_ENUM
 
 
 def create_basic_setup(mat_node_tree: NodeTree, group_node_tree: NodeTree, offset: Vector):
@@ -132,6 +124,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
         new_group.name = self.group_name
         new_group.node_tree = node_tree
         new_group.update_node_tree(context)
+        new_group.template = self.template
         mat_node_tree = mat.node_tree
         
         # Create Channels and layers and setup the group
@@ -356,10 +349,30 @@ class PAINTSYSTEM_OT_MoveGroup(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_HideNormalPaintingTips(PSContextMixin, MultiMaterialOperator):
+    """Hide the normal painting tips"""
+    bl_idname = "paint_system.hide_normal_painting_tips"
+    bl_label = "Hide Normal Painting Tips"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_group is not None
+    
+    def process_material(self, context):
+        ps_ctx = self.ensure_context(context)
+        ps_ctx.active_group.hide_norm_paint_tips = True
+        redraw_panel(context)
+        return {'FINISHED'}
+
+
 classes = (
     PAINTSYSTEM_OT_NewGroup,
     PAINTSYSTEM_OT_DeleteGroup,
     PAINTSYSTEM_OT_MoveGroup,
+    PAINTSYSTEM_OT_HideNormalPaintingTips,
 )
 
 register, unregister = register_classes_factory(classes)    

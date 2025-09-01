@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import Operator
-from bpy.props import IntProperty, StringProperty
+from bpy.props import IntProperty, StringProperty, EnumProperty
 from .common import PSContextMixin, MultiMaterialOperator
 from bpy.utils import register_classes_factory
 from .brushes import get_brushes_from_library
@@ -257,6 +257,70 @@ class PAINTSYSTEM_OT_OpenPaintSystemPreferences(Operator):
             bpy.ops.preferences.addon_expand(module=addon_package())
         return {'FINISHED'}
 
+
+class PAINTSYSTEM_OT_FlipNormals(Operator):
+    """Flip normals of the selected mesh"""
+    bl_idname = "paint_system.flip_normals"
+    bl_label = "Flip Normals"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Flip normals of the selected mesh"
+    
+    @classmethod
+    def poll(cls, context):
+        return context.object and context.object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.object
+        orig_mode = str(obj.mode)
+        if obj.type == 'MESH':
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.flip_normals()
+            bpy.ops.object.mode_set(mode=orig_mode)
+        return {'FINISHED'}
+
+class PAINTSYSTEM_OT_RecalculateNormals(Operator):
+    """Recalculate normals of the selected mesh"""
+    bl_idname = "paint_system.recalculate_normals"
+    bl_label = "Recalculate Normals"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Recalculate normals of the selected mesh"
+    
+    @classmethod
+    def poll(cls, context):
+        return context.object and context.object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.object
+        orig_mode = str(obj.mode)
+        if obj.type == 'MESH':
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.normals_make_consistent(inside=False)
+            bpy.ops.object.mode_set(mode=orig_mode)
+        return {'FINISHED'}
+
+class PAINTSYSTEM_OT_AddCameraPlane(Operator):
+    bl_idname = "paint_system.add_camera_plane"
+    bl_label = "Add Camera Plane"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add a plane with a camera texture"
+
+    align_up: EnumProperty(
+        name="Align Up",
+        items=[
+            ('NONE', "None", "No alignment"),
+            ('X', "X", "Align up with X axis"),
+            ('Y', "Y", "Align up with Y axis"),
+            ('Z', "Z", "Align up with Z axis"),
+        ],
+        default='NONE'
+    )
+
+    def execute(self, context):
+        bpy.ops.mesh.primitive_plane_add('INVOKE_DEFAULT', align='VIEW')
+        return {'FINISHED'}
+
 classes = (
     PAINTSYSTEM_OT_TogglePaintMode,
     PAINTSYSTEM_OT_AddPresetBrushes,
@@ -267,6 +331,9 @@ classes = (
     PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
     PAINTSYSTEM_OT_ColorSampler,
     PAINTSYSTEM_OT_OpenPaintSystemPreferences,
+    PAINTSYSTEM_OT_FlipNormals,
+    PAINTSYSTEM_OT_RecalculateNormals,
+    PAINTSYSTEM_OT_AddCameraPlane,
 )
 
 addon_keymaps = []

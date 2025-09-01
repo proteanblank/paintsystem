@@ -1,6 +1,12 @@
+import bpy
+from bpy.types import Panel
+
+from .common import scale_content
+from ..paintsystem.data import PSContextMixin
+from bpy.utils import register_classes_factory
 
 
-class MAT_PT_PaintSystemQuickToolsDisplay(Panel):
+class MAT_PT_PaintSystemQuickToolsDisplay(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_PaintSystemQuickToolsDisplay'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -10,26 +16,22 @@ class MAT_PT_PaintSystemQuickToolsDisplay(Panel):
 
     def draw_header(self, context):
         layout = self.layout
-        ps = PaintSystem(context)
         layout.label(icon="HIDE_OFF")
 
     def draw(self, context):
-        ps = PaintSystem(context)
-        obj = ps.active_object
+        ps_ctx = self.ensure_context(context)
+        obj = ps_ctx.active_object
         layout = self.layout
         space = context.area.spaces[0]
-        overlay = space.overlay
 
         box = layout.box()
         if obj:
             row = box.row()
-            if not ps.preferences.use_compact_design:
-                row.scale_y = 1.5
-                row.scale_x = 1.5
+            scale_content(context, row)
             row.prop(obj,
                  "show_wire", text="Toggle Wireframe", icon='MOD_WIREFRAME')
         row = box.row()
-        if not ps.preferences.use_compact_design:
+        if not ps_ctx.ps_settings.use_compact_design:
             row.scale_y = 1
             row.scale_x = 1
         row.prop(space, "show_gizmo", text="Toggle Gizmo", icon='GIZMO')
@@ -42,7 +44,7 @@ class MAT_PT_PaintSystemQuickToolsDisplay(Panel):
                  text="", icon='MOD_MESHDEFORM')
 
 
-class MAT_PT_PaintSystemQuickToolsMesh(Panel):
+class MAT_PT_PaintSystemQuickToolsMesh(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_PaintSystemQuickToolsMesh'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -52,12 +54,12 @@ class MAT_PT_PaintSystemQuickToolsMesh(Panel):
 
     def draw_header(self, context):
         layout = self.layout
-        ps = PaintSystem(context)
+        ps_ctx = self.ensure_context(context)
         layout.label(icon="MESH_CUBE")
 
     def draw(self, context):
-        ps = PaintSystem(context)
-        obj = ps.active_object
+        ps_ctx = self.ensure_context(context)
+        obj = ps_ctx.active_object
         layout = self.layout
         space = context.area.spaces[0]
         overlay = space.overlay
@@ -68,9 +70,7 @@ class MAT_PT_PaintSystemQuickToolsMesh(Panel):
         row.alignment = "CENTER"
         row.label(text="Add Mesh:", icon="PLUS")
         row = box.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.5
-            row.scale_x = 1.5
+        scale_content(context, row, 1.5, 1.5)
         row.alignment = 'CENTER'
         row.operator("paint_system.add_camera_plane",
                      text="", icon='IMAGE_PLANE')
@@ -88,9 +88,7 @@ class MAT_PT_PaintSystemQuickToolsMesh(Panel):
         row.alignment = "CENTER"
         row.label(text="Normals:", icon="NORMALS_FACE")
         row = box.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.5
-            row.scale_x = 1.5
+        scale_content(context, row, 1.5, 1.5)
         row.prop(overlay,
                  "show_face_orientation", text="Toggle Check Normals", icon='HIDE_OFF' if overlay.show_face_orientation else 'HIDE_ON')
         row = box.row()
@@ -110,20 +108,16 @@ class MAT_PT_PaintSystemQuickToolsMesh(Panel):
             col.label(text="Object is not uniform!", icon="ERROR")
             col.label(text="Apply Transform -> Scale", icon="BLANK1")
         row = box.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.5
-            row.scale_x = 1.5
+        scale_content(context, row, 1.5, 1.5)
         row.menu("VIEW3D_MT_object_apply",
                  text="Apply Transform", icon="LOOP_BACK")
         row = box.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.5
-            row.scale_x = 1.5
+        scale_content(context, row, 1.5, 1.5)
         row.operator_menu_enum(
             "object.origin_set", text="Set Origin", property="type", icon="EMPTY_AXIS")
 
 
-class MAT_PT_PaintSystemQuickToolsPaint(Panel):
+class MAT_PT_PaintSystemQuickToolsPaint(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_PaintSystemQuickToolsPaint'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -133,20 +127,25 @@ class MAT_PT_PaintSystemQuickToolsPaint(Panel):
     
     @classmethod
     def poll(cls, context):
-        ps = PaintSystem(context)
-        obj = ps.active_object
+        ps_ctx = cls.ensure_context(context)
+        obj = ps_ctx.active_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
     
     def draw_header(self, context):
         layout = self.layout
-        ps = PaintSystem(context)
         layout.label(icon="BRUSHES_ALL")
     
     def draw(self, context):
         layout = self.layout
-        ps = PaintSystem(context)
         row = layout.row()
-        if not ps.preferences.use_compact_design:
-            row.scale_y = 1.5
-            row.scale_x = 1.5
+        scale_content(context, row, 1.5, 1.5)
         row.operator("paint_system.quick_edit", text="Edit Externally", icon='IMAGE')
+
+
+classes = (
+    MAT_PT_PaintSystemQuickToolsDisplay,
+    MAT_PT_PaintSystemQuickToolsMesh,
+    MAT_PT_PaintSystemQuickToolsPaint,
+)
+
+register, unregister = register_classes_factory(classes)    

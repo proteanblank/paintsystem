@@ -219,7 +219,7 @@ class PAINTSYSTEM_OT_ProjectApply(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_QuickEdit(Operator):
+class PAINTSYSTEM_OT_QuickEdit(PSContextMixin, Operator):
     bl_idname = "paint_system.quick_edit"
     bl_label = "Quick Edit"
     bl_options = {'REGISTER', 'UNDO'}
@@ -238,6 +238,13 @@ class PAINTSYSTEM_OT_QuickEdit(Operator):
 
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.ensure_context(context)
+        if ps_ctx.ps_settings.show_tooltips:
+            box = layout.box()
+            col = box.column(align=True)
+            col.label(text="This will capture the current view", icon="INFO")
+            col.label(text="and open it in the image editor", icon="BLANK1")
+
         current_image_editor = context.preferences.filepaths.image_editor
         image_paint = context.scene.tool_settings.image_paint
         if not current_image_editor:
