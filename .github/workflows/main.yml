@@ -77,13 +77,13 @@ jobs:
               uses: natapol2547/blender-addon-build@main
               with:
                   name: paint-system
-                  exclude-files: '.git;.github;README.md;library.blend1'
+                  exclude-files: '.git;.github;README.md;*.blend1'
 
-            - name: Build addon (No Updater)
-              uses: natapol2547/blender-addon-build@main
-              with:
-                  name: paint-system-no-updater
-                  exclude-files: '.git;.github;README.md;library.blend1;addon_updater.py;addon_updater_ops.py'
+            # - name: Build addon (No Updater)
+            #   uses: natapol2547/blender-addon-build@main
+            #   with:
+            #       name: paint-system-no-updater
+            #       exclude-files: '.git;.github;README.md;library.blend1;addon_updater.py;addon_updater_ops.py'
 
     Release:
         runs-on: ubuntu-latest
