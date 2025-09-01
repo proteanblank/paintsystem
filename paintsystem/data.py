@@ -276,33 +276,30 @@ class GlobalLayer(PropertyGroup):
             
     def update_node_tree(self, context):
         self.node_tree.name = f".PS_Layer ({self.uid})"
+        
         match self.type:
             case "IMAGE":
-                image_graph = create_image_graph(self.node_tree, self.image, self.coord_type, self.uv_map_name)
-                image_graph.compile()
+                layer_graph = create_image_graph(self.node_tree, self.image, self.coord_type, self.uv_map_name)
             case "FOLDER":
-                folder_graph = create_folder_graph(self.node_tree)
-                folder_graph.compile()
+                layer_graph = create_folder_graph(self.node_tree)
             case "SOLID_COLOR":
-                solid_graph = create_solid_graph(self.node_tree)
-                solid_graph.compile()
+                layer_graph = create_solid_graph(self.node_tree)
             case "ATTRIBUTE":
-                attribute_graph = create_attribute_graph(self.node_tree)
-                attribute_graph.compile()
+                layer_graph = create_attribute_graph(self.node_tree)
             case "ADJUSTMENT":
-                adjustment_graph = create_adjustment_graph(self.node_tree, self.adjustment_type)
-                adjustment_graph.compile()
+                layer_graph = create_adjustment_graph(self.node_tree, self.adjustment_type)
             case "GRADIENT":
-                gradient_graph = create_gradient_graph(self.node_tree, self.gradient_type, self.empty_object)
-                gradient_graph.compile()
+                layer_graph = create_gradient_graph(self.node_tree, self.gradient_type, self.empty_object)
             case "RANDOM":
-                random_graph = create_random_graph(self.node_tree)
-                random_graph.compile()
+                layer_graph = create_random_graph(self.node_tree)
             case "NODE_GROUP":
-                custom_graph = create_custom_graph(self.node_tree, self.custom_node_tree, self.custom_color_input, self.custom_alpha_input, self.custom_color_output, self.custom_alpha_output)
-                custom_graph.compile()
+                layer_graph = create_custom_graph(self.node_tree, self.custom_node_tree, self.custom_color_input, self.custom_alpha_input, self.custom_color_output, self.custom_alpha_output)
             case _:
                 pass
+        if not self.enabled:
+            layer_graph.link("group_input", "group_output", "Color", "Color")
+            layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
+        layer_graph.compile()
             
     def update_layer_name(self, context):
         """Update the layer name to ensure uniqueness."""
@@ -467,7 +464,7 @@ class GlobalLayer(PropertyGroup):
         name="Enabled",
         description="Toggle layer visibility",
         default=True,
-        update=update_active_channel,
+        update=update_node_tree,
         options=set()
     )
     lock_alpha: BoolProperty(
@@ -531,7 +528,7 @@ class Channel(BaseNestedListManager):
                 previous_data = previous_dict.get(layer.parent_id, None)
                 global_layer = get_global_layer(layer)
                 layer_identifier = global_layer.uid
-                node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree, "mute": not global_layer.enabled}, {"Clip": global_layer.is_clip})
+                node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree}, {"Clip": global_layer.is_clip})
                 # match global_layer.type:
                 #     case "IMAGE":
                 #         layer_name = layer.name
