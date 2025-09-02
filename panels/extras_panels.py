@@ -1,32 +1,31 @@
 import bpy
 from bpy.types import Panel, Menu
 from bpy.utils import register_classes_factory
-from ..utils.unified_brushes import get_unified_settings
-from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name
+# from ..utils.unified_brushes import get_unified_settings, paint_settings
+from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name, scale_content
 from ..utils.version import is_newer_than
 
-def prop_unified(
-    layout,
-    context,
-    prop_name,
-    unified_name=None,
-    icon='EMPTY',
-    text=None,
-    slider=False,
-    header=False,
-):
-    """ Generalized way of adding brush options to the UI,
-        along with their pen pressure setting and global toggle, if they exist. """
-    row = layout.row(align=True)
-    ups = context.tool_settings.unified_paint_settings
-    prop_owner = get_unified_settings(context, unified_name)
-
-    row.prop(prop_owner, prop_name, icon=icon, text=text, slider=slider)
-
-    if unified_name and not header:
-        row.prop(ups, unified_name, text="", icon='WORLD')
-
-    return row
+from bl_ui.properties_grease_pencil_common import (
+    GreasePencilSculptAdvancedPanel,
+    GreasePencilDisplayPanel,
+    GreasePencilBrushFalloff,
+)
+from bl_ui.properties_paint_common import (
+    UnifiedPaintPanel,
+    BrushSelectPanel,
+    ClonePanel,
+    TextureMaskPanel,
+    ColorPalettePanel,
+    StrokePanel,
+    SmoothStrokePanel,
+    FalloffPanel,
+    DisplayPanel,
+    brush_texture_settings,
+    brush_mask_texture_settings,
+    brush_settings,
+    brush_settings_advanced,
+    draw_color_settings,
+)
 
 class MAT_PT_BrushTooltips(Panel):
     bl_label = "Brush Tooltips"
@@ -63,7 +62,7 @@ class MAT_PT_BrushTooltips(Panel):
         # layout.operator("paint_system.disable_tool_tips",
         #                 text="Disable Tooltips", icon='CANCEL')
 
-class MAT_PT_Brush(PSContextMixin, Panel):
+class MAT_PT_Brush(PSContextMixin, Panel, UnifiedPaintPanel):
     bl_idname = 'MAT_PT_Brush'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -74,9 +73,8 @@ class MAT_PT_Brush(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
-        obj = ps_ctx.ps_object
-        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
+        mode = cls.get_brush_mode(context)
+        return mode in ['PAINT_TEXTURE', 'PAINT_GREASE_PENCIL', 'VERTEX_GREASE_PENCIL', 'WEIGHT_GREASE_PENCIL', 'SCULPT_GREASE_PENCIL']
 
     def draw_header(self, context):
         layout = self.layout
@@ -84,17 +82,29 @@ class MAT_PT_Brush(PSContextMixin, Panel):
 
     def draw_header_preset(self, context):
         layout = self.layout
+        ps_ctx = self.ensure_context(context)
+        settings = self.paint_settings(context)
+        brush = settings.brush
+        obj = ps_ctx.ps_object
         row = layout.row()
-        prop_unified(row, context, "size",
+        match obj.type:
+            case 'GREASEPENCIL':
+                row.label(text="Grease Pencil", icon="GREASEPENCIL")
+            case 'MESH':
+                self.prop_unified(row, context, brush, "size",
                     "use_unified_size", icon="WORLD", text="Size", slider=True, header=True)
+            case _:
+                pass
             
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.ensure_context(context)
-        tool_settings = context.tool_settings.image_paint
+        settings = self.paint_settings(context)
+        brush = settings.brush
+        mode = self.get_brush_mode(context)
         # Check blender version
         if not is_newer_than(4, 3):
-            layout.template_ID_preview(tool_settings, "brush",
+            layout.template_ID_preview(settings, "brush",
                                        new="brush.add", rows=3, cols=8, hide_buttons=False)
         box = layout.box()
         row = box.row()
@@ -105,27 +115,9 @@ class MAT_PT_Brush(PSContextMixin, Panel):
                 text='Shortcuts!',
                 icon='INFO_LARGE'
             )
-        # row.operator("paint_system.set_active_panel",
-        #              text="More", icon="RIGHTARROW").category = "Tool"
         col = box.column(align=True)
-        if not ps_ctx.ps_settings.use_compact_design:
-            col.scale_y = 1.5
-        prop_unified(col, context, "size",
-                     "use_unified_size", icon="WORLD", text="Size", slider=True)
-        prop_unified(col, context, "strength",
-                     "use_unified_strength", icon="WORLD", text="Strength")
-        # row.label(text="Brush Shortcuts")
-        
-        brush = tool_settings.brush
-        if brush:
-            row = box.row()
-            if not ps_ctx.ps_settings.use_compact_design:
-                row.scale_y = 1.2
-                row.scale_x = 1.2
-            # if global_layer and global_layer.mask_image and global_layer.edit_mask:
-            #     row.operator("paint_system.toggle_mask_erase", text="Toggle Mask Erase", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
-            # else:
-            row.operator("paint_system.toggle_brush_erase_alpha", text="Toggle Erase Alpha", depress=brush.blend == 'ERASE_ALPHA', icon="BRUSHES_ALL")
+        scale_content(context, col, scale_x=1, scale_y=1.2)
+        brush_settings(col, context, brush, popover=self.is_popover)
         
         brush_imported = False
         for brush in bpy.data.brushes:
@@ -135,31 +127,6 @@ class MAT_PT_Brush(PSContextMixin, Panel):
         if not brush_imported:
             layout.operator("paint_system.add_preset_brushes",
                             text="Add Preset Brushes", icon="IMPORT")
-
-class MAT_PT_BrushSettings(PSContextMixin, Panel):
-    bl_idname = 'MAT_PT_BrushSettings'
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_label = "Settings"
-    bl_category = 'Paint System'
-    bl_parent_id = 'MAT_PT_Brush'
-    bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
-        obj = ps_ctx.ps_object
-        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
-
-    def draw(self, context):
-        layout = self.layout
-        tool_settings = context.tool_settings.image_paint
-        brush = tool_settings.brush
-        prop_unified(layout, context, "strength",
-                     "use_unified_strength", icon="WORLD", text="Strength")
-        prop_unified(layout, context, "size",
-                     "use_unified_size", icon="WORLD", text="Size", slider=True)
-
 
 class MAT_PT_BrushAdvanced(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_BrushAdvanced'
@@ -186,7 +153,7 @@ class MAT_PT_BrushAdvanced(PSContextMixin, Panel):
                  text="Auto Image Select", icon='FILE_IMAGE')
 
 
-class MAT_PT_BrushColor(PSContextMixin, Panel):
+class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
     bl_idname = 'MAT_PT_BrushColor'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -197,9 +164,16 @@ class MAT_PT_BrushColor(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
-        obj = ps_ctx.ps_object
-        return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
+        settings = cls.paint_settings(context)
+        if not settings:
+            return False
+        brush = settings.brush
+
+        if context.image_paint_object:
+            capabilities = brush.image_paint_capabilities
+            return capabilities.has_color
+
+        return False
 
     def draw_header(self, context):
         layout = self.layout
@@ -207,27 +181,24 @@ class MAT_PT_BrushColor(PSContextMixin, Panel):
 
     def draw_header_preset(self, context):
         layout = self.layout
-        ups = context.tool_settings.unified_paint_settings
-        row = layout.row(align=True)
-        row.prop(get_unified_settings(context, "use_unified_color"), "color",
-                 text="", icon='IMAGE_RGB_ALPHA')
-        row.prop(ups, "use_unified_color",
-                 text="", icon='WORLD')
-        # prop_unified(layout, context, "color", "use_unified_color",
-        #              icon="IMAGE_RGB_ALPHA", text="Color")
-        # layout.label(text="", icon="INFO")
+        settings = self.paint_settings(context)
+        brush = settings.brush
+        self.prop_unified_color(layout, context, brush, "color", text="")
 
     def draw(self, context):
         layout = self.layout
-        col = layout.column(align=True)
+        col = layout.column()
         row = col.row(align=True)
-        row.scale_y = 1.5
+        row.scale_y = 1.2
         row.prop(context.preferences.view, "color_picker_type", text="")
-        tool_settings = bpy.context.scene.tool_settings
-        unified_settings = tool_settings.unified_paint_settings
-        brush_settings = tool_settings.image_paint.brush
-        col.template_color_picker(
-            unified_settings if unified_settings.use_unified_color else brush_settings, "color", value_slider=True)
+        settings = self.paint_settings(context)
+        brush = settings.brush
+        draw_color_settings(context, col, brush)
+        # tool_settings = bpy.context.scene.tool_settings
+        # unified_settings = tool_settings.unified_paint_settings
+        # brush_settings = tool_settings.image_paint.brush
+        # col.template_color_picker(
+        #     unified_settings if unified_settings.use_unified_color else brush_settings, "color", value_slider=True)
 
 classes = (
     MAT_PT_BrushTooltips,

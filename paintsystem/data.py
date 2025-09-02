@@ -119,13 +119,17 @@ def _parse_context(context: bpy.types.Context) -> dict:
         
         ps_object = None
         obj = context.active_object
-        if obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-            ps_object = obj.parent
-        if obj and obj.type == 'MESH':
-            ps_object = obj
-            
-        if not obj or obj.type != 'MESH' or not ps_object:
-            obj = None
+        match obj.type:
+            case 'EMPTY':
+                if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+                    ps_object = obj.parent
+            case 'MESH':
+                ps_object = obj
+            case 'GREASEPENCIL':
+                ps_object = obj
+            case _:
+                obj = None
+                ps_object = None
 
         mat = ps_object.active_material if ps_object else None
         
