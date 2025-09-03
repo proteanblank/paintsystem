@@ -2,7 +2,6 @@ import bpy
 from bpy.utils import register_classes_factory
 from bpy.types import Panel, Menu
 from .common import PSContextMixin, get_icon, scale_content
-from ..operators.group_operators import TEMPLATE_ENUM
 
 class MAT_MT_PaintSystemMaterialSelectMenu(PSContextMixin, Menu):
     bl_label = "Material Select Menu"

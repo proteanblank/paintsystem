@@ -1,9 +1,11 @@
 import bpy
-from ..utils import get_next_unique_name
+
+# ---
 from ..paintsystem.data import CHANNEL_TYPE_ENUM, COLOR_SPACE_ENUM
-from .utils import redraw_panel
-from .common import PSContextMixin, MultiMaterialOperator
+from ..utils import get_next_unique_name
+from .common import MultiMaterialOperator, PSContextMixin
 from .list_manager import ListManager
+from .operators_utils import redraw_panel
 
 class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
     """Create a new channel in the Paint System"""

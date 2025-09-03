@@ -1,9 +1,10 @@
 import bpy
-from bpy.types import Panel, Menu
+from bpy.types import Panel
 from bpy.utils import register_classes_factory
-# from ..utils.unified_brushes import get_unified_settings, paint_settings
-from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name, scale_content
+
+from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name
 from ..utils.version import is_newer_than
+from ..utils.unified_brushes import get_unified_settings
 
 from bl_ui.properties_paint_common import (
     UnifiedPaintPanel,

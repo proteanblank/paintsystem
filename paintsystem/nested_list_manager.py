@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import StringProperty, IntProperty, CollectionProperty, PointerProperty, EnumProperty
+from bpy.props import StringProperty, IntProperty, EnumProperty
 from bpy.types import (PropertyGroup, UIList, Operator, Panel)
 from bpy.utils import register_classes_factory
 
