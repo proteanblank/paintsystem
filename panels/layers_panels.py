@@ -158,7 +158,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.ensure_context(context)
-        return ps_ctx.active_channel is not None
+        return ps_ctx.active_channel is not None or ps_ctx.ps_object.type == 'GREASEPENCIL'
 
     def draw_header_preset(self, context):
         layout = self.layout
@@ -187,124 +187,132 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     # def draw_header(self, context):
     #     layout = self.layout
     #     layout.label(icon="IMAGE_RGB")
-
     def draw(self, context):
-        layout = self.layout
         ps_ctx = self.ensure_context(context)
-        obj = ps_ctx.ps_object
-        active_group = ps_ctx.active_group
-        active_channel = ps_ctx.active_channel
-        active_layer = ps_ctx.active_global_layer
-        mat = ps_ctx.active_material
-        # contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
-        #                           active_channel.node_tree for node in mat.node_tree.nodes])
 
-        flattened = active_channel.flatten_hierarchy()
-
-        # Toggle paint mode (switch between object and texture paint mode)
+        layout = self.layout
         current_mode = context.mode
         box = layout.box()
-        group_node = find_node(mat.node_tree, {
-                               'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
-        if not group_node:
-            warning_box = box.box()
-            warning_box.alert = True
-            col = warning_box.column(align=True)
-            col.label(text="Paint System not connected", icon='ERROR')
-            col.label(text="to material output!", icon='BLANK1')
         col = box.column()
         row = col.row(align=True)
         row.scale_y = 1.7
         row.scale_x = 1.7
         # if contains_mat_setup:
         row.operator("paint_system.toggle_paint_mode",
-                     text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE', icon_value=get_icon('paintbrush'))
-        # else:
-        #     row.alert = True
-        #     row.operator("paint_system.create_template_setup",
-        #                  text="Setup Material", icon="ERROR")
-        #     row.alert = False
-        if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
-            row.operator("paint_system.preview_active_channel",
-                         text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
-        row.operator("wm.save_mainfile",
-                     text="", icon="FILE_TICK")
-        # Baking and Exporting
-        row = col.row(align=True)
-        row.scale_y = 1.5
-        row.scale_x = 1.5
-        if ps_ctx.ps_settings.show_tooltips and not active_group.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
-            tip_box = col.box()
-            tip_box.scale_x = 1.4
-            tip_row = tip_box.row()
-            tip_col = tip_row.column(align=True)
-            tip_col.label(text="The button above will")
-            tip_col.label(text="show object normal")
-            tip_row.label(icon_value=get_icon('arrow_up'))
-            tip_row.operator("paint_system.hide_normal_painting_tips",
-                         text="", icon='X')
+                    text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon('paintbrush'))
+        if ps_ctx.ps_object.type == 'GREASEPENCIL':
+            grease_pencil = context.grease_pencil
+            layers = grease_pencil.layers
+            row.operator("wm.save_mainfile",
+                text="", icon="FILE_TICK")
+            row = box.row()
+            scale_content(context, row, scale_x=1, scale_y=1.2)
+            row.template_grease_pencil_layer_tree()
+        elif ps_ctx.ps_object.type == 'MESH':
+            active_group = ps_ctx.active_group
+            active_channel = ps_ctx.active_channel
+            active_layer = ps_ctx.active_global_layer
+            mat = ps_ctx.active_material
+            # contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
+            #                           active_channel.node_tree for node in mat.node_tree.nodes])
 
-        # TODO: Bake and Export options
-        # if not active_channel.bake_image:
-        #     row.menu("MAT_MT_PaintSystemMergeAndExport",
-        #              icon='EXPORT', text="Merge and Bake")
+            layers = active_channel.layers
 
-        if active_channel.bake_image:
-            row = box.row(align=True)
-            scale_content(context, row)
-            row.prop(active_channel, "use_bake_image",
-                     text="Use Merged Image", icon='CHECKBOX_HLT' if active_channel.use_bake_image else 'CHECKBOX_DEHLT')
-            row.operator("paint_system.export_baked_image",
-                         icon='EXPORT', text="")
+            # Toggle paint mode (switch between object and texture paint mode)
+            group_node = find_node(mat.node_tree, {
+                                'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
+            if not group_node:
+                warning_box = box.box()
+                warning_box.alert = True
+                col = warning_box.column(align=True)
+                col.label(text="Paint System not connected", icon='ERROR')
+                col.label(text="to material output!", icon='BLANK1')
+            # else:
+            #     row.alert = True
+            #     row.operator("paint_system.create_template_setup",
+            #                  text="Setup Material", icon="ERROR")
+            #     row.alert = False
+            if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
+                row.operator("paint_system.preview_active_channel",
+                            text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
+            row.operator("wm.save_mainfile",
+                        text="", icon="FILE_TICK")
+            # Baking and Exporting
+            row = col.row(align=True)
+            row.scale_y = 1.5
+            row.scale_x = 1.5
+            if ps_ctx.ps_settings.show_tooltips and not active_group.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
+                tip_box = col.box()
+                tip_box.scale_x = 1.4
+                tip_row = tip_box.row()
+                tip_col = tip_row.column(align=True)
+                tip_col.label(text="The button above will")
+                tip_col.label(text="show object normal")
+                tip_row.label(icon_value=get_icon('arrow_up'))
+                tip_row.operator("paint_system.hide_normal_painting_tips",
+                            text="", icon='X')
+
+            # TODO: Bake and Export options
+            # if not active_channel.bake_image:
+            #     row.menu("MAT_MT_PaintSystemMergeAndExport",
+            #              icon='EXPORT', text="Merge and Bake")
+
+            if active_channel.bake_image:
+                row = box.row(align=True)
+                scale_content(context, row)
+                row.prop(active_channel, "use_bake_image",
+                        text="Use Merged Image", icon='CHECKBOX_HLT' if active_channel.use_bake_image else 'CHECKBOX_DEHLT')
+                row.operator("paint_system.export_baked_image",
+                            icon='EXPORT', text="")
+                col = row.column(align=True)
+                col.menu("MAT_MT_PaintSystemMergeOptimize",
+                        icon='COLLAPSEMENU', text="")
+                if active_channel.use_bake_image:
+                    box.label(
+                        text="Merged Image Used. It's faster!", icon='SOLO_ON')
+                    return
+
+            # if active_layer.mask_image:
+            #     row = box.row(align=True)
+            #     if not ps.preferences.use_compact_design:
+            #         row.scale_x = 1.2
+            #         row.scale_y = 1.2
+            #     row.prop(active_layer, "edit_mask", text="Editing Mask" if active_layer.edit_mask else "Click to Edit Mask", icon='MOD_MASK')
+
+            # if active_layer and active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
+            #     mask_box = box.box()
+            #     split = mask_box.split(factor=0.6)
+            #     split.alert = True
+            #     split.label(text="Editing Mask!", icon="INFO")
+            #     split.prop(active_layer, "edit_mask", text="Disable", icon='X', emboss=False)
+
+            row = box.row()
+            scale_content(context, row, scale_x=1, scale_y=1.5)
+            row.template_list(
+                "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
+                rows=min(max(4, len(layers)), 7)
+            )
+
             col = row.column(align=True)
-            col.menu("MAT_MT_PaintSystemMergeOptimize",
-                     icon='COLLAPSEMENU', text="")
-            if active_channel.use_bake_image:
-                box.label(
-                    text="Merged Image Used. It's faster!", icon='SOLO_ON')
+            col.scale_x = 1.2
+            col.menu("MAT_MT_AddLayer", icon_value=get_icon('layer_add'), text="")
+            col.menu("MAT_MT_LayerMenu",
+                    text="", icon='COLLAPSEMENU')
+            col.separator()
+            # col.operator("paint_system.delete_item", icon="TRASH", text="")
+            # col.separator()
+            col.operator("paint_system.move_up", icon="TRIA_UP", text="")
+            col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
+            # col.separator()
+            # col.popover(
+            #     panel="MAT_PT_Actions",
+            #     text="",
+            #     icon='KEYTYPE_KEYFRAME_VEC',
+            # )
+
+            active_layer = ps_ctx.active_layer
+            if not active_layer:
                 return
-
-        # if active_layer.mask_image:
-        #     row = box.row(align=True)
-        #     if not ps.preferences.use_compact_design:
-        #         row.scale_x = 1.2
-        #         row.scale_y = 1.2
-        #     row.prop(active_layer, "edit_mask", text="Editing Mask" if active_layer.edit_mask else "Click to Edit Mask", icon='MOD_MASK')
-
-        # if active_layer and active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
-        #     mask_box = box.box()
-        #     split = mask_box.split(factor=0.6)
-        #     split.alert = True
-        #     split.label(text="Editing Mask!", icon="INFO")
-        #     split.prop(active_layer, "edit_mask", text="Disable", icon='X', emboss=False)
-
-        row = box.row()
-        scale_content(context, row, scale_x=1, scale_y=1.5)
-        row.template_list(
-            "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
-            rows=min(max(4, len(flattened)), 7)
-        )
-
-        col = row.column(align=True)
-        col.scale_x = 1.2
-        col.menu("MAT_MT_AddLayer", icon_value=get_icon('layer_add'), text="")
-        col.menu("MAT_MT_LayerMenu",
-                 text="", icon='COLLAPSEMENU')
-        col.separator()
-        # col.operator("paint_system.delete_item", icon="TRASH", text="")
-        # col.separator()
-        col.operator("paint_system.move_up", icon="TRIA_UP", text="")
-        col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
-        # col.separator()
-        # col.popover(
-        #     panel="MAT_PT_Actions",
-        #     text="",
-        #     icon='KEYTYPE_KEYFRAME_VEC',
-        # )
-
-        active_layer = ps_ctx.active_layer
-        if not active_layer:
-            return
 
 
 class MAT_PT_LayerSettings(PSContextMixin, Panel):
