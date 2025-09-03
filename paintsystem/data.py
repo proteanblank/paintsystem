@@ -7,6 +7,7 @@ from bpy.app.handlers import persistent
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 from ..custom_icons import get_icon
 from ..utils import get_next_unique_name
+from ..utils.version import is_newer_than
 from ..preferences import get_preferences
 from .common import PaintSystemPreferences
 from .graph import NodeTreeBuilder, START, END
@@ -126,7 +127,8 @@ def _parse_context(context: bpy.types.Context) -> dict:
             case 'MESH':
                 ps_object = obj
             case 'GREASEPENCIL':
-                ps_object = obj
+                if is_newer_than(4,3,0):
+                    ps_object = obj
             case _:
                 obj = None
                 ps_object = None
