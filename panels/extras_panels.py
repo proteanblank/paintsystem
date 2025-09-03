@@ -2,7 +2,7 @@ import bpy
 from bpy.types import Panel
 from bpy.utils import register_classes_factory
 
-from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name
+from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name, scale_content
 from ..utils.version import is_newer_than
 from ..utils.unified_brushes import get_unified_settings
 
