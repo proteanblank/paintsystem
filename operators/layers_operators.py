@@ -543,6 +543,23 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
 
+
+class PAINTSYSTEM_OT_SelectGradientEmpty(PSContextMixin, Operator):
+    """Select the gradient empty"""
+    bl_idname = "paint_system.select_gradient_empty"
+    bl_label = "Select Gradient Empty"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        empty_object = ps_ctx.active_global_layer.empty_object
+        if empty_object:
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.context.view_layer.objects.active = empty_object
+            empty_object.select_set(True)
+        return {'FINISHED'}
+
+
 class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
     """Create a new random color layer"""
     bl_idname = "paint_system.new_random_color_layer"
@@ -1157,6 +1174,7 @@ classes = (
     PAINTSYSTEM_OT_NewAdjustment,
     PAINTSYSTEM_OT_NewShader,
     PAINTSYSTEM_OT_NewGradient,
+    PAINTSYSTEM_OT_SelectGradientEmpty,
     PAINTSYSTEM_OT_NewRandomColor,
     PAINTSYSTEM_OT_NewCustomNodeGroup,
     PAINTSYSTEM_OT_DeleteItem,
