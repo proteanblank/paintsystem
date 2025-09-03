@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
-from ..nodetree_builder import NodeTreeBuilder
+from .nodetree_builder import NodeTreeBuilder
 
 import bpy
 

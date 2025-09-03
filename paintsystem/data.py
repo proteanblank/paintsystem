@@ -1,28 +1,44 @@
 from dataclasses import dataclass
-import bpy
-from bpy.props import PointerProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty, StringProperty, FloatProperty
-from bpy.types import PropertyGroup, Image, NodeTree, Node, NodeSocket, Object
-from bpy.utils import register_classes_factory
-from bpy.app.handlers import persistent
-from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
-from ..custom_icons import get_icon
-from ..utils import get_next_unique_name
-from ..preferences import get_preferences
-from .common import PaintSystemPreferences
-from .graph import NodeTreeBuilder, START, END
-from .graph.premade import (
-    create_image_graph, 
-    create_folder_graph, 
-    create_solid_graph, 
-    create_attribute_graph, 
-    create_adjustment_graph, 
-    create_gradient_graph,
-    create_random_graph,
-    create_custom_graph
-    )
-from .graph.premade.common import get_library_nodetree
-from mathutils import Vector
 from typing import Dict, List
+
+import bpy
+from bpy.app.handlers import persistent
+from bpy.props import (
+    BoolProperty,
+    CollectionProperty,
+    EnumProperty,
+    FloatProperty,
+    IntProperty,
+    PointerProperty,
+    StringProperty,
+)
+from bpy.types import (
+    Image,
+    Node,
+    NodeTree,
+    Object,
+    PropertyGroup,
+)
+from bpy.utils import register_classes_factory
+
+# ---
+from ..custom_icons import get_icon
+from ..preferences import get_preferences
+from ..utils import get_next_unique_name
+from .common import PaintSystemPreferences
+from .graph import (
+    NodeTreeBuilder,
+    create_adjustment_graph,
+    create_attribute_graph,
+    create_custom_graph,
+    create_folder_graph,
+    create_gradient_graph,
+    create_image_graph,
+    create_random_graph,
+    create_solid_graph,
+)
+from .graph.common import get_library_nodetree
+from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 
 TEMPLATE_ENUM = [
     ('BASIC', "Basic", "Basic painting setup", "IMAGE", 0),
@@ -874,6 +890,11 @@ class Group(PropertyGroup):
     hide_norm_paint_tips: BoolProperty(
         name="Hide Normal Painting Tips",
         description="Hide the normal painting tips",
+        default=False
+    )
+    hide_color_attr_tips: BoolProperty(
+        name="Hide Color Attribute Tips",
+        description="Hide the color attribute tips",
         default=False
     )
     

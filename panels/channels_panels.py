@@ -2,7 +2,7 @@ import bpy
 from bpy.types import UIList
 from bpy.utils import register_classes_factory
 from bpy.types import Panel
-from .common import PSContextMixin, get_icon, get_icon_from_channel, get_group_node
+from .common import PSContextMixin, get_icon_from_channel, get_group_node
 
 class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
     """UIList for displaying paint channels."""

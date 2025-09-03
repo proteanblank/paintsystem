@@ -1,8 +1,6 @@
 import bpy
-from bpy.types import Context
-from .data import Channel, GlobalLayer, Layer
 from uuid import uuid4
-# from ..graph import NodeTreeBuilder
+from .data import Channel, GlobalLayer, Layer
 
 def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLayer:
     """Add a new layer of the specified type."""
