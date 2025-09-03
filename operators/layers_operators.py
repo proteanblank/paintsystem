@@ -529,7 +529,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
             empty_object = bpy.data.objects.new(f"{ps_ctx.active_group.name} {self.layer_name}", None)
             empty_object.parent = ps_ctx.ps_object
             collection.objects.link(empty_object)
-        empty_object.location = ps_ctx.ps_object.location
+        # empty_object.location = ps_ctx.ps_object.location
         if self.gradient_type == 'LINEAR':
             empty_object.empty_display_type = 'SINGLE_ARROW'
         elif self.gradient_type == 'RADIAL':
