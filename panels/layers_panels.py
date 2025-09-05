@@ -156,12 +156,12 @@ class MAT_PT_Layers(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
 
     def draw_header_preset(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         if ps_ctx.ps_object.mode != 'TEXTURE_PAINT':
             return
         if ps_ctx.active_channel:
@@ -189,7 +189,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         obj = ps_ctx.ps_object
         active_group = ps_ctx.active_group
         active_channel = ps_ctx.active_channel
@@ -316,7 +316,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         active_layer = ps_ctx.active_layer
         return active_layer is not None
 
@@ -336,7 +336,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_layer = ps_ctx.active_layer
         global_layer = get_global_layer(active_layer)
         if not active_layer:
@@ -467,7 +467,7 @@ class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         return global_layer and global_layer.type == 'IMAGE'
 
@@ -475,7 +475,7 @@ class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         layout.prop(global_layer, "coord_type", text="Coordinate Type")
         if global_layer.coord_type == 'UV':
@@ -604,12 +604,12 @@ class MAT_PT_Actions(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         active_layer = ps_ctx.active_layer
         return active_layer is not None
 
     def draw(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         layout = self.layout
         layout.use_property_split = True

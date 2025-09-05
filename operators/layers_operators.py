@@ -201,7 +201,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
     
     coord_type: EnumProperty(
@@ -264,13 +264,13 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
 
     def store_coord_type(self, context):
         """Store the coord_type from the operator to the active channel"""
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         if ps_ctx.active_channel:
             ps_ctx.active_channel.coord_type = self.coord_type
 
     def get_coord_type(self, context):
         """Get the coord_type from the active channel and set it on the operator"""
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         if ps_ctx.active_channel:
             self.coord_type = ps_ctx.active_channel.coord_type
             
@@ -286,13 +286,13 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
             
     def get_next_image_name(self, context):
         """Get the next image name from the active channel"""
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         if ps_ctx.active_channel:
             return get_next_unique_name("Image Layer", [layer.name for layer in ps_ctx.active_channel.layers])
 
     def process_material(self, context):
         self.store_coord_type(context)
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         if self.image_add_type == 'NEW':
             img = bpy.data.images.new(
                 name=self.layer_name, width=self.image_width, height=self.image_height, alpha=True)
@@ -359,7 +359,7 @@ class PAINTSYSTEM_OT_NewFolder(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
 
     layer_name: StringProperty(
@@ -369,7 +369,7 @@ class PAINTSYSTEM_OT_NewFolder(PSContextMixin, MultiMaterialOperator):
     )
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("FOLDER")
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
         layer.update_node_tree(context)
@@ -385,7 +385,7 @@ class PAINTSYSTEM_OT_NewSolidColor(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
 
     layer_name: StringProperty(
@@ -395,7 +395,7 @@ class PAINTSYSTEM_OT_NewSolidColor(PSContextMixin, MultiMaterialOperator):
     )
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("SOLID_COLOR")
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
         layer.update_node_tree(context)
@@ -411,7 +411,7 @@ class PAINTSYSTEM_OT_NewAttribute(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
     
     attribute_name: StringProperty(
@@ -431,7 +431,7 @@ class PAINTSYSTEM_OT_NewAttribute(PSContextMixin, MultiMaterialOperator):
     )
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("ATTRIBUTE")
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
         layer.update_node_tree(context)
@@ -447,7 +447,7 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
     
     adjustment_type: EnumProperty(
@@ -457,7 +457,7 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
     )
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("ADJUSTMENT")
         global_layer.adjustment_type = self.adjustment_type
         layer_name = next(name for adjustment_type, name, description in ADJUSTMENT_TYPE_ENUM if adjustment_type == self.adjustment_type)
@@ -475,7 +475,7 @@ class PAINTSYSTEM_OT_NewShader(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
 
     layer_name: StringProperty(
@@ -485,7 +485,7 @@ class PAINTSYSTEM_OT_NewShader(PSContextMixin, MultiMaterialOperator):
     )
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("SHADER")
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
         layer.update_node_tree(context)
@@ -501,7 +501,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
 
     layer_name: StringProperty(
@@ -517,7 +517,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
     )
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         view_layer = bpy.context.view_layer
         with bpy.context.temp_override():
             if "Paint System Collection" not in view_layer.layer_collection.collection.children:
@@ -556,11 +556,11 @@ class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
     
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("RANDOM")
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
         layer.update_node_tree(context)
@@ -669,13 +669,13 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
     
     def process_material(self, context):
         if not self.node_tree_name:
             return {'CANCELLED'}
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         print("Selected node tree:", self.node_tree_name)
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
         print("Custom node tree:", custom_node_tree)
@@ -740,11 +740,11 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_layer is not None
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
         global_layer = ps_ctx.active_global_layer
@@ -794,7 +794,7 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         layout = self.layout
         active_layer = ps_ctx.active_layer
         layout.label(
@@ -821,7 +821,7 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return False
@@ -830,7 +830,7 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, MultiMaterialOperator):
         return bool(options)
 
     def invoke(self, context, event):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
@@ -853,7 +853,7 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
     def draw_menu(self, self_menu, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
@@ -866,7 +866,7 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, MultiMaterialOperator):
                 setattr(op, key, value)
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
@@ -905,7 +905,7 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return False
@@ -914,7 +914,7 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, MultiMaterialOperator):
         return bool(options)
 
     def invoke(self, context, event):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
@@ -937,7 +937,7 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
     def draw_menu(self, self_menu, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
@@ -951,7 +951,7 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, MultiMaterialOperator):
                 setattr(op, key, value)
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         if not active_channel:
             return {'CANCELLED'}
@@ -982,11 +982,11 @@ class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_layer is not None
     
     def execute(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_layer = ps_ctx.active_layer
         ps_scene_data = ps_ctx.ps_scene_data
         if not ps_scene_data:
@@ -1010,11 +1010,11 @@ class PAINTSYSTEM_OT_CopyAllLayers(PSContextMixin, Operator):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
     
     def execute(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         clipboard_layers.clear()
@@ -1044,7 +1044,7 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
         return len(bpy.context.scene.ps_scene_data.clipboard_layers) > 0
     
     def execute(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         for layer in clipboard_layers:
             global_layer = get_global_layer(layer)
@@ -1096,13 +1096,13 @@ class PAINTSYSTEM_OT_AddAction(PSContextMixin, Operator):
     )
     
     def get_next_action_name(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         return get_next_unique_name("Action", [action.name for action in global_layer.actions])
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_layer is not None
     
     def draw(self, context):
@@ -1116,7 +1116,7 @@ class PAINTSYSTEM_OT_AddAction(PSContextMixin, Operator):
             layout.prop_search(self, "marker_name", context.scene, "timeline_markers", text="Marker", icon="MARKER_HLT")
     
     def execute(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         action = global_layer.actions.add()
         action.name = self.name
@@ -1143,11 +1143,11 @@ class PAINTSYSTEM_OT_DeleteAction(PSContextMixin, Operator):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_layer is not None
     
     def execute(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         global_layer.actions.remove(global_layer.active_action_index)
         global_layer.active_action_index = min(global_layer.active_action_index, len(global_layer.actions) - 1)

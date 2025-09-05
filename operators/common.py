@@ -34,7 +34,7 @@ class MultiMaterialOperator(Operator):
     )
     def execute(self, context: Context):
         error_count = 0
-        ps_ctx = PSContextMixin.ensure_context(context)
+        ps_ctx = PSContextMixin.parse_context(context)
         objects = set()
         objects.add(ps_ctx.ps_object)
         if self.multiple_objects:

@@ -75,7 +75,7 @@ class MAT_PT_Brush(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         obj = ps_ctx.ps_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
@@ -91,7 +91,7 @@ class MAT_PT_Brush(PSContextMixin, Panel):
             
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         tool_settings = context.tool_settings.image_paint
         # Check blender version
         if not is_newer_than(4, 3):
@@ -148,7 +148,7 @@ class MAT_PT_BrushSettings(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         obj = ps_ctx.ps_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 
@@ -173,7 +173,7 @@ class MAT_PT_BrushAdvanced(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         image_paint = context.tool_settings.image_paint
         layout.prop(image_paint, "use_occlude", text="Occlude Faces")
         layout.prop(image_paint, "use_backface_culling", text="Backface Culling")
@@ -198,7 +198,7 @@ class MAT_PT_BrushColor(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         obj = ps_ctx.ps_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
 

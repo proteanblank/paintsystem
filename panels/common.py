@@ -32,7 +32,7 @@ def get_icon_from_channel(channel: Channel) -> int:
 
 
 def get_group_node(context: bpy.types.Context) -> bpy.types.Node:
-    ps_ctx = PSContextMixin.ensure_context(context)
+    ps_ctx = PSContextMixin.parse_context(context)
     if not ps_ctx.active_group:
         return None
     return find_node(ps_ctx.active_material.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})

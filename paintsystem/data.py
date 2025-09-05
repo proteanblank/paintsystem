@@ -114,81 +114,81 @@ COLOR_SPACE_ENUM = [
     ('NONCOLOR', "Non-Color", "Non-Color"),
 ]
 
-def _parse_context(context: bpy.types.Context) -> dict:
-        """
-        Parses the Blender context to extract relevant information for the paint system.
+# def _parse_context(context: bpy.types.Context) -> dict:
+#         """
+#         Parses the Blender context to extract relevant information for the paint system.
         
-        Args:
-            context (bpy.types.Context): The Blender context to parse.
+#         Args:
+#             context (bpy.types.Context): The Blender context to parse.
             
-        Returns:
-            dict: A dictionary containing parsed context information.
-        """
-        if not context:
-            raise ValueError("Context cannot be None")
-        if not isinstance(context, bpy.types.Context):
-            raise TypeError("context must be of type bpy.types.Context")
+#         Returns:
+#             dict: A dictionary containing parsed context information.
+#         """
+#         if not context:
+#             raise ValueError("Context cannot be None")
+#         if not isinstance(context, bpy.types.Context):
+#             raise TypeError("context must be of type bpy.types.Context")
         
-        ps_settings = get_preferences(context)
+#         ps_settings = get_preferences(context)
         
-        ps_scene_data = context.scene.get("ps_scene_data", None)
+#         ps_scene_data = context.scene.get("ps_scene_data", None)
         
-        ps_object = None
-        obj = context.active_object
-        if obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-            ps_object = obj.parent
-        if obj and obj.type == 'MESH':
-            ps_object = obj
+#         ps_object = None
+#         obj = context.active_object
+#         if obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+#             ps_object = obj.parent
+#         if obj and obj.type == 'MESH':
+#             ps_object = obj
             
-        if not obj or obj.type != 'MESH' or not ps_object:
-            obj = None
+#         if not obj or obj.type != 'MESH' or not ps_object:
+#             obj = None
 
-        mat = ps_object.active_material if ps_object else None
+#         mat = ps_object.active_material if ps_object else None
         
-        mat_data = None
-        groups = None
-        active_group = None
-        if mat and hasattr(mat, 'ps_mat_data') and mat.ps_mat_data:
-            mat_data = mat.ps_mat_data
-            groups = mat_data.groups
-            if groups and mat_data.active_index >= 0:
-                active_group = groups[mat_data.active_index]
+#         mat_data = None
+#         groups = None
+#         active_group = None
+#         if mat and hasattr(mat, 'ps_mat_data') and mat.ps_mat_data:
+#             mat_data = mat.ps_mat_data
+#             groups = mat_data.groups
+#             if groups and mat_data.active_index >= 0:
+#                 active_group = groups[mat_data.active_index]
         
-        channels = None
-        active_channel = None
-        if active_group:
-            channels = active_group.channels
-            if channels and active_group.active_index >= 0:
-                active_channel = channels[active_group.active_index]
+#         channels = None
+#         active_channel = None
+#         if active_group:
+#             channels = active_group.channels
+#             if channels and active_group.active_index >= 0:
+#                 active_channel = channels[active_group.active_index]
 
-        layers = None
-        active_layer = None
-        if active_channel:
-            layers = active_channel.layers
-            if layers and active_channel.active_index >= 0:
-                active_layer = layers[active_channel.active_index]
+#         layers = None
+#         active_layer = None
+#         if active_channel:
+#             layers = active_channel.layers
+#             if layers and active_channel.active_index >= 0:
+#                 active_layer = layers[active_channel.active_index]
         
-        return {
-            "ps_settings": ps_settings,
-            "ps_scene_data": ps_scene_data,
-            "active_object": obj,
-            "ps_object": ps_object,
-            "active_material": mat,
-            "ps_mat_data": mat_data,
-            "groups": groups,
-            "active_group": active_group,
-            "channels": channels,
-            "active_channel": active_channel,
-            "layers": layers,
-            "active_layer": active_layer,
-            "active_global_layer": get_global_layer(active_layer) if active_layer else None
-        }
+#         return {
+#             "ps_settings": ps_settings,
+#             "ps_scene_data": ps_scene_data,
+#             "active_object": obj,
+#             "ps_object": ps_object,
+#             "active_material": mat,
+#             "ps_mat_data": mat_data,
+#             "groups": groups,
+#             "active_group": active_group,
+#             "channels": channels,
+#             "active_channel": active_channel,
+#             "layers": layers,
+#             "active_layer": active_layer,
+#             "active_global_layer": get_global_layer(active_layer) if active_layer else None
+#         }
 
 def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
     if context.mode != 'PAINT_TEXTURE':
         return
-    ps_ctx = _parse_context(context)
-    global_layer = ps_ctx["active_global_layer"]
+    ps_ctx = parse_context(context)
+    global_layer = ps_ctx.active_global_layer
     if not global_layer:
         return
     brush = context.tool_settings.image_paint.brush
@@ -198,14 +198,14 @@ def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
 
 def update_active_image(self=None, context: bpy.types.Context = None):
     context = context or bpy.context
-    ps_ctx = _parse_context(context)
+    ps_ctx = parse_context(context)
     image_paint = context.tool_settings.image_paint
-    obj = ps_ctx["ps_object"]
-    mat = ps_ctx["active_material"]
-    active_channel = ps_ctx["active_channel"]
+    obj = ps_ctx.ps_object
+    mat = ps_ctx.active_material
+    active_channel = ps_ctx.active_channel
     if not mat or not active_channel:
         return
-    global_layer = ps_ctx["active_global_layer"]
+    global_layer = ps_ctx.active_global_layer
     update_brush_settings(self, context)
     if not global_layer:
         return
@@ -224,20 +224,20 @@ def update_active_image(self=None, context: bpy.types.Context = None):
             obj.data.uv_layers[global_layer.uv_map_name].active = True
 
 def update_active_layer(self, context):
-    ps_ctx = _parse_context(context)
-    active_layer = ps_ctx["active_layer"]
+    ps_ctx = parse_context(context)
+    active_layer = ps_ctx.active_layer
     if active_layer:
         active_layer.update_node_tree(context)
 
 def update_active_channel(self, context):
-    ps_ctx = _parse_context(context)
-    active_channel = ps_ctx["active_channel"]
+    ps_ctx = parse_context(context)
+    active_channel = ps_ctx.active_channel
     if active_channel:
         active_channel.update_node_tree(context)
 
 def update_active_group(self, context):
-    ps_ctx = _parse_context(context)
-    active_group = ps_ctx["active_group"]
+    ps_ctx = parse_context(context)
+    active_group = ps_ctx.active_group
     if active_group:
         active_group.update_node_tree(context)
 
@@ -624,7 +624,7 @@ class Channel(BaseNestedListManager):
             return
         self.node_tree.name = f".PS_Channel ({self.name})"
         self.updating_name_flag = True
-        parsed_context = _parse_context(context)
+        parsed_context = parse_context(context)
         active_group = parsed_context.get("active_group")
         new_name = get_next_unique_name(self.name, [channel.name for channel in active_group.channels if channel != self])
         if new_name != self.name:
@@ -1020,32 +1020,69 @@ class PSContext:
 
 def parse_context(context: bpy.types.Context) -> PSContext:
     """Parse the context and return a PSContext object."""
-    parsed_context = _parse_context(context)
+    if not context:
+        raise ValueError("Context cannot be None")
+    if not isinstance(context, bpy.types.Context):
+        raise TypeError("context must be of type bpy.types.Context")
+    
+    ps_settings = get_preferences(context)
+    
+    ps_scene_data = context.scene.get("ps_scene_data", None)
+    
+    ps_object = None
+    obj = context.active_object
+    if obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+        ps_object = obj.parent
+    if obj and obj.type == 'MESH':
+        ps_object = obj
+        
+    if not obj or obj.type != 'MESH' or not ps_object:
+        obj = None
+
+    mat = ps_object.active_material if ps_object else None
+    
+    mat_data = None
+    groups = None
+    active_group = None
+    if mat and hasattr(mat, 'ps_mat_data') and mat.ps_mat_data:
+        mat_data = mat.ps_mat_data
+        groups = mat_data.groups
+        if groups and mat_data.active_index >= 0:
+            active_group = groups[mat_data.active_index]
+    
+    channels = None
+    active_channel = None
+    if active_group:
+        channels = active_group.channels
+        if channels and active_group.active_index >= 0:
+            active_channel = channels[active_group.active_index]
+
+    layers = None
+    active_layer = None
+    if active_channel:
+        layers = active_channel.layers
+        if layers and active_channel.active_index >= 0:
+            active_layer = layers[active_channel.active_index]
     return PSContext(
-        ps_settings=parsed_context.get("ps_settings"),
-        ps_scene_data=parsed_context.get("ps_scene_data"),
-        active_object=parsed_context.get("active_object"),
-        ps_object=parsed_context.get("ps_object"),
-        active_material=parsed_context.get("active_material"),
-        ps_mat_data=parsed_context.get("ps_mat_data"),
-        active_group=parsed_context.get("active_group"),
-        active_channel=parsed_context.get("active_channel"),
-        active_layer=parsed_context.get("active_layer"),
-        active_global_layer=parsed_context.get("active_global_layer")
+        ps_settings=ps_settings,
+        ps_scene_data=ps_scene_data,
+        active_object=obj,
+        ps_object=ps_object,
+        active_material=mat,
+        ps_mat_data=mat_data,
+        active_group=active_group,
+        active_channel=active_channel,
+        active_layer=active_layer,
+        active_global_layer=get_global_layer(active_layer) if active_layer else None
     )
 
 class PSContextMixin:
     """A mixin for classes that need access to the paint system context."""
 
     @staticmethod
-    def ensure_context(context: bpy.types.Context) -> PSContext:
+    def parse_context(context: bpy.types.Context) -> PSContext:
         """Return a PSContext parsed from Blender context. Safe to call from class or instance methods."""
         return parse_context(context)
-
-    @staticmethod
-    def parse_context(context: bpy.types.Context) -> dict:
-        """Parse the context and return a plain dict. Provided for convenience."""
-        return _parse_context(context)
 
 
 # Legacy properties (for backward compatibility)

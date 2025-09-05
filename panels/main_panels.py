@@ -9,7 +9,7 @@ class MAT_MT_PaintSystemMaterialSelectMenu(PSContextMixin, Menu):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         ob = ps_ctx.ps_object
         for idx, material_slot in enumerate(ob.material_slots):
             is_selected = ob.active_material_index == idx
@@ -48,7 +48,7 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.ps_object is not None and ps_ctx.ps_object.type == 'MESH'
     
     def draw_header(self, context):
@@ -57,7 +57,7 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         ob = ps_ctx.ps_object
         mat = ps_ctx.active_material
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
