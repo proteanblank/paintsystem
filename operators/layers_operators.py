@@ -1,26 +1,29 @@
 import bpy
+from bpy.props import (
+    StringProperty, IntProperty, EnumProperty,
+    BoolProperty, PointerProperty
+)
 from bpy.types import Operator, Context, NodeTree
-from bpy.props import StringProperty, IntProperty, EnumProperty, BoolProperty, PointerProperty
 from bpy.utils import register_classes_factory
-from .utils import redraw_panel, intern_enum_items
+from bpy_extras.node_utils import find_base_socket_type
+
 from ..paintsystem.create import (
     add_global_layer,
     add_global_layer_to_channel,
 )
 from ..paintsystem.data import (
-    GRADIENT_TYPE_ENUM, 
-    ADJUSTMENT_TYPE_ENUM, 
-    COORDINATE_TYPE_ENUM, 
-    ATTRIBUTE_TYPE_ENUM, 
-    Channel, 
-    get_global_layer, 
-    is_global_layer_linked,
     ACTION_BIND_ENUM,
-    ACTION_TYPE_ENUM
-    )
+    ACTION_TYPE_ENUM,
+    ADJUSTMENT_TYPE_ENUM,
+    ATTRIBUTE_TYPE_ENUM,
+    COORDINATE_TYPE_ENUM,
+    GRADIENT_TYPE_ENUM,
+    get_global_layer,
+    is_global_layer_linked,
+)
 from ..utils import get_next_unique_name
 from .common import PSContextMixin, scale_content, get_icon, MultiMaterialOperator
-from bpy_extras.node_utils import find_base_socket_type
+from .operators_utils import redraw_panel, intern_enum_items
 
 def get_object_uv_maps(self, context: Context):
     items = [

@@ -2,15 +2,14 @@ import bpy
 from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTree
 from bpy.utils import register_classes_factory
 from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
+
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
 from ..paintsystem.data import (
-    is_valid_ps_nodetree, 
-    GlobalLayer,
     ADJUSTMENT_TYPE_ENUM, 
     GRADIENT_TYPE_ENUM, 
     is_global_layer_linked,
     sort_actions
-    )
+)
 
 
 def is_image_painted(image: Image | ImagePreview) -> bool:

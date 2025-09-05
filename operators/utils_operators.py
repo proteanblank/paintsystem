@@ -1,17 +1,21 @@
+import math
+import pathlib
+
+import addon_utils
 import bpy
+import gpu
+from bpy.props import EnumProperty, IntProperty, StringProperty
 from bpy.types import Operator
-from bpy.props import IntProperty, StringProperty, EnumProperty
-from .common import PSContextMixin, MultiMaterialOperator
 from bpy.utils import register_classes_factory
-from .brushes import get_brushes_from_library
-from ..utils.nodes import find_node, get_material_output
-from ..preferences import addon_package, get_preferences
 from bpy_extras.node_utils import connect_sockets
 from mathutils import Vector
-import pathlib
-import math
-import gpu
-import addon_utils
+
+# ---
+from ..preferences import addon_package, get_preferences
+from ..utils.nodes import find_node, get_material_output
+from .brushes import get_brushes_from_library
+from .common import MultiMaterialOperator, PSContextMixin
+from .operators_utils import redraw_panel
 
 
 
@@ -20,16 +24,22 @@ class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
     bl_label = "Toggle Paint Mode"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     bl_description = "Toggle between texture paint and object mode"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.ps_object.type == 'MESH' or ps_ctx.ps_object.type == 'GREASEPENCIL'
 
     def execute(self, context):
         ps_ctx = self.ensure_context(context)
-        active_channel = ps_ctx.active_channel
-        if not active_channel:
-            return {'CANCELLED'}
-
-        bpy.ops.object.mode_set(mode='TEXTURE_PAINT', toggle=True)
+        obj = ps_ctx.ps_object
+        if obj.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+            return {'FINISHED'}
+        desired_mode = 'TEXTURE_PAINT' if obj.type == 'MESH' else 'PAINT_GREASE_PENCIL'
+        bpy.ops.object.mode_set(mode=desired_mode)
         is_cycles = bpy.context.scene.render.engine == 'CYCLES'
-        if bpy.context.object.mode == 'TEXTURE_PAINT':
+        if obj.mode == desired_mode:
             # Change shading mode
             if bpy.context.space_data.shading.type != ('RENDERED' if not is_cycles else 'MATERIAL'):
                 bpy.context.space_data.shading.type = ('RENDERED' if not is_cycles else 'MATERIAL')
@@ -321,6 +331,34 @@ class PAINTSYSTEM_OT_AddCameraPlane(Operator):
         bpy.ops.mesh.primitive_plane_add('INVOKE_DEFAULT', align='VIEW')
         return {'FINISHED'}
 
+
+class PAINTSYSTEM_OT_HidePaintingTips(PSContextMixin, MultiMaterialOperator):
+    """Hide the normal painting tips"""
+    bl_idname = "paint_system.hide_normal_painting_tips"
+    bl_label = "Hide Normal Painting Tips"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    tip_attribute_name: bpy.props.StringProperty(
+        name="Tip Attribute Name",
+        description="The attribute name of the tip",
+        default=""
+    )
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.ensure_context(context)
+        return ps_ctx.active_group is not None
+    
+    def process_material(self, context):
+        ps_ctx = self.ensure_context(context)
+        if hasattr(ps_ctx.ps_scene_data, self.tip_attribute_name):
+            setattr(ps_ctx.ps_scene_data, self.tip_attribute_name, True)
+        else:
+            return {'CANCELLED'}
+        redraw_panel(context)
+        return {'FINISHED'}
+
+
 classes = (
     PAINTSYSTEM_OT_TogglePaintMode,
     PAINTSYSTEM_OT_AddPresetBrushes,
@@ -334,6 +372,7 @@ classes = (
     PAINTSYSTEM_OT_FlipNormals,
     PAINTSYSTEM_OT_RecalculateNormals,
     PAINTSYSTEM_OT_AddCameraPlane,
+    PAINTSYSTEM_OT_HidePaintingTips,
 )
 
 addon_keymaps = []

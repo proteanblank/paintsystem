@@ -1,4 +1,6 @@
 import bpy
+
+# --
 from ..paintsystem.data import PSContextMixin, get_global_layer, Channel
 from ..custom_icons import get_icon
 from ..preferences import get_preferences
