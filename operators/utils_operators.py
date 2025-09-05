@@ -168,11 +168,10 @@ class PAINTSYSTEM_OT_CreatePaintSystemUVMap(PSContextMixin, Operator):
         obj.update_from_editmode()
         bpy.ops.mesh.select_all(action='SELECT')
         # Apply to only the active object
-        bpy.ops.uv.smart_project(angle_limit=30/180*math.pi, island_margin=0.005)
         uv_layers = ps_object.data.uv_layers
         uvmap = uv_layers.new(name="PS_UVMap")
-        # Set active UV Map
-        uv_layers.active = uv_layers.get(uvmap.name)
+        ps_object.data.uv_layers.active = uvmap
+        bpy.ops.uv.smart_project(angle_limit=30/180*math.pi, island_margin=0.005)
         bpy.ops.object.mode_set(mode=original_mode)
         # Deselect the object
         ps_object.select_set(False)
