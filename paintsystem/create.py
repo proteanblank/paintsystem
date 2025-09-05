@@ -23,8 +23,6 @@ def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLa
     global_layer.uid = str(uuid4())
     global_layer.type = layer_type
     global_layer.node_tree = node_tree
-    # Ensure we set the declared property name
-    # global_layer.name = layer_name
     return global_layer
 
 def add_global_layer_to_channel(channel: Channel, global_layer: GlobalLayer, layer_name: str) -> Layer:
@@ -47,62 +45,3 @@ def add_global_layer_to_channel(channel: Channel, global_layer: GlobalLayer, lay
                 channel.active_index = i
                 break
     return layer
-
-# def create_image_layer(channel: Channel, global_layer: GlobalLayer, img: bpy.types.Image):
-#     """Create a new image layer."""
-#     if not img:
-#         raise ValueError("Image cannot be None")
-#     if not isinstance(img, bpy.types.Image):
-#         raise TypeError("img must be of type bpy.types.Image")
-    
-#     # Create a new ImageLayer instance
-#     global_layer.image = img
-#     layer = add_global_layer_to_channel(channel, global_layer)
-#     return layer
-
-
-# def create_folder_layer(channel: Channel, global_layer: GlobalLayer, layer_name: str = "New Folder") -> Layer:
-#     """Create a new folder layer (dummy)."""
-#     layer = add_global_layer_to_channel(channel, global_layer)
-#     return layer
-
-
-# def create_solid_color_layer(channel: Channel, global_layer: GlobalLayer) -> Layer:
-#     """Create a new solid color layer (dummy)."""
-#     layer = add_global_layer_to_channel(channel, global_layer)
-#     return layer
-
-
-# def create_attribute_layer(channel: Channel, global_layer: GlobalLayer, ) -> Layer:
-#     """Create a new attribute layer (dummy)."""
-#     global_layer = add_global_layer("ATTRIBUTE", layer_name)
-#     layer = add_global_layer_to_channel(channel, global_layer)
-#     return layer
-
-
-# def create_adjustment_layer(channel: Channel, global_layer: GlobalLayer, ) -> Layer:
-#     """Create a new adjustment layer (dummy)."""
-#     global_layer = add_global_layer("ADJUSTMENT", layer_name)
-#     layer = add_global_layer_to_channel(channel, global_layer)
-#     return layer
-
-
-# def create_shader_layer(channel: Channel, global_layer: GlobalLayer, ) -> Layer:
-#     """Create a new shader layer (dummy)."""
-#     global_layer = add_global_layer("SHADER", layer_name)
-#     layer = add_global_layer_to_channel(channel, global_layer)
-#     return layer
-
-
-# def create_node_group_layer(channel: Channel, global_layer: GlobalLayer) -> Layer:
-#     """Create a new node group layer (dummy)."""
-#     global_layer = add_global_layer("NODE_GROUP", layer_name)
-#     layer = add_global_layer_to_channel(channel, global_layer)
-#     return layer
-
-
-# def create_gradient_layer(channel: Channel, global_layer: GlobalLayer, ) -> Layer:
-#     """Create a new gradient layer (dummy)."""
-#     global_layer = add_global_layer("GRADIENT", layer_name)
-#     layer = add_global_layer_to_channel(channel, global_layer)
-#     return layer

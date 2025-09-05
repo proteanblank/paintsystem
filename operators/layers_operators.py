@@ -1,11 +1,10 @@
 import bpy
 from bpy.props import (
     StringProperty, IntProperty, EnumProperty,
-    BoolProperty, PointerProperty
+    BoolProperty
 )
 from bpy.types import Operator, Context, NodeTree
 from bpy.utils import register_classes_factory
-from bpy_extras.node_utils import find_base_socket_type
 
 from ..paintsystem.create import (
     add_global_layer,

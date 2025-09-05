@@ -13,9 +13,7 @@
 
 import bpy
 from bpy.utils import register_submodule_factory
-from bpy.app.handlers import persistent
 from .custom_icons import load_icons, unload_icons
-from pathlib import Path
 # from .paintsystem.data import parse_context
 
 bl_info = {
@@ -34,8 +32,6 @@ bl_info = {
 bl_info_copy = bl_info.copy()
 
 print("Paint System: Registering...")
-
-owner = object()
 
 submodules = [
     "paintsystem",

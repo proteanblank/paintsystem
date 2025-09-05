@@ -1,17 +1,15 @@
 import math
-import pathlib
 
 import addon_utils
 import bpy
 import gpu
-from bpy.props import EnumProperty, IntProperty, StringProperty
+from bpy.props import EnumProperty, IntProperty
 from bpy.types import Operator
 from bpy.utils import register_classes_factory
 from bpy_extras.node_utils import connect_sockets
-from mathutils import Vector
 
 # ---
-from ..preferences import addon_package, get_preferences
+from ..preferences import addon_package
 from ..utils.nodes import find_node, get_material_output
 from .brushes import get_brushes_from_library
 from .common import MultiMaterialOperator, PSContextMixin
