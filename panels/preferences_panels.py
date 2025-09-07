@@ -1,0 +1,74 @@
+import bpy
+from bpy.types import AddonPreferences
+from bpy.props import BoolProperty
+from bpy.utils import register_classes_factory
+from .common import find_keymap
+from ..preferences import addon_package
+
+class PaintSystemPreferences(AddonPreferences):
+    """Demo bare-bones preferences"""
+    bl_idname = addon_package()
+
+    show_tooltips: BoolProperty(
+        name="Show Tooltips",
+        description="Show tooltips in the UI",
+        default=True
+    )
+
+    use_compact_design: BoolProperty(
+        name="Use Compact Design",
+        description="Use a more compact design for the UI",
+        default=False
+    )
+
+    # name_layers_group: BoolProperty(
+    #     name="Name Layers According to Group Name",
+    #     default=False
+    # )
+
+    def draw_shortcut(self, layout, kmi, text):
+        row = layout.row(align=True)
+        row.prop(kmi, "active", text="", emboss=False)
+        row.label(text=text)
+        row.prop(kmi, "map_type", text="")
+        map_type = kmi.map_type
+        if map_type == 'KEYBOARD':
+            row.prop(kmi, "type", text="", full_event=True)
+        elif map_type == 'MOUSE':
+            row.prop(kmi, "type", text="", full_event=True)
+        elif map_type == 'NDOF':
+            row.prop(kmi, "type", text="", full_event=True)
+        elif map_type == 'TWEAK':
+            subrow = row.row()
+            subrow.prop(kmi, "type", text="")
+            subrow.prop(kmi, "value", text="")
+        elif map_type == 'TIMER':
+            row.prop(kmi, "type", text="")
+        else:
+            row.label()
+
+        if (not kmi.is_user_defined) and kmi.is_user_modified:
+            row.operator("preferences.keyitem_restore", text="", icon='BACK').item_id = kmi.id
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "show_tooltips", text="Show Tooltips")
+        layout.prop(self, "use_compact_design", text="Use Compact Design")
+        # layout.prop(self, "name_layers_group",
+        #             text="Name Layers According to Group Name")
+
+        box = layout.box()
+        box.label(text="Paint System Shortcuts:")
+        kmi = find_keymap('paint_system.color_sampler')
+        if kmi:
+            self.draw_shortcut(box, kmi, "Color Sampler Shortcut")
+        kmi = find_keymap('paint_system.toggle_brush_erase_alpha')
+        if kmi:
+            self.draw_shortcut(box, kmi, "Toggle Eraser")
+
+classes = (
+    PaintSystemPreferences,
+)
+
+register, unregister = register_classes_factory(classes)
