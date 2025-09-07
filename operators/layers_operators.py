@@ -1069,7 +1069,7 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
                     pid = getattr(prop, 'identifier', '')
                     if not pid or getattr(prop, 'is_readonly', False):
                         continue
-                    if pid in {"name", "node_tree"}:
+                    if pid in {"name", "node_tree", "type"}:
                         continue
                     setattr(new_global_layer, pid, getattr(global_layer, pid))
                 layer = add_global_layer_to_channel(ps_ctx.active_channel, new_global_layer, layer.name)

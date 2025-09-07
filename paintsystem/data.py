@@ -1045,18 +1045,19 @@ def parse_context(context: bpy.types.Context) -> PSContext:
     
     ps_object = None
     obj = context.active_object
-    match obj.type:
-        case 'EMPTY':
-            if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-                ps_object = obj.parent
-        case 'MESH':
-            ps_object = obj
-        case 'GREASEPENCIL':
-            if is_newer_than(4,3,0):
+    if obj:
+        match obj.type:
+            case 'EMPTY':
+                if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+                    ps_object = obj.parent
+            case 'MESH':
                 ps_object = obj
-        case _:
-            obj = None
-            ps_object = None
+            case 'GREASEPENCIL':
+                if is_newer_than(4,3,0):
+                    ps_object = obj
+            case _:
+                obj = None
+                ps_object = None
 
     mat = ps_object.active_material if ps_object else None
     
@@ -1222,6 +1223,10 @@ class LegacyPaintSystemGroups(PropertyGroup):
         default="Paint System"
     )
     groups: CollectionProperty(type=LegacyPaintSystemGroup)
+    active_index: IntProperty(
+        name="Active Index",
+        description="Active group index",
+    )
     use_paintsystem_uv: BoolProperty(
         name="Use Paint System UV",
         description="Use the Paint System UV Map",
@@ -1263,7 +1268,7 @@ class LegacyPaintSystemContextParser:
         paint_system = self.get_material_settings()
         if not paint_system or len(paint_system.groups) == 0:
             return None
-        active_group_idx = int(paint_system.active_group)
+        active_group_idx = int(paint_system.active_index)
         if active_group_idx >= len(paint_system.groups):
             return None  # handle cases where active index is invalid
         return paint_system.groups[active_group_idx]
@@ -1283,7 +1288,7 @@ class LegacyPaintSystemContextParser:
 
     def get_active_layer_node_group(self) -> Optional[Node]:
         active_group = self.get_active_group()
-        layer_node_tree = self.get_active_layer().node_tree
+        layer_node_tree = self.get_layer_node_tree()
         if not layer_node_tree:
             return None
         node_details = {'type': 'GROUP', 'node_tree': layer_node_tree}
@@ -1291,37 +1296,37 @@ class LegacyPaintSystemContextParser:
         return node
 
     def find_color_mix_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_active_layer().node_tree
+        layer_node_tree = self.get_layer_node_tree()
         node_details = {'type': 'MIX', 'data_type': 'RGBA'}
         return self.find_node(layer_node_tree, node_details)
 
     def find_uv_map_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_active_layer().node_tree
+        layer_node_tree = self.get_layer_node_tree()
         node_details = {'type': 'UVMAP'}
         return self.find_node(layer_node_tree, node_details)
 
     def find_opacity_mix_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_active_layer().node_tree
+        layer_node_tree = self.get_layer_node_tree()
         node_details = {'type': 'MIX', 'name': 'Opacity'}
         return self.find_node(layer_node_tree, node_details) or self.find_color_mix_node()
 
     def find_clip_mix_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_active_layer().node_tree
+        layer_node_tree = self.get_layer_node_tree()
         node_details = {'type': 'MIX', 'name': 'Clip'}
         return self.find_node(layer_node_tree, node_details)
 
     def find_image_texture_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_active_layer().node_tree
+        layer_node_tree = self.get_layer_node_tree()
         node_details = {'type': 'TEX_IMAGE'}
         return self.find_node(layer_node_tree, node_details)
 
     def find_rgb_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_active_layer().node_tree
+        layer_node_tree = self.get_layer_node_tree()
         node_details = {'name': 'RGB'}
         return self.find_node(layer_node_tree, node_details)
 
     def find_adjustment_node(self) -> Optional[Node]:
-        layer_node_tree = self.get_active_layer().node_tree
+        layer_node_tree = self.get_layer_node_tree()
         node_details = {'label': 'Adjustment'}
         return self.find_node(layer_node_tree, node_details)
 
@@ -1336,6 +1341,19 @@ class LegacyPaintSystemContextParser:
         layer_node_tree = self.get_active_layer().node_tree
         node_details = {'type': 'ATTRIBUTE'}
         return self.find_node(layer_node_tree, node_details)
+    
+    def find_node(self, node_tree, node_details):
+        if not node_tree:
+            return None
+        for node in node_tree.nodes:
+            match = True
+            for key, value in node_details.items():
+                if getattr(node, key) != value:
+                    match = False
+                    break
+            if match:
+                return node
+        return None
 
 classes = (
     MarkerAction,
@@ -1401,6 +1419,7 @@ def unregister():
     """Unregister the Paint System data module."""
     bpy.app.handlers.save_pre.remove(save_handler)
     bpy.app.handlers.load_post.remove(refresh_image)
+    del bpy.types.Material.paint_system
     del bpy.types.Material.ps_mat_data
     del bpy.types.Scene.ps_scene_data
     _unregister()
