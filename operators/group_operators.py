@@ -1,14 +1,25 @@
 import bpy
-from bpy.props import EnumProperty, BoolProperty
-from .list_manager import ListManager
+from bpy.props import BoolProperty, EnumProperty
+from bpy.types import Node, NodeTree
 from bpy.utils import register_classes_factory
-from bpy.types import NodeTree, Node
-from .common import PSContextMixin, scale_content, MultiMaterialOperator, get_icon
-from .utils import redraw_panel
+from bpy_extras.node_utils import connect_sockets, find_base_socket_type
 from mathutils import Vector
-from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output, transfer_connection
-from bpy_extras.node_utils import find_base_socket_type, connect_sockets
+
 from ..paintsystem.data import TEMPLATE_ENUM
+from ..utils.nodes import (
+    find_node,
+    get_material_output,
+    transfer_connection,
+    traverse_connected_nodes,
+)
+from .common import (
+    MultiMaterialOperator,
+    PSContextMixin,
+    get_icon,
+    scale_content,
+)
+from .list_manager import ListManager
+from .operators_utils import redraw_panel
 
 
 def create_basic_setup(mat_node_tree: NodeTree, group_node_tree: NodeTree, offset: Vector):
@@ -96,16 +107,16 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.ps_object is not None
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         # See if there is any material slot on the active object
         if not ps_ctx.active_material:
             bpy.data.materials.new(name="New Material")
             ps_ctx.ps_object.active_material = bpy.data.materials[-1]
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         mat = ps_ctx.active_material
         mat.use_nodes = True
         
@@ -183,7 +194,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                     norm_map_node.space = 'OBJECT'
                     connect_sockets(node_group.outputs['Normal'], norm_map_node.inputs[1])
                     connect_sockets(norm_map_node.outputs[0], principled_node.inputs['Normal'])
-                ps_ctx = self.ensure_context(context)
+                ps_ctx = self.parse_context(context)
                 ps_ctx.active_group.active_index = 0
 
             case 'PAINT_OVER':
@@ -300,11 +311,11 @@ class PAINTSYSTEM_OT_DeleteGroup(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_group is not None
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         lm.remove_active_item()
@@ -337,33 +348,14 @@ class PAINTSYSTEM_OT_MoveGroup(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return bool(ps_ctx.ps_mat_data and ps_ctx.ps_mat_data.active_index >= 0)
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         lm.move_active_down() if self.direction == 'DOWN' else lm.move_active_up()
-        redraw_panel(context)
-        return {'FINISHED'}
-
-
-class PAINTSYSTEM_OT_HideNormalPaintingTips(PSContextMixin, MultiMaterialOperator):
-    """Hide the normal painting tips"""
-    bl_idname = "paint_system.hide_normal_painting_tips"
-    bl_label = "Hide Normal Painting Tips"
-    bl_options = {'REGISTER', 'UNDO'}
-    
-    
-    @classmethod
-    def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
-        return ps_ctx.active_group is not None
-    
-    def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
-        ps_ctx.active_group.hide_norm_paint_tips = True
         redraw_panel(context)
         return {'FINISHED'}
 
@@ -372,7 +364,6 @@ classes = (
     PAINTSYSTEM_OT_NewGroup,
     PAINTSYSTEM_OT_DeleteGroup,
     PAINTSYSTEM_OT_MoveGroup,
-    PAINTSYSTEM_OT_HideNormalPaintingTips,
 )
 
 register, unregister = register_classes_factory(classes)    

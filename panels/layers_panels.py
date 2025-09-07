@@ -2,15 +2,14 @@ import bpy
 from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTree
 from bpy.utils import register_classes_factory
 from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
+
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
 from ..paintsystem.data import (
-    is_valid_ps_nodetree, 
-    GlobalLayer,
     ADJUSTMENT_TYPE_ENUM, 
     GRADIENT_TYPE_ENUM, 
     is_global_layer_linked,
     sort_actions
-    )
+)
 
 
 def is_image_painted(image: Image | ImagePreview) -> bool:
@@ -157,12 +156,12 @@ class MAT_PT_Layers(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None or ps_ctx.ps_object.type == 'GREASEPENCIL'
 
     def draw_header_preset(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         if ps_ctx.ps_object.mode != 'TEXTURE_PAINT':
             return
         if ps_ctx.active_channel:
@@ -174,7 +173,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
 
     # def draw_header_preset(self, context):
     #     layout = self.layout
-    #     ps_ctx = self.ensure_context(context)
+    #     ps_ctx = self.parse_context(context)
     #     active_channel = ps_ctx.active_channel
     #     global_layers = [get_global_layer(layer) for layer, _ in active_channel.flatten_hierarchy()]
     #     has_dirty_images = any(
@@ -188,7 +187,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     #     layout = self.layout
     #     layout.label(icon="IMAGE_RGB")
     def draw(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
 
         layout = self.layout
         current_mode = context.mode
@@ -325,7 +324,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         active_layer = ps_ctx.active_layer
         return active_layer is not None
 
@@ -335,7 +334,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         
     # def draw_header_preset(self, context):
     #     layout = self.layout
-    #     ps_ctx = self.ensure_context(context)
+    #     ps_ctx = self.parse_context(context)
     #     global_layer = ps_ctx.active_global_layer
     #     layout.popover(
     #         panel="MAT_PT_Actions",
@@ -345,7 +344,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_layer = ps_ctx.active_layer
         global_layer = get_global_layer(active_layer)
         if not active_layer:
@@ -476,7 +475,7 @@ class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         return global_layer and global_layer.type == 'IMAGE'
 
@@ -484,7 +483,7 @@ class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         layout.prop(global_layer, "coord_type", text="Coordinate Type")
         if global_layer.coord_type == 'UV':
@@ -613,12 +612,12 @@ class MAT_PT_Actions(PSContextMixin, Panel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         active_layer = ps_ctx.active_layer
         return active_layer is not None
 
     def draw(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         layout = self.layout
         layout.use_property_split = True

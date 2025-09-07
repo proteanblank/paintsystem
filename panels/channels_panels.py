@@ -2,14 +2,14 @@ import bpy
 from bpy.types import UIList
 from bpy.utils import register_classes_factory
 from bpy.types import Panel
-from .common import PSContextMixin, get_icon, get_icon_from_channel, get_group_node
+from .common import PSContextMixin, get_icon_from_channel, get_group_node
 
 class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
     """UIList for displaying paint channels."""
 
     def draw_item(self, context, layout: bpy.types.UILayout, data, item, icon, active_data, active_propname, index):
         channel = item
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         split = layout.split(factor=0.6)
         group_node = get_group_node(context)
         icon_row = split.row(align=True)
@@ -33,7 +33,7 @@ class MAT_PT_ChannelsSelect(PSContextMixin, Panel):
     
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         col = layout.column(align=True)
         col.label(text="Channels")
         row = col.row()
@@ -63,7 +63,7 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         ob = context.object
         return ps_ctx.ps_mat_data and ps_ctx.active_group is not None and ob.mode == 'OBJECT'
     
@@ -73,7 +73,7 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
         
     def draw_header_preset(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         if ps_ctx.active_channel:
             layout.popover(
                 panel="MAT_PT_ChannelsSelect",
@@ -83,7 +83,7 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         row = layout.row()
         row.template_list(
             "PAINTSYSTEM_UL_channels", 
@@ -112,14 +112,14 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None and len(ps_ctx.active_group.channels) > 0
     
     def draw(self, context):
         layout = self.layout
         row = layout.row()
         row.label(icon="BLANK1")
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         col = row.column(align=True)
         col.prop(active_channel, "use_alpha")

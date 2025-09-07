@@ -1,9 +1,11 @@
 import bpy
-from ..utils import get_next_unique_name
+
+# ---
 from ..paintsystem.data import CHANNEL_TYPE_ENUM, COLOR_SPACE_ENUM
-from .utils import redraw_panel
-from .common import PSContextMixin, MultiMaterialOperator
+from ..utils import get_next_unique_name
+from .common import MultiMaterialOperator, PSContextMixin
 from .list_manager import ListManager
+from .operators_utils import redraw_panel
 
 class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
     """Create a new channel in the Paint System"""
@@ -13,7 +15,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
     
     def get_unique_channel_name(self, context):
         """Set a unique name for the new channel."""
-        ps_ctx = PSContextMixin.ensure_context(context)
+        ps_ctx = PSContextMixin.parse_context(context)
         active_group = ps_ctx.active_group
         return get_next_unique_name(self.channel_name, [channel.name for channel in active_group.channels])
 
@@ -66,7 +68,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
     )
     
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         channels = ps_ctx.active_group.channels
         node_tree = bpy.data.node_groups.new(name=f"PS_Channel ({self.channel_name})", type='ShaderNodeTree')
         node_tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
@@ -125,12 +127,12 @@ class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, MultiMaterialOperator):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         ps_mat_data = ps_ctx.ps_mat_data
         return bool(ps_mat_data and ps_mat_data.active_index >= 0)
 
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_index = ps_ctx.active_group.active_index
         if active_index < 0 or active_index >= len(ps_ctx.active_group.channels):
             self.report({'ERROR'}, "No valid channel selected")
@@ -151,13 +153,13 @@ class PAINTSYSTEM_OT_MoveChannelUp(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         active_group = ps_ctx.active_group
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
         return bool(active_group and active_group.active_index >= 0 and "UP" in lm.possible_moves())
     
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_group = ps_ctx.active_group
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
         lm.move_active_up()
@@ -173,13 +175,13 @@ class PAINTSYSTEM_OT_MoveChannelDown(PSContextMixin, MultiMaterialOperator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         active_group = ps_ctx.active_group
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
         return bool(active_group and active_group.active_index >= 0 and "DOWN" in lm.possible_moves())
     
     def process_material(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_group = ps_ctx.active_group
         lm = ListManager(active_group, 'channels', active_group, 'active_index')
         lm.move_active_down()

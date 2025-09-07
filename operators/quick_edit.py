@@ -15,7 +15,7 @@ class PAINTSYSTEM_OT_ProjectEdit(PSContextMixin, Operator):
     def execute(self, context):
         import os
 
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         if not global_layer.image:
             self.report({'ERROR'}, "Layer Does not have an image")
@@ -181,12 +181,12 @@ class PAINTSYSTEM_OT_ProjectApply(PSContextMixin, Operator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         return global_layer and global_layer.external_image
 
     def execute(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
 
         current_image_editor = context.preferences.filepaths.image_editor
@@ -238,7 +238,7 @@ class PAINTSYSTEM_OT_QuickEdit(PSContextMixin, Operator):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         if ps_ctx.ps_settings.show_tooltips:
             box = layout.box()
             col = box.column(align=True)

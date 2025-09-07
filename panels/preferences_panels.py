@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import AddonPreferences
-from bpy.props import BoolProperty, IntProperty
+from bpy.props import BoolProperty
 from bpy.utils import register_classes_factory
 from .common import find_keymap
 from ..preferences import addon_package

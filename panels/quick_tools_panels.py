@@ -19,7 +19,7 @@ class MAT_PT_PaintSystemQuickToolsDisplay(PSContextMixin, Panel):
         layout.label(icon="HIDE_OFF")
 
     def draw(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         obj = ps_ctx.active_object
         layout = self.layout
         space = context.area.spaces[0]
@@ -54,11 +54,11 @@ class MAT_PT_PaintSystemQuickToolsMesh(PSContextMixin, Panel):
 
     def draw_header(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         layout.label(icon="MESH_CUBE")
 
     def draw(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         obj = ps_ctx.active_object
         layout = self.layout
         space = context.area.spaces[0]
@@ -127,7 +127,7 @@ class MAT_PT_PaintSystemQuickToolsPaint(PSContextMixin, Panel):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         obj = ps_ctx.active_object
         return hasattr(obj, "mode") and obj.mode == 'TEXTURE_PAINT'
     
