@@ -334,7 +334,7 @@ class NodeTreeBuilder:
                 pass
             # Ensure identifier custom property is set/updated
             try:
-                node["identifier"] = identifier
+                node.label = identifier
             except Exception:
                 pass
         else:
@@ -349,7 +349,7 @@ class NodeTreeBuilder:
             node.width = self.node_width
             # Persist identifier on the node as a custom property
             try:
-                node["identifier"] = identifier
+                node.label = identifier
             except Exception:
                 pass
             self.nodes[identifier] = node
@@ -560,13 +560,13 @@ class NodeTreeBuilder:
         reroute_node = self.tree.nodes.new(type='NodeReroute')
         identifier = f"{prefix}{socket_name}"
         reroute_node.name = identifier
-        reroute_node.label = socket_name
+        reroute_node.label = identifier
         reroute_node.parent = self.frame
         # Persist identifier on the reroute node as well for consistency
-        try:
-            reroute_node["identifier"] = identifier
-        except Exception:
-            pass
+        # try:
+        #     reroute_node["identifier"] = identifier
+        # except Exception:
+        #     pass
 
         if is_input_socket:
             sock = reroute_node.inputs[0]
@@ -732,10 +732,11 @@ class NodeTreeBuilder:
             # Prefer custom identifier property when available
             getter = getattr(node, 'get', None)
             if callable(getter):
-                ident = node.get("identifier")
+                ident = node.label
                 if ident is not None:
                     return ident
-        except Exception:
+        except Exception as e:
+            print("Exception getting node identifier", node, e)
             pass
         # Fallback to Blender internal name
         return getattr(node, 'name', '')
