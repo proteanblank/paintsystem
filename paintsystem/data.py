@@ -301,7 +301,7 @@ class MarkerAction(PropertyGroup):
 class GlobalLayer(PropertyGroup):
             
     def update_node_tree(self, context):
-        self.node_tree.name = f".PS_Layer ({self.uid})"
+        self.node_tree.name = f".PS_Layer ({self.name})"
         
         match self.type:
             case "IMAGE":
@@ -369,7 +369,7 @@ class GlobalLayer(PropertyGroup):
     #         return self.post_mix_node.inputs["Factor"].default_value
     #     return 1.0
     
-    uid: StringProperty()
+    name: StringProperty()
     
     # name: StringProperty(
     #     name="Name",
@@ -553,7 +553,9 @@ class Channel(BaseNestedListManager):
             for layer, _ in flattened_layers:
                 previous_data = previous_dict.get(layer.parent_id, None)
                 global_layer = get_global_layer(layer)
-                layer_identifier = global_layer.uid
+                if not global_layer:
+                    continue
+                layer_identifier = global_layer.name
                 node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree}, {"Clip": global_layer.is_clip})
                 # match global_layer.type:
                 #     case "IMAGE":
@@ -962,10 +964,10 @@ class MaterialData(PropertyGroup):
 
 def get_global_layer(layer: Layer) -> GlobalLayer | None:
     """Get the global layer data from the context."""
-    if not layer or not bpy.context.scene or not bpy.context.scene.get("ps_scene_data"):
+    if not layer or not bpy.context.scene or not bpy.context.scene.ps_scene_data:
         return None
     for global_layer in bpy.context.scene.ps_scene_data.layers:
-        if global_layer.uid == layer.ref_layer_id:
+        if global_layer.name == layer.ref_layer_id:
             return global_layer
     return None
 
@@ -978,7 +980,7 @@ def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
             for group in material.ps_mat_data.groups:
                 for channel in group.channels:
                     for layer in channel.layers:
-                        if layer.ref_layer_id == global_layer.uid:
+                        if layer.ref_layer_id == global_layer.name:
                             count += 1
     return count > 1
 
@@ -1088,7 +1090,7 @@ class PSContextMixin:
 
 
 # Legacy properties (for backward compatibility)
-class PaintSystemLegacyLayer(PropertyGroup):
+class LegacyPaintSystemLayer(PropertyGroup):
 
     name: StringProperty(
         name="Name",

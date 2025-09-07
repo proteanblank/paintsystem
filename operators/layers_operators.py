@@ -1054,11 +1054,10 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
                 # Create a new global layer and copy everything except the uid
                 new_global_layer = add_global_layer(global_layer.type, layer.name)
                 for prop in global_layer.bl_rna.properties:
-                    print(prop)
                     pid = getattr(prop, 'identifier', '')
                     if not pid or getattr(prop, 'is_readonly', False):
                         continue
-                    if pid in {"uid", "node_tree"}:
+                    if pid in {"name", "node_tree"}:
                         continue
                     setattr(new_global_layer, pid, getattr(global_layer, pid))
                 layer = add_global_layer_to_channel(ps_ctx.active_channel, new_global_layer, layer.name)
