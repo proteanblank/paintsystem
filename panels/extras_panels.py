@@ -168,11 +168,15 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
         elif ps_ctx.ps_object.type == 'GREASEPENCIL':
             from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
             tool = ToolSelectPanelHelper.tool_active_from_context(context)
+            if is_newer_than(5,0):
+                gpencil_brush_type = brush.gpencil_brush_type
+            else:
+                gpencil_brush_type = brush.gpencil_tool
             if tool and tool.idname in {"builtin.cutter", "builtin.eyedropper", "builtin.interpolate"}:
                 return False
-            if brush.gpencil_tool == 'TINT':
+            if gpencil_brush_type == 'TINT':
                 return True
-            if brush.gpencil_tool not in {'DRAW', 'FILL'}:
+            if gpencil_brush_type not in {'DRAW', 'FILL'}:
                 return False
             return True
         return False
@@ -202,10 +206,9 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
             row = col.row()
             row.prop(settings, "color_mode", expand=True)
             use_unified_paint = (context.object.mode != 'PAINT_GREASE_PENCIL')
-            ups = context.tool_settings.unified_paint_settings
+            ups = self.paint_settings(context).unified_paint_settings
             prop_owner = ups if use_unified_paint and ups.use_unified_color else brush
             enable_color_picker = settings.color_mode == 'VERTEXCOLOR'
-            gp_settings = brush.gpencil_settings
             if not enable_color_picker:
                 ma = ps_ctx.ps_object.active_material
                 icon_id = 0
