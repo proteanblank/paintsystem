@@ -81,8 +81,8 @@ class PAINTSYSTEM_OT_ExportActiveLayer(PSContextMixin, Operator):
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
-        active_layer = ps_ctx.active_layer
-        image = active_layer.image
+        active_global_layer = ps_ctx.active_global_layer
+        image = active_global_layer.image
         with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
             bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
         return {'FINISHED'}
