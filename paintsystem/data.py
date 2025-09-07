@@ -228,8 +228,11 @@ def update_active_image(self=None, context: bpy.types.Context = None):
     else:
         # print("Selected image: ", selected_image)
         image_paint.canvas = selected_image
-        if global_layer.uv_map_name:
-            obj.data.uv_layers[global_layer.uv_map_name].active = True
+        if global_layer.coord_type == 'AUTO':
+            obj.data.uv_layers["PS_UVMap"].active = True
+        elif global_layer.coord_type == 'UV':
+            if global_layer.uv_map_name:
+                obj.data.uv_layers[global_layer.uv_map_name].active = True
 
 def update_active_layer(self, context):
     ps_ctx = parse_context(context)
