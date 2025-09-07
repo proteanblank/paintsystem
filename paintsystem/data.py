@@ -332,6 +332,7 @@ class GlobalLayer(PropertyGroup):
             layer_graph.link("group_input", "group_output", "Color", "Color")
             layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
         layer_graph.compile()
+        update_active_image(self, context)
             
     def update_layer_name(self, context):
         """Update the layer name to ensure uniqueness."""
