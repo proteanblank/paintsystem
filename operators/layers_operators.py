@@ -280,7 +280,6 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
         if self.coord_type == 'UV':
             row = layout.row(align=True)
             row.prop_search(self, "uv_map_name", context.object.data, "uv_layers", text="")
-            print(self.uv_map_name)
             if not self.uv_map_name:
                 row.alert = True
             
@@ -550,7 +549,7 @@ class PAINTSYSTEM_OT_SelectGradientEmpty(PSContextMixin, Operator):
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     
     def execute(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         empty_object = ps_ctx.active_global_layer.empty_object
         if empty_object:
             bpy.ops.object.select_all(action='DESELECT')
@@ -693,16 +692,13 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
         if not self.node_tree_name:
             return {'CANCELLED'}
         ps_ctx = self.parse_context(context)
-        print("Selected node tree:", self.node_tree_name)
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        print("Custom node tree:", custom_node_tree)
         global_layer = add_global_layer("NODE_GROUP")
         global_layer.custom_node_tree = custom_node_tree
         global_layer.custom_color_input = int(self.custom_color_input)
         global_layer.custom_alpha_input = int(self.custom_alpha_input if self.custom_alpha_input != "" else "-1")
         global_layer.custom_color_output = int(self.custom_color_output)
         global_layer.custom_alpha_output = int(self.custom_alpha_output if self.custom_alpha_output != "" else "-1")
-        print("Sockets:", self.custom_color_input, self.custom_alpha_input, self.custom_color_output, self.custom_alpha_output)
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.node_tree_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
@@ -1007,7 +1003,6 @@ class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
         active_layer = ps_ctx.active_layer
         ps_scene_data = ps_ctx.ps_scene_data
         if not ps_scene_data:
-            print("No ps_scene_data found")
             return {'CANCELLED'}
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         clipboard_layers.clear()

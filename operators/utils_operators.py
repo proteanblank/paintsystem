@@ -11,11 +11,15 @@ from bpy_extras.node_utils import connect_sockets
 # ---
 from ..preferences import addon_package
 from ..utils.nodes import find_node, get_material_output
+from ..utils.version import is_newer_than
+from ..utils.unified_brushes import get_unified_settings
 from .brushes import get_brushes_from_library
 from .common import MultiMaterialOperator, PSContextMixin
 from .operators_utils import redraw_panel
 
-
+from bl_ui.properties_paint_common import (
+    UnifiedPaintPanel,
+)
 
 class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
     bl_idname = "paint_system.toggle_paint_mode"
@@ -187,13 +191,16 @@ class PAINTSYSTEM_OT_ToggleBrushEraseAlpha(Operator):
     bl_label = "Toggle Brush Erase Alpha"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Toggle between brush and erase alpha"
+    
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'PAINT_TEXTURE'
 
     def execute(self, context):
-        tool_settings = context.tool_settings
-        paint = tool_settings.image_paint
+        tool_settings = UnifiedPaintPanel.paint_settings(context)
 
-        if paint is not None:
-            brush = paint.brush
+        if tool_settings is not None:
+            brush = tool_settings.brush
             if brush is not None:
                 if brush.blend == 'ERASE_ALPHA':
                     brush.blend = 'MIX'  # Switch back to normal blending
@@ -209,8 +216,15 @@ class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
 
     x: IntProperty()
     y: IntProperty()
+    
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'PAINT_TEXTURE'
 
     def execute(self, context):
+        if is_newer_than(4,4):
+            bpy.ops.paint.sample_color('INVOKE_DEFAULT', merged=True)
+            return {'FINISHED'}
         # Get the screen dimensions
         x, y = self.x, self.y
 
@@ -219,9 +233,9 @@ class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
         pixel.dimensions = 1 * 1 * 3
         pix_value = [float(item) for item in pixel]
 
-        tool_settings = bpy.context.scene.tool_settings
-        unified_settings = tool_settings.unified_paint_settings
-        brush_settings = tool_settings.image_paint.brush
+        tool_settings = UnifiedPaintPanel.paint_settings(context)
+        unified_settings = get_unified_settings(context, "use_unified_color")
+        brush_settings = tool_settings.brush
         unified_settings.color = pix_value
         brush_settings.color = pix_value
 

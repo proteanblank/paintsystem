@@ -108,9 +108,6 @@ def set_rgb_to_zero_if_alpha_zero(image):
     #     # before calling this function if this happens.
     #     return False
 
-    print(
-        f"Processing image: '{image.name}' ({image.size[0]}x{image.size[1]})")
-
     # --- Method 1: Using Numpy (Generally Faster for large images) ---
     width = image.size[0]
     height = image.size[1]
@@ -169,7 +166,6 @@ def set_rgb_to_zero_if_alpha_zero(image):
 
     # --- Final Step ---
     # Mark the image as updated so Blender recognizes the changes
-    print(f"Finished processing '{image.name}'. Image updated.")
     return True
 
 
@@ -198,8 +194,6 @@ class PAINTSYSTEM_OT_ProjectApply(PSContextMixin, Operator):
         # external_image_name = str(external_image.name)
         # print(external_image_name)
 
-        print(external_image)
-
         external_image.reload()
         if app_name == "CLIPStudioPaint.exe":
             set_rgb_to_zero_if_alpha_zero(external_image)
@@ -212,7 +206,6 @@ class PAINTSYSTEM_OT_ProjectApply(PSContextMixin, Operator):
 
         with bpy.context.temp_override(**{'mode': 'IMAGE_PAINT'}):
             bpy.ops.paint.project_image(image=external_image_name)
-            print("Projected image")
 
         global_layer.external_image = None
 

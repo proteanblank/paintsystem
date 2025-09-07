@@ -736,7 +736,7 @@ class NodeTreeBuilder:
                 if ident is not None:
                     return ident
         except Exception as e:
-            print("Exception getting node identifier", node, e)
+            self._log(f"Exception getting node identifier: {node}, {e}")
             pass
         # Fallback to Blender internal name
         return getattr(node, 'name', '')
