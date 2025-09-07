@@ -3,6 +3,8 @@ from bpy.utils import register_classes_factory
 from bpy.types import Panel, Menu
 from .common import PSContextMixin, get_icon, scale_content
 
+from ..paintsystem.data import LegacyPaintSystemContextParser
+
 class MAT_MT_PaintSystemMaterialSelectMenu(PSContextMixin, Menu):
     bl_label = "Material Select Menu"
     bl_idname = "MAT_MT_PaintSystemMaterialSelectMenu"
@@ -57,6 +59,17 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
+        legacy_ps_ctx = LegacyPaintSystemContextParser(context)
+        legacy_material_settings = legacy_ps_ctx.get_material_settings()
+        if legacy_material_settings and legacy_material_settings.groups:
+            box = layout.box()
+            box.alert = True
+            scale_content(context, box, 1.5, 1.5)
+            col = box.column()
+            col.label(text="Legacy Paint System Detected", icon="ERROR")
+            col.operator("paint_system.update_paint_system_data", text="Update Paint System Data")
+            
+            return
         ps_ctx = self.parse_context(context)
         ob = ps_ctx.ps_object
         if ob.type != 'MESH':
