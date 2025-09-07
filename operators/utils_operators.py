@@ -370,6 +370,35 @@ class PAINTSYSTEM_OT_HidePaintingTips(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_DuplicatePaintSystemData(PSContextMixin, MultiMaterialOperator):
+    """Duplicate the selected group in the Paint System"""
+    bl_idname = "paint_system.duplicate_paint_system_data"
+    bl_label = "Duplicate Paint System Data"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        ps_mat_data = ps_ctx.ps_mat_data
+        mat = ps_ctx.active_material
+        
+        for group in ps_mat_data.groups:
+            original_node_tree = group.node_tree
+            node_tree = bpy.data.node_groups.new(name=f"Paint System ({mat.name})", type='ShaderNodeTree')
+            group.node_tree = node_tree
+            for channel in group.channels:
+                node_tree = bpy.data.node_groups.new(name=f"PS_Channel ({channel.name})", type='ShaderNodeTree')
+                channel.node_tree = node_tree
+                channel.update_node_tree(context)
+            group.update_node_tree(context)
+            
+            # Find node group that uses the original node tree
+            for node in mat.node_tree.nodes:
+                if node.type == 'GROUP' and node.node_tree == original_node_tree:
+                    node.node_tree = group.node_tree
+        redraw_panel(context)
+        return {'FINISHED'}
+
+
 classes = (
     PAINTSYSTEM_OT_TogglePaintMode,
     PAINTSYSTEM_OT_AddPresetBrushes,
@@ -384,6 +413,7 @@ classes = (
     PAINTSYSTEM_OT_RecalculateNormals,
     PAINTSYSTEM_OT_AddCameraPlane,
     PAINTSYSTEM_OT_HidePaintingTips,
+    PAINTSYSTEM_OT_DuplicatePaintSystemData,
 )
 
 addon_keymaps = []
