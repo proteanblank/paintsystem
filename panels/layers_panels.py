@@ -3,7 +3,15 @@ from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTre
 from bpy.utils import register_classes_factory
 
 from ..utils.version import is_newer_than
-from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
+from .common import (
+    PSContextMixin,
+    scale_content,
+    get_global_layer,
+    icon_parser,
+    get_icon,
+    get_icon_from_channel,
+    check_group_multiuser
+)
 
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
 from ..paintsystem.data import (
@@ -165,7 +173,9 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.active_channel is not None or ps_ctx.ps_object.type == 'GREASEPENCIL'
+        if check_group_multiuser(ps_ctx.active_group.node_tree):
+            return False
+        return (ps_ctx.active_channel is not None or ps_ctx.ps_object.type == 'GREASEPENCIL')
 
     def draw_header_preset(self, context):
         layout = self.layout

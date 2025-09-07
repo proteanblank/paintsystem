@@ -532,6 +532,11 @@ class Channel(BaseNestedListManager):
     def update_node_tree(self, context):
         if not self.node_tree:
             return
+        if len(self.node_tree.interface.items_tree) == 0:
+            self.node_tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
+            self.node_tree.interface.new_socket("Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
+            self.node_tree.interface.new_socket("Color", in_out="INPUT", socket_type="NodeSocketColor")
+            self.node_tree.interface.new_socket("Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
         node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200, clear=True)
         node_builder.add_node("group_input", "NodeGroupInput")
         node_builder.add_node("group_output", "NodeGroupOutput")
@@ -1407,7 +1412,6 @@ def register():
         name="Paint System Material Data",
         description="Material Data for the Paint System"
     )
-    bpy.types.Material.paint_system = PointerProperty(type=LegacyPaintSystemGroups)
     bpy.app.handlers.save_pre.append(save_handler)
     bpy.app.handlers.load_post.append(refresh_image)
     

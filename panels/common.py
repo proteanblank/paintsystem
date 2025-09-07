@@ -193,3 +193,12 @@ def find_keymap_by_name(keymap_name) -> list[bpy.types.KeyMapItem]:
                     if kmi.name == keymap_name:
                         return kmi
     return None
+
+def check_group_multiuser(group_node_tree: bpy.types.NodeTree) -> bool:
+    user_count = 0
+    for mat in bpy.data.materials:
+        if hasattr(mat, "ps_mat_data") and mat.ps_mat_data.groups:
+            for group in mat.ps_mat_data.groups:
+                if group.node_tree == group_node_tree:
+                    user_count += 1
+    return user_count > 1

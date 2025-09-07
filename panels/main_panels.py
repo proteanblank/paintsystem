@@ -1,7 +1,12 @@
 import bpy
 from bpy.utils import register_classes_factory
 from bpy.types import Panel, Menu
-from .common import PSContextMixin, get_icon, scale_content
+from .common import (
+    PSContextMixin,
+    get_icon,
+    scale_content,
+    check_group_multiuser
+)
 
 from ..paintsystem.data import LegacyPaintSystemContextParser
 
@@ -106,6 +111,16 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
                 row.operator("object.material_slot_assign", text="Assign")
                 row.operator("object.material_slot_select", text="Select")
                 row.operator("object.material_slot_deselect", text="Deselect")
+        
+        if check_group_multiuser(ps_ctx.active_group.node_tree):
+            # Show a warning
+            box = layout.box()
+            box.alert = True
+            box.label(text="Duplicated Paint System Data", icon="ERROR")
+            row = box.row(align=True)
+            scale_content(context, row, 1.5, 1.5)
+            row.operator("paint_system.duplicate_paint_system_data", text="Fix Data Duplication")
+            return
 
         if not ps_ctx.active_group:
             row = layout.row()
