@@ -3,7 +3,6 @@ from bpy.utils import register_classes_factory
 from mathutils import Vector, Color
 from typing import Dict, List, Union, Sequence, Set, Optional, Tuple
 from dataclasses import dataclass, field
-from ...utils.version import is_newer_than
 from uuid import uuid4
 import re
 import time
@@ -41,6 +40,144 @@ def get_main_socket_type(socket_type: str) -> str:
             return socket
     return None
 
+
+def capture_node_properties(node: bpy.types.Node) -> dict:
+    node_props: Dict[str, object] = {}
+    try:
+        for prop in getattr(node, 'bl_rna', None).properties:
+            # Ignore internal/meta properties
+            pid = getattr(prop, 'identifier', '')
+            if not pid or getattr(prop, 'is_readonly', False):
+                if node.bl_idname == "ShaderNodeValToRGB" and hasattr(node, "color_ramp"):
+                    node_props["color_ramp"] = [(element.color, element.alpha, element.position) for element in node.color_ramp.elements]
+                continue
+            if pid in {
+                'rna_type', 'type', 'location_absolute', 'location', 'internal_links',
+                'inputs', 'outputs', 'parent', 'name', 'label', 'node_width', 'mute', 'hide'
+            }:
+                continue
+            ptype = getattr(prop, 'type', None)
+            if ptype in {'BOOLEAN', 'INT', 'FLOAT', 'STRING', 'ENUM'}:
+                try:
+                    node_props[pid] = getattr(node, pid)
+                except Exception as e:
+                    # print(f"Warning: Could not capture property '{pid}' for '{node.name}'. Error: {e}")
+                    pass
+    except Exception as e:
+        # print(f"Warning: Could not capture node state for '{node.name}'. Error: {e}")
+        # If introspection fails on this node type, skip silently
+        pass
+    return node_props
+
+
+def capture_node_defaults(node: bpy.types.Node) -> dict:
+    def capture_defaults(node: bpy.types.Node, property_name: str= 'inputs'):
+        defaults: Dict[str, object] = {}
+        try:
+            for sock in getattr(node, property_name, []):
+                if sock.enabled and hasattr(sock, 'default_value'):
+                    try:
+                        val = sock.default_value
+                        # Convert vector/color/array types to tuple for safe storage
+                        try:
+                            # Avoid treating scalars as iterables
+                            if isinstance(val, (str, bytes)):
+                                defaults[sock.name] = val
+                            else:
+                                iter(val)
+                                defaults[sock.name] = tuple(val)
+                        except TypeError:
+                            defaults[sock.name] = val
+                    except Exception as e:
+                        # print(f"Warning: Could not set default value for input '{sock.name}' to '{val}'. Error: {e}")
+                        pass
+        except Exception as e:
+            # print(f"Warning: Could not capture node defaults for '{node.name}'. Error: {e}")
+            pass
+        return defaults
+        
+    input_defaults = capture_defaults(node, 'inputs')
+    output_defaults = capture_defaults(node, 'outputs')
+    return input_defaults, output_defaults
+
+
+def capture_node_state(node: bpy.types.Node) -> dict:
+    node_props = capture_node_properties(node)
+    input_defaults, output_defaults = capture_node_defaults(node)
+    return {
+            'properties': node_props,
+            'inputs': input_defaults,
+            'outputs': output_defaults,
+        }
+
+
+def apply_node_properties(node: bpy.types.Node, properties: dict) -> None:
+    for pid, value in properties.items():
+        # try:
+            if pid == "color_ramp":
+                elements = node.color_ramp.elements
+                desired_count = len(value)
+                # Ensure we never go below 1 element in the ramp
+                target_count = max(1, desired_count)
+
+                # Add missing elements (only if necessary)
+                while len(elements) < target_count:
+                    if desired_count > 0 and len(elements) < desired_count:
+                        # Create at the desired position for the new element
+                        _, _, new_pos = value[len(elements)]
+                        elements.new(new_pos)
+                    else:
+                        # Fallback: create at end
+                        elements.new(1.0)
+
+                # Remove extra elements (only if necessary), keep at least one
+                while len(elements) > target_count:
+                    try:
+                        elements.remove(elements[-1])
+                    except Exception as e:
+                        print(f"Warning: Could not remove extra color ramp element for '{node.name}'. Error: {e}")
+                        break
+
+                # Apply desired values if provided
+                if desired_count > 0:
+                    # Work on stable references to avoid index changes while adjusting positions
+                    element_refs = list(elements)
+                    apply_count = min(len(element_refs), desired_count)
+                    for i in range(apply_count):
+                        color, alpha, position = value[i]
+                        element_refs[i].color = color
+                        element_refs[i].alpha = alpha
+                        element_refs[i].position = position
+            else:
+                if hasattr(node, pid):
+                    setattr(node, pid, value)
+        # except Exception as e:
+        #     # pass
+        #     print(f"Warning: Could not apply property '{pid}' for '{node.name}'. Error: {e}")
+
+
+def apply_node_defaults(node: bpy.types.Node, defaults: dict, outputs: dict) -> None:
+    for input_name, value in defaults.items():
+        try:
+            if input_name in node.inputs and hasattr(node.inputs[input_name], 'default_value') and value != node.inputs[input_name].default_value:
+                node.inputs[input_name].default_value = value
+                # print(f"Applied input '{input_name}' for '{node.name}'")
+        except Exception as e:
+            pass
+            # print(f"Warning: Could not apply input '{input_name}' for '{node.name}'. Error: {e}")
+    for output_name, value in outputs.items():
+        try:
+            if output_name in node.outputs and hasattr(node.outputs[output_name], 'default_value') and value != node.outputs[output_name].default_value:
+                node.outputs[output_name].default_value = value
+                # print(f"Applied output '{output_name}' for '{node.name}'")
+        except Exception as e:
+            pass
+            # print(f"Warning: Could not apply output '{output_name}' for '{node.name}'. Error: {e}")
+
+
+def apply_node_state(node: bpy.types.Node, state: dict) -> None:
+    apply_node_properties(node, state['properties'])
+    apply_node_defaults(node, state['inputs'], state['outputs'])
 
 @dataclass
 class Edge:
@@ -761,7 +898,7 @@ class NodeTreeBuilder:
         # Capture current node state so we can restore user-changed values on recompilation
         saved_state: Dict[str, dict] = {}
         if self.compiled:
-            saved_state = self._capture_node_state()
+            saved_state = self._capture_node_states()
             self._log("Graph already compiled. Recompiling...")
             # for subgraph in self.sub_graphs:
             #     subgraph.compile()
@@ -785,7 +922,7 @@ class NodeTreeBuilder:
 
         # Re-apply previously captured state (node-level props and input defaults)
         if saved_state:
-            self._apply_node_state(saved_state)
+            self._apply_node_states(saved_state)
 
         # --- Create the links between nodes ---
         # Remove existing links touching any node in this frame to avoid duplicates
@@ -836,7 +973,7 @@ class NodeTreeBuilder:
         except Exception:
             pass
 
-    def _capture_node_state(self) -> Dict[str, dict]:
+    def _capture_node_states(self) -> Dict[str, dict]:
         """Capture non-readonly node properties and input socket default values.
 
         Returns a mapping: identifier -> { 'properties': {...}, 'inputs': {...} }
@@ -852,71 +989,12 @@ class NodeTreeBuilder:
             ):
                 continue
 
-            node_props: Dict[str, object] = {}
-            try:
-                for prop in getattr(node, 'bl_rna', None).properties:
-                    # Ignore internal/meta properties
-                    pid = getattr(prop, 'identifier', '')
-                    if not pid or getattr(prop, 'is_readonly', False):
-                        continue
-                    if pid in {
-                        'rna_type', 'type', 'location_absolute', 'location', 'internal_links',
-                        'inputs', 'outputs', 'parent', 'name', 'label', 'node_width', 'mute', 'hide'
-                    }:
-                        continue
-                    ptype = getattr(prop, 'type', None)
-                    # TODO: Capture color ramp values
-                    if ptype in {'BOOLEAN', 'INT', 'FLOAT', 'STRING', 'ENUM'}:
-                        try:
-                            node_props[pid] = getattr(node, pid)
-                        except Exception as e:
-                            self._log(f"Warning: Could not capture property '{pid}' for '{identifier}'. Error: {e}")
-                            pass
-            except Exception as e:
-                self._log(f"Warning: Could not capture node state for '{identifier}'. Error: {e}")
-                # If introspection fails on this node type, skip silently
-                pass
-
-            
-            def capture_defaults(node: bpy.types.Node, property_name: str= 'inputs'):
-                defaults: Dict[str, object] = {}
-                try:
-                    for sock in getattr(node, property_name, []):
-                        if sock.enabled and hasattr(sock, 'default_value'):
-                            try:
-                                val = sock.default_value
-                                # Convert vector/color/array types to tuple for safe storage
-                                try:
-                                    # Avoid treating scalars as iterables
-                                    if isinstance(val, (str, bytes)):
-                                        defaults[sock.name] = val
-                                    else:
-                                        iter(val)
-                                        defaults[sock.name] = tuple(val)
-                                except TypeError:
-                                    defaults[sock.name] = val
-                            except Exception as e:
-                                self._log(f"Warning: Could not set default value for input '{sock.name}' to '{val}'. Error: {e}")
-                                pass
-                except Exception as e:
-                    self._log(f"Warning: Could not capture node state for '{identifier}'. Error: {e}")
-                    pass
-                return defaults
-                
-            input_defaults = capture_defaults(node, 'inputs')
-            output_defaults = capture_defaults(node, 'outputs')
-
-            if node_props or input_defaults:
-                captured[identifier] = {
-                    'properties': node_props,
-                    'inputs': input_defaults,
-                    'outputs': output_defaults,
-                }
+            captured[identifier] = capture_node_state(node)
         self._log("Captured node state")
         self._log(captured)
         return captured
 
-    def _apply_node_state(self, saved_state: Dict[str, dict]) -> None:
+    def _apply_node_states(self, saved_state: Dict[str, dict]) -> None:
         """Apply captured properties and input defaults to current nodes by identifier."""
         self._log("Applying node state")
         for identifier, state in saved_state.items():
@@ -927,40 +1005,13 @@ class NodeTreeBuilder:
             
             # Ignore if the node is force_properties
             # Find node in __add_nodes_commands
-            if self.__add_nodes_commands[identifier].force_properties:
-                continue
-
-            props = state.get('properties', {})
-            for pid, value in props.items():
-                try:
-                    if hasattr(node, pid):
-                        setattr(node, pid, value)
-                except Exception as e:
-                    # Some properties may be invalid for the new node type or context
-                    self._log(f"Warning: Could not apply property '{pid}' for '{identifier}'. Error: {e}")
+            if not self.__add_nodes_commands[identifier].force_properties:
+                apply_node_properties(node, state['properties'])
 
             # Ignore if the node is force_default_values
             # Find node in __add_nodes_commands
-            if self.__add_nodes_commands[identifier].force_default_values:
-                continue
-
-            inputs = state.get('inputs', dict())
-            outputs = state.get('outputs', dict())
-            for input_name, value in inputs.items():
-                try:
-                    if input_name in node.inputs and hasattr(node.inputs[input_name], 'default_value') and value != node.inputs[input_name].default_value:
-                        node.inputs[input_name].default_value = value
-                        self._log(f"Applied input '{input_name}' for '{identifier}'")
-                except Exception as e:
-                    # Socket types or arity may differ; best-effort only
-                    self._log(f"Warning: Could not apply input '{input_name}' for '{identifier}'. Error: {e}")
-            for output_name, value in outputs.items():
-                try:
-                    if output_name in node.outputs and hasattr(node.outputs[output_name], 'default_value') and value != node.outputs[output_name].default_value:
-                        node.outputs[output_name].default_value = value
-                        self._log(f"Applied output '{output_name}' for '{identifier}'")
-                except Exception as e:
-                    self._log(f"Warning: Could not apply output '{output_name}' for '{identifier}'. Error: {e}")
+            if not self.__add_nodes_commands[identifier].force_default_values:
+                apply_node_defaults(node, state['inputs'], state['outputs'])
         self._log("Applied node state")
 
     def _arrange_nodes(self):
