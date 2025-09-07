@@ -11,6 +11,11 @@ from ..paintsystem.data import (
     sort_actions
 )
 
+from bl_ui.properties_data_grease_pencil import (
+    GreasePencil_LayerMaskPanel,
+    DATA_PT_grease_pencil_onion_skinning,
+)
+
 
 def is_image_painted(image: Image | ImagePreview) -> bool:
     """Check if the image is painted
@@ -388,7 +393,8 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 options_row = row.row(align=True)
                 options_row.enabled = not active_layer.lock
                 options_row.prop(active_layer, "use_masks", text="")
-                options_row.prop(active_layer, "use_onion_skinning", text="")
+                # options_row.prop(active_layer, "use_lights", text="", icon='LIGHT')
+                # options_row.prop(active_layer, "use_onion_skinning", text="")
                 lock_row = row.row(align=True)
                 lock_row.prop(active_layer, "lock", text="")
                 blend_row = row.row(align=True)
@@ -398,6 +404,11 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 opacity_row.enabled = not active_layer.lock
                 scale_content(context, opacity_row, 1.7, 1.5)
                 opacity_row.prop(active_layer, "opacity")
+                
+                col = box.column()
+                col.enabled = not active_layer.lock
+                col.prop(active_layer, "use_lights", text="Use Lights", icon='LIGHT')
+                # box.prop(active_layer, "use_onion_skinning", text="Use Onion Skinning")
             
         elif ps_ctx.ps_object.type == 'MESH':
             active_layer = ps_ctx.active_layer
@@ -519,7 +530,61 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 case _:
                     pass
 
+# Grease Pencil Layer Settings
 
+def disable_if_lock(self, context):
+    active_layer = context.grease_pencil.layers.active
+    layout = self.layout
+    layout.enabled = not active_layer.lock
+
+class MAT_PT_GreasePencilMaskSettings(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_GreasePencilMaskSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Mask"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.ps_object.type == 'GREASEPENCIL'
+
+    def draw_header(self, context):
+        GreasePencil_LayerMaskPanel.draw_header(self, context)
+        disable_if_lock(self, context)
+    
+    def draw(self, context):
+        GreasePencil_LayerMaskPanel.draw(self, context)
+        disable_if_lock(self, context)
+
+class MAT_PT_GreasePencilOnionSkinningSettings(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_GreasePencilOnionSkinningSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Onion Skinning"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.ps_object.type == 'GREASEPENCIL'
+    
+    def draw(self, context):
+        DATA_PT_grease_pencil_onion_skinning.draw(self, context)
+        disable_if_lock(self, context)
+    
+    def draw_header(self, context):
+        layout = self.layout
+        active_layer = context.grease_pencil.layers.active
+        layout.prop(active_layer, "use_onion_skinning", text="", toggle=0)
+        disable_if_lock(self, context)
+
+
+# Paint System Layer Settings Advanced
 class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_PaintSystemLayerSettingsAdvanced'
     bl_space_type = "VIEW_3D"
@@ -733,6 +798,8 @@ classes = (
     MAT_MT_LayerMenu,
     MAT_PT_Layers,
     MAT_PT_LayerSettings,
+    MAT_PT_GreasePencilMaskSettings,
+    MAT_PT_GreasePencilOnionSkinningSettings,
     MAT_PT_PaintSystemLayerSettingsAdvanced,
     MAT_PT_Actions,
     PAINTSYSTEM_UL_Actions,
