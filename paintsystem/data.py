@@ -1389,10 +1389,6 @@ def register():
         name="Paint System Material Data",
         description="Material Data for the Paint System"
     )
-    bpy.types.Node.identifier = StringProperty(
-        name="Identifier",
-        description="Identifier for the node"
-    )
     bpy.app.handlers.save_pre.append(save_handler)
     bpy.app.handlers.load_post.append(refresh_image)
     
@@ -1402,5 +1398,4 @@ def unregister():
     bpy.app.handlers.load_post.remove(refresh_image)
     del bpy.types.Material.ps_mat_data
     del bpy.types.Scene.ps_scene_data
-    del bpy.types.Node.identifier
     _unregister()
