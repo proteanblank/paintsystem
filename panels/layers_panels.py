@@ -109,7 +109,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             if global_item.is_clip:
                 row.label(icon="SELECT_INTERSECT")
             if global_item.lock_layer:
-                row.label(icon="VIEW_LOCKED")
+                row.label(icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
             if len(global_item.actions) > 0:
                 row.label(icon="KEYTYPE_KEYFRAME_VEC")
             if is_global_layer_linked(global_item):
