@@ -27,7 +27,7 @@ class MAT_MT_PaintSystemMaterialSelectMenu(PSContextMixin, Menu):
     
 #     def draw(self, context):
 #         layout = self.layout
-#         ps_ctx = self.ensure_context(context)
+#         ps_ctx = self.parse_context(context)
 #         for template in TEMPLATE_ENUM:
 #             op = layout.operator("paint_system.new_group", text=template[0], icon=template[3])
 #             op.template = template[0]
@@ -49,7 +49,7 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.ps_object is not None and ps_ctx.ps_object.type == 'MESH'
+        return ps_ctx.ps_object is not None
     
     def draw_header(self, context):
         layout = self.layout
@@ -59,6 +59,8 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
         layout = self.layout
         ps_ctx = self.parse_context(context)
         ob = ps_ctx.ps_object
+        if ob.type != 'MESH':
+            return
         mat = ps_ctx.active_material
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
             row = layout.row(align=True)

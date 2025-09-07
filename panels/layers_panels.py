@@ -11,6 +11,11 @@ from ..paintsystem.data import (
     sort_actions
 )
 
+from bl_ui.properties_data_grease_pencil import (
+    GreasePencil_LayerMaskPanel,
+    DATA_PT_grease_pencil_onion_skinning,
+)
+
 
 def is_image_painted(image: Image | ImagePreview) -> bool:
     """Check if the image is painted
@@ -157,7 +162,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.active_channel is not None
+        return ps_ctx.active_channel is not None or ps_ctx.ps_object.type == 'GREASEPENCIL'
 
     def draw_header_preset(self, context):
         layout = self.layout
@@ -173,7 +178,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
 
     # def draw_header_preset(self, context):
     #     layout = self.layout
-    #     ps_ctx = self.ensure_context(context)
+    #     ps_ctx = self.parse_context(context)
     #     active_channel = ps_ctx.active_channel
     #     global_layers = [get_global_layer(layer) for layer, _ in active_channel.flatten_hierarchy()]
     #     has_dirty_images = any(
@@ -186,124 +191,155 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     # def draw_header(self, context):
     #     layout = self.layout
     #     layout.label(icon="IMAGE_RGB")
-
     def draw(self, context):
-        layout = self.layout
         ps_ctx = self.parse_context(context)
-        obj = ps_ctx.ps_object
-        active_group = ps_ctx.active_group
-        active_channel = ps_ctx.active_channel
-        active_layer = ps_ctx.active_global_layer
-        mat = ps_ctx.active_material
-        # contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
-        #                           active_channel.node_tree for node in mat.node_tree.nodes])
 
-        flattened = active_channel.flatten_hierarchy()
-
-        # Toggle paint mode (switch between object and texture paint mode)
+        layout = self.layout
         current_mode = context.mode
         box = layout.box()
-        group_node = find_node(mat.node_tree, {
-                               'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
-        if not group_node:
-            warning_box = box.box()
-            warning_box.alert = True
-            col = warning_box.column(align=True)
-            col.label(text="Paint System not connected", icon='ERROR')
-            col.label(text="to material output!", icon='BLANK1')
         col = box.column()
         row = col.row(align=True)
         row.scale_y = 1.7
         row.scale_x = 1.7
         # if contains_mat_setup:
         row.operator("paint_system.toggle_paint_mode",
-                     text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE', icon_value=get_icon('paintbrush'))
-        # else:
-        #     row.alert = True
-        #     row.operator("paint_system.create_template_setup",
-        #                  text="Setup Material", icon="ERROR")
-        #     row.alert = False
-        if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
-            row.operator("paint_system.preview_active_channel",
-                         text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
-        row.operator("wm.save_mainfile",
-                     text="", icon="FILE_TICK")
-        # Baking and Exporting
-        row = col.row(align=True)
-        row.scale_y = 1.5
-        row.scale_x = 1.5
-        if ps_ctx.ps_settings.show_tooltips and not active_group.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
-            tip_box = col.box()
-            tip_box.scale_x = 1.4
-            tip_row = tip_box.row()
-            tip_col = tip_row.column(align=True)
-            tip_col.label(text="The button above will")
-            tip_col.label(text="show object normal")
-            tip_row.label(icon_value=get_icon('arrow_up'))
-            tip_row.operator("paint_system.hide_normal_painting_tips",
-                         text="", icon='X')
+                    text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon('paintbrush'))
+        if ps_ctx.ps_object.type == 'GREASEPENCIL':
+            grease_pencil = context.grease_pencil
+            layers = grease_pencil.layers
+            is_layer_active = layers.active is not None
+            is_group_active = grease_pencil.layer_groups.active is not None
+            row.operator("wm.save_mainfile",
+                text="", icon="FILE_TICK")
+            row = box.row()
+            scale_content(context, row, scale_x=1, scale_y=1.2)
+            row.template_grease_pencil_layer_tree()
+            col = row.column()
+            sub = col.column(align=True)
+            sub.operator_context = 'EXEC_DEFAULT'
+            sub.operator("grease_pencil.layer_add", icon='ADD', text="")
+            sub.operator("grease_pencil.layer_group_add", icon='NEWFOLDER', text="")
+            sub.separator()
 
-        # TODO: Bake and Export options
-        # if not active_channel.bake_image:
-        #     row.menu("MAT_MT_PaintSystemMergeAndExport",
-        #              icon='EXPORT', text="Merge and Bake")
+            if is_layer_active:
+                sub.operator("grease_pencil.layer_remove", icon='REMOVE', text="")
+            if is_group_active:
+                sub.operator("grease_pencil.layer_group_remove", icon='REMOVE', text="").keep_children = True
 
-        if active_channel.bake_image:
-            row = box.row(align=True)
-            scale_content(context, row)
-            row.prop(active_channel, "use_bake_image",
-                     text="Use Merged Image", icon='CHECKBOX_HLT' if active_channel.use_bake_image else 'CHECKBOX_DEHLT')
-            row.operator("paint_system.export_baked_image",
-                         icon='EXPORT', text="")
+            sub.separator()
+
+            sub.menu("GREASE_PENCIL_MT_grease_pencil_add_layer_extra", icon='DOWNARROW_HLT', text="")
+
+            col.separator()
+
+            sub = col.column(align=True)
+            sub.operator("grease_pencil.layer_move", icon='TRIA_UP', text="").direction = 'UP'
+            sub.operator("grease_pencil.layer_move", icon='TRIA_DOWN', text="").direction = 'DOWN'
+        elif ps_ctx.ps_object.type == 'MESH':
+            active_group = ps_ctx.active_group
+            active_channel = ps_ctx.active_channel
+            active_layer = ps_ctx.active_global_layer
+            mat = ps_ctx.active_material
+            # contains_mat_setup = any([node.type == 'GROUP' and node.node_tree ==
+            #                           active_channel.node_tree for node in mat.node_tree.nodes])
+
+            layers = active_channel.layers
+
+            # Toggle paint mode (switch between object and texture paint mode)
+            group_node = find_node(mat.node_tree, {
+                                'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
+            if not group_node:
+                warning_box = box.box()
+                warning_box.alert = True
+                col = warning_box.column(align=True)
+                col.label(text="Paint System not connected", icon='ERROR')
+                col.label(text="to material output!", icon='BLANK1')
+            # else:
+            #     row.alert = True
+            #     row.operator("paint_system.create_template_setup",
+            #                  text="Setup Material", icon="ERROR")
+            #     row.alert = False
+            if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
+                row.operator("paint_system.preview_active_channel",
+                            text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
+            row.operator("wm.save_mainfile",
+                        text="", icon="FILE_TICK")
+            # Baking and Exporting
+            row = col.row(align=True)
+            row.scale_y = 1.5
+            row.scale_x = 1.5
+            if ps_ctx.ps_settings.show_tooltips and not active_group.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
+                tip_box = col.box()
+                tip_box.scale_x = 1.4
+                tip_row = tip_box.row()
+                tip_col = tip_row.column(align=True)
+                tip_col.label(text="The button above will")
+                tip_col.label(text="show object normal")
+                tip_row.label(icon_value=get_icon('arrow_up'))
+                tip_row.operator("paint_system.hide_normal_painting_tips",
+                            text="", icon='X')
+
+            # TODO: Bake and Export options
+            # if not active_channel.bake_image:
+            #     row.menu("MAT_MT_PaintSystemMergeAndExport",
+            #              icon='EXPORT', text="Merge and Bake")
+
+            if active_channel.bake_image:
+                row = box.row(align=True)
+                scale_content(context, row)
+                row.prop(active_channel, "use_bake_image",
+                        text="Use Merged Image", icon='CHECKBOX_HLT' if active_channel.use_bake_image else 'CHECKBOX_DEHLT')
+                row.operator("paint_system.export_baked_image",
+                            icon='EXPORT', text="")
+                col = row.column(align=True)
+                col.menu("MAT_MT_PaintSystemMergeOptimize",
+                        icon='COLLAPSEMENU', text="")
+                if active_channel.use_bake_image:
+                    box.label(
+                        text="Merged Image Used. It's faster!", icon='SOLO_ON')
+                    return
+
+            # if active_layer.mask_image:
+            #     row = box.row(align=True)
+            #     if not ps.preferences.use_compact_design:
+            #         row.scale_x = 1.2
+            #         row.scale_y = 1.2
+            #     row.prop(active_layer, "edit_mask", text="Editing Mask" if active_layer.edit_mask else "Click to Edit Mask", icon='MOD_MASK')
+
+            # if active_layer and active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
+            #     mask_box = box.box()
+            #     split = mask_box.split(factor=0.6)
+            #     split.alert = True
+            #     split.label(text="Editing Mask!", icon="INFO")
+            #     split.prop(active_layer, "edit_mask", text="Disable", icon='X', emboss=False)
+
+            row = box.row()
+            scale_content(context, row, scale_x=1, scale_y=1.5)
+            row.template_list(
+                "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
+                rows=min(max(4, len(layers)), 7)
+            )
+
             col = row.column(align=True)
-            col.menu("MAT_MT_PaintSystemMergeOptimize",
-                     icon='COLLAPSEMENU', text="")
-            if active_channel.use_bake_image:
-                box.label(
-                    text="Merged Image Used. It's faster!", icon='SOLO_ON')
+            col.scale_x = 1.2
+            col.menu("MAT_MT_AddLayer", icon_value=get_icon('layer_add'), text="")
+            col.menu("MAT_MT_LayerMenu",
+                    text="", icon='COLLAPSEMENU')
+            col.separator()
+            # col.operator("paint_system.delete_item", icon="TRASH", text="")
+            # col.separator()
+            col.operator("paint_system.move_up", icon="TRIA_UP", text="")
+            col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
+            # col.separator()
+            # col.popover(
+            #     panel="MAT_PT_Actions",
+            #     text="",
+            #     icon='KEYTYPE_KEYFRAME_VEC',
+            # )
+
+            active_layer = ps_ctx.active_layer
+            if not active_layer:
                 return
-
-        # if active_layer.mask_image:
-        #     row = box.row(align=True)
-        #     if not ps.preferences.use_compact_design:
-        #         row.scale_x = 1.2
-        #         row.scale_y = 1.2
-        #     row.prop(active_layer, "edit_mask", text="Editing Mask" if active_layer.edit_mask else "Click to Edit Mask", icon='MOD_MASK')
-
-        # if active_layer and active_layer.edit_mask and obj.mode == 'TEXTURE_PAINT':
-        #     mask_box = box.box()
-        #     split = mask_box.split(factor=0.6)
-        #     split.alert = True
-        #     split.label(text="Editing Mask!", icon="INFO")
-        #     split.prop(active_layer, "edit_mask", text="Disable", icon='X', emboss=False)
-
-        row = box.row()
-        scale_content(context, row, scale_x=1, scale_y=1.5)
-        row.template_list(
-            "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
-            rows=min(max(4, len(flattened)), 7)
-        )
-
-        col = row.column(align=True)
-        col.scale_x = 1.2
-        col.menu("MAT_MT_AddLayer", icon_value=get_icon('layer_add'), text="")
-        col.menu("MAT_MT_LayerMenu",
-                 text="", icon='COLLAPSEMENU')
-        col.separator()
-        # col.operator("paint_system.delete_item", icon="TRASH", text="")
-        # col.separator()
-        col.operator("paint_system.move_up", icon="TRIA_UP", text="")
-        col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
-        # col.separator()
-        # col.popover(
-        #     panel="MAT_PT_Actions",
-        #     text="",
-        #     icon='KEYTYPE_KEYFRAME_VEC',
-        # )
-
-        active_layer = ps_ctx.active_layer
-        if not active_layer:
-            return
 
 
 class MAT_PT_LayerSettings(PSContextMixin, Panel):
@@ -317,8 +353,15 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        active_layer = ps_ctx.active_layer
-        return active_layer is not None
+        if ps_ctx.ps_object.type == 'MESH':
+            active_layer = ps_ctx.active_layer
+            return active_layer is not None
+        elif ps_ctx.ps_object.type == 'GREASEPENCIL':
+            grease_pencil = context.grease_pencil
+            active_layer = grease_pencil.layers.active
+            return active_layer is not None
+        else:
+            return False
 
     # def draw_header(self, context):
     #     layout = self.layout
@@ -326,7 +369,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         
     # def draw_header_preset(self, context):
     #     layout = self.layout
-    #     ps_ctx = self.ensure_context(context)
+    #     ps_ctx = self.parse_context(context)
     #     global_layer = ps_ctx.active_global_layer
     #     layout.popover(
     #         panel="MAT_PT_Actions",
@@ -337,127 +380,213 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
-        active_layer = ps_ctx.active_layer
-        global_layer = get_global_layer(active_layer)
-        if not active_layer:
-            return
-            # Settings
-        row = layout.row(align=True)
-        scale_content(context, row)
-        row.popover(
-            panel="MAT_PT_Actions",
-            text=f"{len(global_layer.actions)} Active Actions" if global_layer.actions else "Add Layer Actions",
-            icon="KEYTYPE_KEYFRAME_VEC"
-        )
-        box = layout.box()
-        if global_layer.image:
-            row = box.row(align=True)
-            if not global_layer.external_image:
-                row.operator("paint_system.quick_edit", text="Edit Externally")
-            else:
-                row.operator("paint_system.project_apply",
-                             text="Apply")
-            row.menu("MAT_MT_ImageMenu",
-                     text="", icon='COLLAPSEMENU')
+        if ps_ctx.ps_object.type == 'GREASEPENCIL':
+            active_layer = context.grease_pencil.layers.active
+            active_group = context.grease_pencil.layer_groups.active
+            if active_layer:
+                box = layout.box()
+                col = box.column(align=True)
+                row = col.row(align=True)
+                row.scale_y = 1.2
+                row.scale_x = 1.2
+                scale_content(context, row, 1.7, 1.5)
+                options_row = row.row(align=True)
+                options_row.enabled = not active_layer.lock
+                options_row.prop(active_layer, "use_masks", text="")
+                # options_row.prop(active_layer, "use_lights", text="", icon='LIGHT')
+                # options_row.prop(active_layer, "use_onion_skinning", text="")
+                lock_row = row.row(align=True)
+                lock_row.prop(active_layer, "lock", text="")
+                blend_row = row.row(align=True)
+                blend_row.enabled = not active_layer.lock
+                blend_row.prop(active_layer, "blend_mode", text="")
+                opacity_row = col.row(align=True)
+                opacity_row.enabled = not active_layer.lock
+                scale_content(context, opacity_row, 1.7, 1.5)
+                opacity_row.prop(active_layer, "opacity")
+                
+                col = box.column()
+                col.enabled = not active_layer.lock
+                col.prop(active_layer, "use_lights", text="Use Lights", icon='LIGHT')
+                # box.prop(active_layer, "use_onion_skinning", text="Use Onion Skinning")
+            
+        elif ps_ctx.ps_object.type == 'MESH':
+            active_layer = ps_ctx.active_layer
+            global_layer = get_global_layer(active_layer)
+            if not active_layer:
+                return
+                # Settings
+            row = layout.row(align=True)
+            scale_content(context, row)
+            row.popover(
+                panel="MAT_PT_Actions",
+                text=f"{len(global_layer.actions)} Active Actions" if global_layer.actions else "Add Layer Actions",
+                icon="KEYTYPE_KEYFRAME_VEC"
+            )
+            box = layout.box()
+            if global_layer.image:
+                row = box.row(align=True)
+                if not global_layer.external_image:
+                    row.operator("paint_system.quick_edit", text="Edit Externally")
+                else:
+                    row.operator("paint_system.project_apply",
+                                text="Apply")
+                row.menu("MAT_MT_ImageMenu",
+                        text="", icon='COLLAPSEMENU')
 
-        # if ps.preferences.show_tooltips:
-        #     row.menu("MAT_MT_LayersSettingsTooltips", text='', icon='QUESTION')
+            # if ps.preferences.show_tooltips:
+            #     row.menu("MAT_MT_LayersSettingsTooltips", text='', icon='QUESTION')
 
-        # Let user set opacity and blend mode:
-        color_mix_node = global_layer.mix_node
-        col = box.column(align=True)
-        row = col.row(align=True)
-        row.scale_y = 1.2
-        row.scale_x = 1.2
-        scale_content(context, row, 1.5, 1.5)
-        clip_row = row.row(align=True)
-        clip_row.enabled = not global_layer.lock_layer
-        clip_row.prop(global_layer, "is_clip", text="",
-                 icon="SELECT_INTERSECT")
-        if global_layer.type == 'IMAGE':
-            clip_row.prop(global_layer, "lock_alpha",
-                     text="", icon='TEXTURE')
-        row.prop(global_layer, "lock_layer",
-                 text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
-        blend_type_row = row.row(align=True)
-        blend_type_row.enabled = not global_layer.lock_layer
-        blend_type_row.prop(color_mix_node, "blend_type", text="")
-        row = col.row(align=True)
-        scale_content(context, row, scale_x=1.2, scale_y=1.5)
-        row.enabled = not global_layer.lock_layer
-        row.prop(global_layer.pre_mix_node.inputs['Opacity'], "default_value",
-                 text="Opacity", slider=True)
-        col = box.column()
-        match global_layer.type:
-            case 'IMAGE':
-                pass
-            case 'ADJUSTMENT':
-                adjustment_node = global_layer.find_node("adjustment")
-                if adjustment_node:
+            # Let user set opacity and blend mode:
+            color_mix_node = global_layer.mix_node
+            col = box.column(align=True)
+            row = col.row(align=True)
+            row.scale_y = 1.2
+            row.scale_x = 1.2
+            scale_content(context, row, 1.7, 1.5)
+            clip_row = row.row(align=True)
+            clip_row.enabled = not global_layer.lock_layer
+            clip_row.prop(global_layer, "is_clip", text="",
+                    icon="SELECT_INTERSECT")
+            if global_layer.type == 'IMAGE':
+                clip_row.prop(global_layer, "lock_alpha",
+                        text="", icon='TEXTURE')
+            lock_row = row.row(align=True)
+            lock_row.prop(global_layer, "lock_layer",
+                    text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
+            blend_type_row = row.row(align=True)
+            blend_type_row.enabled = not global_layer.lock_layer
+            blend_type_row.prop(color_mix_node, "blend_type", text="")
+            row = col.row(align=True)
+            scale_content(context, row, scale_x=1.2, scale_y=1.5)
+            row.enabled = not global_layer.lock_layer
+            row.prop(global_layer.pre_mix_node.inputs['Opacity'], "default_value",
+                    text="Opacity", slider=True)
+            col = box.column()
+            match global_layer.type:
+                case 'IMAGE':
+                    pass
+                case 'ADJUSTMENT':
+                    adjustment_node = global_layer.find_node("adjustment")
+                    if adjustment_node:
+                        col.enabled = not global_layer.lock_layer
+                        col.label(text="Adjustment Settings:", icon='SHADERFX')
+                        col.template_node_inputs(adjustment_node)
+                case 'NODE_GROUP':
+                    custom_node_tree = global_layer.custom_node_tree
+                    node_group = global_layer.find_node('custom_node_tree')
+                    inputs = [i for i in node_group.inputs if not i.is_linked and i.name not in (
+                        'Color', 'Alpha')]
+                    if not inputs:
+                        return
                     col.enabled = not global_layer.lock_layer
-                    col.label(text="Adjustment Settings:", icon='SHADERFX')
-                    col.template_node_inputs(adjustment_node)
-            case 'NODE_GROUP':
-                custom_node_tree = global_layer.custom_node_tree
-                node_group = global_layer.find_node('custom_node_tree')
-                inputs = [i for i in node_group.inputs if not i.is_linked and i.name not in (
-                    'Color', 'Alpha')]
-                if not inputs:
-                    return
-                col.enabled = not global_layer.lock_layer
-                col.label(text="Node Group Settings:", icon='NODETREE')
-                for socket in inputs:
-                    col.prop(socket, "default_value",
-                             text=socket.name)
+                    col.label(text="Node Group Settings:", icon='NODETREE')
+                    for socket in inputs:
+                        col.prop(socket, "default_value",
+                                text=socket.name)
 
-            case 'ATTRIBUTE':
-                attribute_node = global_layer.find_node("attribute")
-                if attribute_node:
-                    col.enabled = not global_layer.lock_layer
-                    col.label(text="Attribute Settings:", icon='MESH_DATA')
-                    col.template_node_inputs(attribute_node)
-            case 'GRADIENT':
-                gradient_node = global_layer.find_node("gradient")
-                map_range_node = global_layer.find_node("map_range")
-                if gradient_node and map_range_node:
-                    col.use_property_split = True
-                    col.use_property_decorate = False
-                    col.enabled = not global_layer.lock_layer
-                    col.operator("paint_system.select_gradient_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
-                    col.separator()
-                    col.label(text="Gradient Settings:", icon='SHADERFX')
-                    col.template_node_inputs(gradient_node)
-                    col.separator()
-                    col.prop(map_range_node, "interpolation_type", text="Interpolation")
-                    if map_range_node.interpolation_type in ('STEPPED'):
-                        col.prop(map_range_node.inputs[5], "default_value", text="Steps")
-                    col.prop(map_range_node.inputs[1], "default_value", text="Start Distance")
-                    col.prop(map_range_node.inputs[2], "default_value", text="End Distance")
-            case 'SOLID_COLOR':
-                rgb_node = global_layer.find_node("rgb")
-                if rgb_node:
-                    col.enabled = not global_layer.lock_layer
-                    col.prop(rgb_node.outputs[0], "default_value", text="Color",
-                             icon='IMAGE_RGB_ALPHA')
+                case 'ATTRIBUTE':
+                    attribute_node = global_layer.find_node("attribute")
+                    if attribute_node:
+                        col.enabled = not global_layer.lock_layer
+                        col.label(text="Attribute Settings:", icon='MESH_DATA')
+                        col.template_node_inputs(attribute_node)
+                case 'GRADIENT':
+                    gradient_node = global_layer.find_node("gradient")
+                    map_range_node = global_layer.find_node("map_range")
+                    if gradient_node and map_range_node:
+                        col.use_property_split = True
+                        col.use_property_decorate = False
+                        col.enabled = not global_layer.lock_layer
+                        col.operator("paint_system.select_gradient_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
+                        col.separator()
+                        col.label(text="Gradient Settings:", icon='SHADERFX')
+                        col.template_node_inputs(gradient_node)
+                        col.separator()
+                        col.prop(map_range_node, "interpolation_type", text="Interpolation")
+                        if map_range_node.interpolation_type in ('STEPPED'):
+                            col.prop(map_range_node.inputs[5], "default_value", text="Steps")
+                        col.prop(map_range_node.inputs[1], "default_value", text="Start Distance")
+                        col.prop(map_range_node.inputs[2], "default_value", text="End Distance")
+                case 'SOLID_COLOR':
+                    rgb_node = global_layer.find_node("rgb")
+                    if rgb_node:
+                        col.enabled = not global_layer.lock_layer
+                        col.prop(rgb_node.outputs[0], "default_value", text="Color",
+                                icon='IMAGE_RGB_ALPHA')
 
-            case 'ADJUSTMENT':
-                adjustment_node = global_layer.find_node("adjustment")
-                if adjustment_node:
-                    col.enabled = not global_layer.lock_layer
-                    col.label(text="Adjustment Settings:", icon='SHADERFX')
-                    col.template_node_inputs(adjustment_node)
+                case 'ADJUSTMENT':
+                    adjustment_node = global_layer.find_node("adjustment")
+                    if adjustment_node:
+                        col.enabled = not global_layer.lock_layer
+                        col.label(text="Adjustment Settings:", icon='SHADERFX')
+                        col.template_node_inputs(adjustment_node)
 
-            case 'RANDOM':
-                random_node = global_layer.find_node("add_2")
-                if random_node:
-                    col.enabled = not global_layer.lock_layer
-                    col.label(text="Random Settings:", icon='SHADERFX')
-                    col.prop(
-                        random_node.inputs[1], "default_value", text="Random Seed")
-            case _:
-                pass
+                case 'RANDOM':
+                    random_node = global_layer.find_node("add_2")
+                    if random_node:
+                        col.enabled = not global_layer.lock_layer
+                        col.label(text="Random Settings:", icon='SHADERFX')
+                        col.prop(
+                            random_node.inputs[1], "default_value", text="Random Seed")
+                case _:
+                    pass
+
+# Grease Pencil Layer Settings
+
+def disable_if_lock(self, context):
+    active_layer = context.grease_pencil.layers.active
+    layout = self.layout
+    layout.enabled = not active_layer.lock
+
+class MAT_PT_GreasePencilMaskSettings(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_GreasePencilMaskSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Mask"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.ps_object.type == 'GREASEPENCIL'
+
+    def draw_header(self, context):
+        GreasePencil_LayerMaskPanel.draw_header(self, context)
+        disable_if_lock(self, context)
+    
+    def draw(self, context):
+        GreasePencil_LayerMaskPanel.draw(self, context)
+        disable_if_lock(self, context)
+
+class MAT_PT_GreasePencilOnionSkinningSettings(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_GreasePencilOnionSkinningSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Onion Skinning"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.ps_object.type == 'GREASEPENCIL'
+    
+    def draw(self, context):
+        DATA_PT_grease_pencil_onion_skinning.draw(self, context)
+        disable_if_lock(self, context)
+    
+    def draw_header(self, context):
+        layout = self.layout
+        active_layer = context.grease_pencil.layers.active
+        layout.prop(active_layer, "use_onion_skinning", text="", toggle=0)
+        disable_if_lock(self, context)
 
 
+# Paint System Layer Settings Advanced
 class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_PaintSystemLayerSettingsAdvanced'
     bl_space_type = "VIEW_3D"
@@ -671,6 +800,8 @@ classes = (
     MAT_MT_LayerMenu,
     MAT_PT_Layers,
     MAT_PT_LayerSettings,
+    MAT_PT_GreasePencilMaskSettings,
+    MAT_PT_GreasePencilOnionSkinningSettings,
     MAT_PT_PaintSystemLayerSettingsAdvanced,
     MAT_PT_Actions,
     PAINTSYSTEM_UL_Actions,

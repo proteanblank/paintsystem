@@ -46,7 +46,7 @@ def get_icon_from_type(type: str) -> int:
     
 #     @classmethod
 #     def poll(cls, context):
-#         ps_ctx = cls.ensure_context(context)
+#         ps_ctx = cls.parse_context(context)
 #         return ps_ctx.active_channel is not None
     
 #     coord_type: EnumProperty(
@@ -164,7 +164,7 @@ def get_icon_from_type(type: str) -> int:
 #                     box.prop(self, "image_height")
     
 #     def process_material(self, context):
-#         ps_ctx = self.ensure_context(context)
+#         ps_ctx = self.parse_context(context)
 #         channel = ps_ctx.active_channel
 #         if not channel:
 #             self.report({'ERROR'}, "No active channel found")

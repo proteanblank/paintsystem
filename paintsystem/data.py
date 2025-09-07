@@ -25,6 +25,7 @@ from typing import Optional
 
 # ---
 from ..custom_icons import get_icon
+from ..utils.version import is_newer_than
 from ..preferences import get_preferences
 from ..utils import get_next_unique_name
 from .common import PaintSystemPreferences
@@ -135,15 +136,20 @@ COLOR_SPACE_ENUM = [
         
 #         ps_scene_data = context.scene.get("ps_scene_data", None)
         
-#         ps_object = None
-#         obj = context.active_object
-#         if obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-#             ps_object = obj.parent
-#         if obj and obj.type == 'MESH':
-#             ps_object = obj
-            
-#         if not obj or obj.type != 'MESH' or not ps_object:
-#             obj = None
+        # ps_object = None
+        # obj = context.active_object
+        # match obj.type:
+        #     case 'EMPTY':
+        #         if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+        #             ps_object = obj.parent
+        #     case 'MESH':
+        #         ps_object = obj
+        #     case 'GREASEPENCIL':
+        #         if is_newer_than(4,3,0):
+        #             ps_object = obj
+        #     case _:
+        #         obj = None
+        #         ps_object = None
 
 #         mat = ps_object.active_material if ps_object else None
         
@@ -1035,13 +1041,18 @@ def parse_context(context: bpy.types.Context) -> PSContext:
     
     ps_object = None
     obj = context.active_object
-    if obj and obj.type == 'EMPTY' and obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-        ps_object = obj.parent
-    if obj and obj.type == 'MESH':
-        ps_object = obj
-        
-    if not obj or obj.type != 'MESH' or not ps_object:
-        obj = None
+    match obj.type:
+        case 'EMPTY':
+            if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+                ps_object = obj.parent
+        case 'MESH':
+            ps_object = obj
+        case 'GREASEPENCIL':
+            if is_newer_than(4,3,0):
+                ps_object = obj
+        case _:
+            obj = None
+            ps_object = None
 
     mat = ps_object.active_material if ps_object else None
     
