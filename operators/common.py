@@ -38,29 +38,29 @@ class MultiMaterialOperator(Operator):
         objects = set()
         objects.add(ps_ctx.ps_object)
         if self.multiple_objects:
-            objects.update(context.selected_objects)
+            for obj in context.selected_objects:
+                if obj.type == 'MESH':
+                    objects.add(obj)
         
         seen_materials = set()
-        for object in objects:
-            if object.type != 'MESH':
-                continue
-            object_mats = object.data.materials
+        for obj in objects:
+            object_mats = obj.data.materials
             if object_mats:
                 if self.multiple_materials:
                     for mat in object_mats:
                         if mat in seen_materials:
                             continue
-                        with context.temp_override(object=object, active_object=object, selected_objects=[object], active_material=mat):
+                        with context.temp_override(object=obj, active_object=obj, selected_objects=[obj], active_material=mat):
                             error_count += not bool(self.process_material(bpy.context))
                         seen_materials.add(mat)
                 else:
-                    if object.active_material in seen_materials:
+                    if obj.active_material in seen_materials:
                         continue
-                    with context.temp_override(object=object, active_object=object, selected_objects=[object], active_material=object.active_material):
+                    with context.temp_override(object=obj, active_object=obj, selected_objects=[obj], active_material=obj.active_material):
                         error_count += not bool(self.process_material(bpy.context))
-                    seen_materials.add(object.active_material)
+                    seen_materials.add(obj.active_material)
             else:
-                with context.temp_override(object=object, active_object=object, selected_objects=[object]):
+                with context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
                     error_count += not bool(self.process_material(bpy.context))
         
         if error_count > 0:
