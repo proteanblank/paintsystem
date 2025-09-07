@@ -1,6 +1,8 @@
 import bpy
 from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTree
 from bpy.utils import register_classes_factory
+
+from ..utils.version import is_newer_than
 from .common import PSContextMixin, scale_content, get_global_layer, icon_parser, get_icon, get_icon_from_channel
 
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
@@ -11,10 +13,11 @@ from ..paintsystem.data import (
     sort_actions
 )
 
-from bl_ui.properties_data_grease_pencil import (
-    GreasePencil_LayerMaskPanel,
-    DATA_PT_grease_pencil_onion_skinning,
-)
+if is_newer_than(4,3):
+    from bl_ui.properties_data_grease_pencil import (
+        GreasePencil_LayerMaskPanel,
+        DATA_PT_grease_pencil_onion_skinning,
+    )
 
 
 def is_image_painted(image: Image | ImagePreview) -> bool:
@@ -551,7 +554,7 @@ class MAT_PT_GreasePencilMaskSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.ps_object.type == 'GREASEPENCIL'
+        return ps_ctx.ps_object.type == 'GREASEPENCIL' and is_newer_than(4,3)
 
     def draw_header(self, context):
         GreasePencil_LayerMaskPanel.draw_header(self, context)
@@ -573,7 +576,7 @@ class MAT_PT_GreasePencilOnionSkinningSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.ps_object.type == 'GREASEPENCIL'
+        return ps_ctx.ps_object.type == 'GREASEPENCIL' and is_newer_than(4,3)
     
     def draw(self, context):
         DATA_PT_grease_pencil_onion_skinning.draw(self, context)
