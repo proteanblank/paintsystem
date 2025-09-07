@@ -613,7 +613,7 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
     def get_node_groups(self, context: Context):
         node_groups = []
         for node_group in bpy.data.node_groups:
-            if node_group.bl_idname == 'ShaderNodeTree' and not node_group.name.startswith(".PS") and not node_group.name.startswith("Paint System"):
+            if node_group.bl_idname == 'ShaderNodeTree' and not node_group.name.startswith(".PS") and not node_group.name.startswith("Paint System") and not node_group.name.startswith("PS_"):
                 node_groups.append((node_group.name, node_group.name, ""))
         return node_groups
     
@@ -691,6 +691,8 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
         return ps_ctx.active_channel is not None
     
     def process_material(self, context):
+        if not self.node_tree_name:
+            return {'CANCELLED'}
         ps_ctx = self.ensure_context(context)
         print("Selected node tree:", self.node_tree_name)
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
@@ -714,6 +716,10 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
     def draw(self, context):
         layout = self.layout
         layout.label(text="Select node tree:", icon='NODETREE')
+        available_node_trees = self.get_node_groups(context)
+        if not available_node_trees:
+            layout.label(text="No supported node trees found", icon='ERROR')
+            return
         row = layout.row()
         scale_content(context, row, 1.5, 1.5)
         row.prop(self, "node_tree_name", text="")

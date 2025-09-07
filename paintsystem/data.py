@@ -1047,6 +1047,131 @@ class PSContextMixin:
         """Parse the context and return a plain dict. Provided for convenience."""
         return _parse_context(context)
 
+
+# Legacy properties (for backward compatibility)
+class PaintSystemLegacyLayer(PropertyGroup):
+
+    name: StringProperty(
+        name="Name",
+        description="Layer name",
+        default="Layer",
+    )
+    enabled: BoolProperty(
+        name="Enabled",
+        description="Toggle layer visibility",
+        default=True,
+    )
+    image: PointerProperty(
+        name="Image",
+        type=Image
+    )
+    type: EnumProperty(
+        items=[
+        ('FOLDER', "Folder", "Folder layer"),
+        ('IMAGE', "Image", "Image layer"),
+        ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
+        ('ATTRIBUTE', "Attribute", "Attribute layer"),
+        ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
+        ('SHADER', "Shader", "Shader layer"),
+        ('NODE_GROUP', "Node Group", "Node Group layer"),
+        ('GRADIENT', "Gradient", "Gradient layer"),
+    ],
+        default='IMAGE'
+    )
+    sub_type: StringProperty(
+        name="Sub Type",
+        default="",
+    )
+    clip: BoolProperty(
+        name="Clip to Below",
+        description="Clip the layer to the one below",
+        default=False,
+    )
+    lock_alpha: BoolProperty(
+        name="Lock Alpha",
+        description="Lock the alpha channel",
+        default=False,
+    )
+    lock_layer: BoolProperty(
+        name="Lock Layer",
+        description="Lock the layer",
+        default=False,
+    )
+    node_tree: PointerProperty(
+        name="Node Tree",
+        type=NodeTree
+    )
+    edit_mask: BoolProperty(
+        name="Edit Mask",
+        description="Edit mask",
+        default=False,
+    )
+    mask_image: PointerProperty(
+        name="Mask Image",
+        type=Image,
+    )
+    enable_mask: BoolProperty(
+        name="Enabled Mask",
+        description="Toggle mask visibility",
+        default=False,
+    )
+    mask_uv_map: StringProperty(
+        name="Mask UV Map",
+        default="",
+    )
+    external_image: PointerProperty(
+        name="Edit External Image",
+        type=Image,
+    )
+    expanded: BoolProperty(
+        name="Expanded",
+        description="Expand the layer",
+        default=True,
+    )
+
+class PaintSystemLegacyGroup(PropertyGroup):
+# Define the collection property directly in the class
+    items: CollectionProperty(type=PaintSystemLegacyLayer)
+    name: StringProperty(
+        name="Name",
+        description="Group name",
+        default="Group",
+    )
+    active_index: IntProperty(
+        name="Active Index",
+        description="Active layer index",
+    )
+    node_tree: PointerProperty(
+        name="Node Tree",
+        type=bpy.types.NodeTree
+    )
+    bake_image: PointerProperty(
+        name="Bake Image",
+        type=Image
+    )
+    bake_uv_map: StringProperty(
+        name="Bake Image UV Map",
+        default="UVMap",
+    )
+    use_bake_image: BoolProperty(
+        name="Use Bake Image",
+        default=False,
+    )
+
+
+class PaintSystemLegacyGroups(PropertyGroup):
+    name: StringProperty(
+        name="Name",
+        description="Paint system name",
+        default="Paint System"
+    )
+    groups: CollectionProperty(type=PaintSystemLegacyGroup)
+    use_paintsystem_uv: BoolProperty(
+        name="Use Paint System UV",
+        description="Use the Paint System UV Map",
+        default=True
+    )
+
 classes = (
     MarkerAction,
     GlobalLayer,
@@ -1055,6 +1180,9 @@ classes = (
     Group,
     PaintSystemGlobalData,
     MaterialData,
+    PaintSystemLegacyLayer,
+    PaintSystemLegacyGroup,
+    PaintSystemLegacyGroups,
     )
 
 @persistent
