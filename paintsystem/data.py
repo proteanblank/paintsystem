@@ -1412,6 +1412,7 @@ def register():
         name="Paint System Material Data",
         description="Material Data for the Paint System"
     )
+    bpy.types.Material.paint_system = PointerProperty(type=LegacyPaintSystemGroups)
     bpy.app.handlers.save_pre.append(save_handler)
     bpy.app.handlers.load_post.append(refresh_image)
     
