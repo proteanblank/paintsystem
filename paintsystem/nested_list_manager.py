@@ -1,6 +1,6 @@
 import bpy
 from bpy.props import StringProperty, IntProperty, EnumProperty
-from bpy.types import (PropertyGroup, UIList, Operator, Panel)
+from bpy.types import (PropertyGroup, Operator)
 from bpy.utils import register_classes_factory
 
 class BaseNestedListItem(PropertyGroup):

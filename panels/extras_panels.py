@@ -4,7 +4,6 @@ from bpy.utils import register_classes_factory
 
 from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name, scale_content
 from ..utils.version import is_newer_than
-from ..utils.unified_brushes import get_unified_settings
 
 from bl_ui.properties_paint_common import (
     UnifiedPaintPanel,
@@ -67,7 +66,7 @@ class MAT_PT_Brush(PSContextMixin, Panel, UnifiedPaintPanel):
 
     def draw_header_preset(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         settings = self.paint_settings(context)
         brush = settings.brush
         obj = ps_ctx.ps_object
@@ -83,7 +82,7 @@ class MAT_PT_Brush(PSContextMixin, Panel, UnifiedPaintPanel):
             
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         settings = self.paint_settings(context)
         brush = settings.brush
         mode = self.get_brush_mode(context)
@@ -124,12 +123,12 @@ class MAT_PT_BrushAdvanced(PSContextMixin, Panel):
     
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         return ps_ctx.ps_object.type == 'MESH'
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         image_paint = context.tool_settings.image_paint
         layout.prop(image_paint, "use_occlude", text="Occlude Faces")
         layout.prop(image_paint, "use_backface_culling", text="Backface Culling")
@@ -154,7 +153,7 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         settings = cls.paint_settings(context)
         if not settings:
             return False
@@ -190,7 +189,7 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         col = layout.column()
         settings = self.paint_settings(context)
         brush = settings.brush

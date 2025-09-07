@@ -12,13 +12,13 @@ class MAT_MT_ImageMenu(PSContextMixin, Menu):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.ensure_context(context)
+        ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         return global_layer and global_layer.image
 
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         image_name = global_layer.image.name
         layout.operator("paint_system.export_active_layer",
@@ -80,7 +80,7 @@ class PAINTSYSTEM_OT_ExportActiveLayer(PSContextMixin, Operator):
     bl_description = "Save the active image"
 
     def execute(self, context):
-        ps_ctx = self.ensure_context(context)
+        ps_ctx = self.parse_context(context)
         active_layer = ps_ctx.active_layer
         image = active_layer.image
         with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):

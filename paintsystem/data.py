@@ -18,8 +18,10 @@ from bpy.types import (
     NodeTree,
     Object,
     PropertyGroup,
+    Material,
 )
 from bpy.utils import register_classes_factory
+from typing import Optional
 
 # ---
 from ..custom_icons import get_icon
@@ -115,86 +117,86 @@ COLOR_SPACE_ENUM = [
     ('NONCOLOR', "Non-Color", "Non-Color"),
 ]
 
-def _parse_context(context: bpy.types.Context) -> dict:
-        """
-        Parses the Blender context to extract relevant information for the paint system.
+# def _parse_context(context: bpy.types.Context) -> dict:
+#         """
+#         Parses the Blender context to extract relevant information for the paint system.
         
-        Args:
-            context (bpy.types.Context): The Blender context to parse.
+#         Args:
+#             context (bpy.types.Context): The Blender context to parse.
             
-        Returns:
-            dict: A dictionary containing parsed context information.
-        """
-        if not context:
-            raise ValueError("Context cannot be None")
-        if not isinstance(context, bpy.types.Context):
-            raise TypeError("context must be of type bpy.types.Context")
+#         Returns:
+#             dict: A dictionary containing parsed context information.
+#         """
+#         if not context:
+#             raise ValueError("Context cannot be None")
+#         if not isinstance(context, bpy.types.Context):
+#             raise TypeError("context must be of type bpy.types.Context")
         
-        ps_settings = get_preferences(context)
+#         ps_settings = get_preferences(context)
         
-        ps_scene_data = context.scene.get("ps_scene_data", None)
+#         ps_scene_data = context.scene.get("ps_scene_data", None)
         
-        ps_object = None
-        obj = context.active_object
-        match obj.type:
-            case 'EMPTY':
-                if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-                    ps_object = obj.parent
-            case 'MESH':
-                ps_object = obj
-            case 'GREASEPENCIL':
-                if is_newer_than(4,3,0):
-                    ps_object = obj
-            case _:
-                obj = None
-                ps_object = None
+        # ps_object = None
+        # obj = context.active_object
+        # match obj.type:
+        #     case 'EMPTY':
+        #         if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+        #             ps_object = obj.parent
+        #     case 'MESH':
+        #         ps_object = obj
+        #     case 'GREASEPENCIL':
+        #         if is_newer_than(4,3,0):
+        #             ps_object = obj
+        #     case _:
+        #         obj = None
+        #         ps_object = None
 
-        mat = ps_object.active_material if ps_object else None
+#         mat = ps_object.active_material if ps_object else None
         
-        mat_data = None
-        groups = None
-        active_group = None
-        if mat and hasattr(mat, 'ps_mat_data') and mat.ps_mat_data:
-            mat_data = mat.ps_mat_data
-            groups = mat_data.groups
-            if groups and mat_data.active_index >= 0:
-                active_group = groups[mat_data.active_index]
+#         mat_data = None
+#         groups = None
+#         active_group = None
+#         if mat and hasattr(mat, 'ps_mat_data') and mat.ps_mat_data:
+#             mat_data = mat.ps_mat_data
+#             groups = mat_data.groups
+#             if groups and mat_data.active_index >= 0:
+#                 active_group = groups[mat_data.active_index]
         
-        channels = None
-        active_channel = None
-        if active_group:
-            channels = active_group.channels
-            if channels and active_group.active_index >= 0:
-                active_channel = channels[active_group.active_index]
+#         channels = None
+#         active_channel = None
+#         if active_group:
+#             channels = active_group.channels
+#             if channels and active_group.active_index >= 0:
+#                 active_channel = channels[active_group.active_index]
 
-        layers = None
-        active_layer = None
-        if active_channel:
-            layers = active_channel.layers
-            if layers and active_channel.active_index >= 0:
-                active_layer = layers[active_channel.active_index]
+#         layers = None
+#         active_layer = None
+#         if active_channel:
+#             layers = active_channel.layers
+#             if layers and active_channel.active_index >= 0:
+#                 active_layer = layers[active_channel.active_index]
         
-        return {
-            "ps_settings": ps_settings,
-            "ps_scene_data": ps_scene_data,
-            "active_object": obj,
-            "ps_object": ps_object,
-            "active_material": mat,
-            "ps_mat_data": mat_data,
-            "groups": groups,
-            "active_group": active_group,
-            "channels": channels,
-            "active_channel": active_channel,
-            "layers": layers,
-            "active_layer": active_layer,
-            "active_global_layer": get_global_layer(active_layer) if active_layer else None
-        }
+#         return {
+#             "ps_settings": ps_settings,
+#             "ps_scene_data": ps_scene_data,
+#             "active_object": obj,
+#             "ps_object": ps_object,
+#             "active_material": mat,
+#             "ps_mat_data": mat_data,
+#             "groups": groups,
+#             "active_group": active_group,
+#             "channels": channels,
+#             "active_channel": active_channel,
+#             "layers": layers,
+#             "active_layer": active_layer,
+#             "active_global_layer": get_global_layer(active_layer) if active_layer else None
+#         }
 
 def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
     if context.mode != 'PAINT_TEXTURE':
         return
-    ps_ctx = _parse_context(context)
-    global_layer = ps_ctx["active_global_layer"]
+    ps_ctx = parse_context(context)
+    global_layer = ps_ctx.active_global_layer
     if not global_layer:
         return
     brush = context.tool_settings.image_paint.brush
@@ -204,14 +206,14 @@ def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
 
 def update_active_image(self=None, context: bpy.types.Context = None):
     context = context or bpy.context
-    ps_ctx = _parse_context(context)
+    ps_ctx = parse_context(context)
     image_paint = context.tool_settings.image_paint
-    obj = ps_ctx["ps_object"]
-    mat = ps_ctx["active_material"]
-    active_channel = ps_ctx["active_channel"]
+    obj = ps_ctx.ps_object
+    mat = ps_ctx.active_material
+    active_channel = ps_ctx.active_channel
     if not mat or not active_channel:
         return
-    global_layer = ps_ctx["active_global_layer"]
+    global_layer = ps_ctx.active_global_layer
     update_brush_settings(self, context)
     if not global_layer:
         return
@@ -230,20 +232,20 @@ def update_active_image(self=None, context: bpy.types.Context = None):
             obj.data.uv_layers[global_layer.uv_map_name].active = True
 
 def update_active_layer(self, context):
-    ps_ctx = _parse_context(context)
-    active_layer = ps_ctx["active_layer"]
+    ps_ctx = parse_context(context)
+    active_layer = ps_ctx.active_layer
     if active_layer:
         active_layer.update_node_tree(context)
 
 def update_active_channel(self, context):
-    ps_ctx = _parse_context(context)
-    active_channel = ps_ctx["active_channel"]
+    ps_ctx = parse_context(context)
+    active_channel = ps_ctx.active_channel
     if active_channel:
         active_channel.update_node_tree(context)
 
 def update_active_group(self, context):
-    ps_ctx = _parse_context(context)
-    active_group = ps_ctx["active_group"]
+    ps_ctx = parse_context(context)
+    active_group = ps_ctx.active_group
     if active_group:
         active_group.update_node_tree(context)
 
@@ -305,7 +307,7 @@ class MarkerAction(PropertyGroup):
 class GlobalLayer(PropertyGroup):
             
     def update_node_tree(self, context):
-        self.node_tree.name = f".PS_Layer ({self.uid})"
+        self.node_tree.name = f".PS_Layer ({self.name})"
         
         match self.type:
             case "IMAGE":
@@ -373,7 +375,7 @@ class GlobalLayer(PropertyGroup):
     #         return self.post_mix_node.inputs["Factor"].default_value
     #     return 1.0
     
-    uid: StringProperty()
+    name: StringProperty()
     
     # name: StringProperty(
     #     name="Name",
@@ -557,7 +559,9 @@ class Channel(BaseNestedListManager):
             for layer, _ in flattened_layers:
                 previous_data = previous_dict.get(layer.parent_id, None)
                 global_layer = get_global_layer(layer)
-                layer_identifier = global_layer.uid
+                if not global_layer:
+                    continue
+                layer_identifier = global_layer.name
                 node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree}, {"Clip": global_layer.is_clip})
                 # match global_layer.type:
                 #     case "IMAGE":
@@ -630,7 +634,7 @@ class Channel(BaseNestedListManager):
             return
         self.node_tree.name = f".PS_Channel ({self.name})"
         self.updating_name_flag = True
-        parsed_context = _parse_context(context)
+        parsed_context = parse_context(context)
         active_group = parsed_context.get("active_group")
         new_name = get_next_unique_name(self.name, [channel.name for channel in active_group.channels if channel != self])
         if new_name != self.name:
@@ -966,10 +970,10 @@ class MaterialData(PropertyGroup):
 
 def get_global_layer(layer: Layer) -> GlobalLayer | None:
     """Get the global layer data from the context."""
-    if not layer or not bpy.context.scene or not bpy.context.scene.get("ps_scene_data"):
+    if not layer or not bpy.context.scene or not bpy.context.scene.ps_scene_data:
         return None
     for global_layer in bpy.context.scene.ps_scene_data.layers:
-        if global_layer.uid == layer.ref_layer_id:
+        if global_layer.name == layer.ref_layer_id:
             return global_layer
     return None
 
@@ -982,7 +986,7 @@ def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
             for group in material.ps_mat_data.groups:
                 for channel in group.channels:
                     for layer in channel.layers:
-                        if layer.ref_layer_id == global_layer.uid:
+                        if layer.ref_layer_id == global_layer.name:
                             count += 1
     return count > 1
 
@@ -1026,32 +1030,308 @@ class PSContext:
 
 def parse_context(context: bpy.types.Context) -> PSContext:
     """Parse the context and return a PSContext object."""
-    parsed_context = _parse_context(context)
+    if not context:
+        raise ValueError("Context cannot be None")
+    if not isinstance(context, bpy.types.Context):
+        raise TypeError("context must be of type bpy.types.Context")
+    
+    ps_settings = get_preferences(context)
+    
+    ps_scene_data = context.scene.get("ps_scene_data", None)
+    
+    ps_object = None
+    obj = context.active_object
+    match obj.type:
+        case 'EMPTY':
+            if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
+                ps_object = obj.parent
+        case 'MESH':
+            ps_object = obj
+        case 'GREASEPENCIL':
+            if is_newer_than(4,3,0):
+                ps_object = obj
+        case _:
+            obj = None
+            ps_object = None
+
+    mat = ps_object.active_material if ps_object else None
+    
+    mat_data = None
+    groups = None
+    active_group = None
+    if mat and hasattr(mat, 'ps_mat_data') and mat.ps_mat_data:
+        mat_data = mat.ps_mat_data
+        groups = mat_data.groups
+        if groups and mat_data.active_index >= 0:
+            active_group = groups[mat_data.active_index]
+    
+    channels = None
+    active_channel = None
+    if active_group:
+        channels = active_group.channels
+        if channels and active_group.active_index >= 0:
+            active_channel = channels[active_group.active_index]
+
+    layers = None
+    active_layer = None
+    if active_channel:
+        layers = active_channel.layers
+        if layers and active_channel.active_index >= 0:
+            active_layer = layers[active_channel.active_index]
     return PSContext(
-        ps_settings=parsed_context.get("ps_settings"),
-        ps_scene_data=parsed_context.get("ps_scene_data"),
-        active_object=parsed_context.get("active_object"),
-        ps_object=parsed_context.get("ps_object"),
-        active_material=parsed_context.get("active_material"),
-        ps_mat_data=parsed_context.get("ps_mat_data"),
-        active_group=parsed_context.get("active_group"),
-        active_channel=parsed_context.get("active_channel"),
-        active_layer=parsed_context.get("active_layer"),
-        active_global_layer=parsed_context.get("active_global_layer")
+        ps_settings=ps_settings,
+        ps_scene_data=ps_scene_data,
+        active_object=obj,
+        ps_object=ps_object,
+        active_material=mat,
+        ps_mat_data=mat_data,
+        active_group=active_group,
+        active_channel=active_channel,
+        active_layer=active_layer,
+        active_global_layer=get_global_layer(active_layer) if active_layer else None
     )
 
 class PSContextMixin:
     """A mixin for classes that need access to the paint system context."""
 
     @staticmethod
-    def ensure_context(context: bpy.types.Context) -> PSContext:
+    def parse_context(context: bpy.types.Context) -> PSContext:
         """Return a PSContext parsed from Blender context. Safe to call from class or instance methods."""
         return parse_context(context)
 
-    @staticmethod
-    def parse_context(context: bpy.types.Context) -> dict:
-        """Parse the context and return a plain dict. Provided for convenience."""
-        return _parse_context(context)
+
+# Legacy properties (for backward compatibility)
+class LegacyPaintSystemLayer(PropertyGroup):
+
+    name: StringProperty(
+        name="Name",
+        description="Layer name",
+        default="Layer",
+    )
+    enabled: BoolProperty(
+        name="Enabled",
+        description="Toggle layer visibility",
+        default=True,
+    )
+    image: PointerProperty(
+        name="Image",
+        type=Image
+    )
+    type: EnumProperty(
+        items=[
+        ('FOLDER', "Folder", "Folder layer"),
+        ('IMAGE', "Image", "Image layer"),
+        ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
+        ('ATTRIBUTE', "Attribute", "Attribute layer"),
+        ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
+        ('SHADER', "Shader", "Shader layer"),
+        ('NODE_GROUP', "Node Group", "Node Group layer"),
+        ('GRADIENT', "Gradient", "Gradient layer"),
+    ],
+        default='IMAGE'
+    )
+    sub_type: StringProperty(
+        name="Sub Type",
+        default="",
+    )
+    clip: BoolProperty(
+        name="Clip to Below",
+        description="Clip the layer to the one below",
+        default=False,
+    )
+    lock_alpha: BoolProperty(
+        name="Lock Alpha",
+        description="Lock the alpha channel",
+        default=False,
+    )
+    lock_layer: BoolProperty(
+        name="Lock Layer",
+        description="Lock the layer",
+        default=False,
+    )
+    node_tree: PointerProperty(
+        name="Node Tree",
+        type=NodeTree
+    )
+    edit_mask: BoolProperty(
+        name="Edit Mask",
+        description="Edit mask",
+        default=False,
+    )
+    mask_image: PointerProperty(
+        name="Mask Image",
+        type=Image,
+    )
+    enable_mask: BoolProperty(
+        name="Enabled Mask",
+        description="Toggle mask visibility",
+        default=False,
+    )
+    mask_uv_map: StringProperty(
+        name="Mask UV Map",
+        default="",
+    )
+    external_image: PointerProperty(
+        name="Edit External Image",
+        type=Image,
+    )
+    expanded: BoolProperty(
+        name="Expanded",
+        description="Expand the layer",
+        default=True,
+    )
+
+class LegacyPaintSystemGroup(PropertyGroup):
+# Define the collection property directly in the class
+    items: CollectionProperty(type=LegacyPaintSystemLayer)
+    name: StringProperty(
+        name="Name",
+        description="Group name",
+        default="Group",
+    )
+    active_index: IntProperty(
+        name="Active Index",
+        description="Active layer index",
+    )
+    node_tree: PointerProperty(
+        name="Node Tree",
+        type=bpy.types.NodeTree
+    )
+    bake_image: PointerProperty(
+        name="Bake Image",
+        type=Image
+    )
+    bake_uv_map: StringProperty(
+        name="Bake Image UV Map",
+        default="UVMap",
+    )
+    use_bake_image: BoolProperty(
+        name="Use Bake Image",
+        default=False,
+    )
+
+
+class LegacyPaintSystemGroups(PropertyGroup):
+    name: StringProperty(
+        name="Name",
+        description="Paint system name",
+        default="Paint System"
+    )
+    groups: CollectionProperty(type=LegacyPaintSystemGroup)
+    use_paintsystem_uv: BoolProperty(
+        name="Use Paint System UV",
+        description="Use the Paint System UV Map",
+        default=True
+    )
+
+class LegacyPaintSystemContextParser:
+    def __init__(self, context: bpy.types.Context):
+        self.context = context
+        self.active_object = context.object
+        self.groups = self.get_groups()
+        # layer_node_tree = self.get_active_layer().node_tree
+        # self.layer_node_group = self.get_active_layer_node_group()
+        self.color_mix_node = self.find_color_mix_node()
+        self.uv_map_node = self.find_uv_map_node()
+        self.opacity_mix_node = self.find_opacity_mix_node()
+        self.clip_mix_node = self.find_clip_mix_node()
+        self.rgb_node = self.find_rgb_node()
+        
+    def get_active_material(self) -> Optional[Material]:
+        if not self.active_object or self.active_object.type != 'MESH':
+            return None
+
+        return self.active_object.active_material
+
+    def get_material_settings(self):
+        mat = self.get_active_material()
+        if not mat or not hasattr(mat, "paint_system"):
+            return None
+        return mat.paint_system
+
+    def get_groups(self) -> Optional[PropertyGroup]:
+        paint_system = self.get_material_settings()
+        if not paint_system:
+            return None
+        return paint_system.groups
+
+    def get_active_group(self) -> Optional[PropertyGroup]:
+        paint_system = self.get_material_settings()
+        if not paint_system or len(paint_system.groups) == 0:
+            return None
+        active_group_idx = int(paint_system.active_group)
+        if active_group_idx >= len(paint_system.groups):
+            return None  # handle cases where active index is invalid
+        return paint_system.groups[active_group_idx]
+
+    def get_active_layer(self) -> Optional[PropertyGroup]:
+        active_group = self.get_active_group()
+        if not active_group or len(active_group.items) == 0 or active_group.active_index >= len(active_group.items):
+            return None
+
+        return active_group.items[active_group.active_index]
+
+    def get_layer_node_tree(self) -> Optional[NodeTree]:
+        active_layer = self.get_active_layer()
+        if not active_layer:
+            return None
+        return active_layer.node_tree
+
+    def get_active_layer_node_group(self) -> Optional[Node]:
+        active_group = self.get_active_group()
+        layer_node_tree = self.get_active_layer().node_tree
+        if not layer_node_tree:
+            return None
+        node_details = {'type': 'GROUP', 'node_tree': layer_node_tree}
+        node = self.find_node(active_group.node_tree, node_details)
+        return node
+
+    def find_color_mix_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'type': 'MIX', 'data_type': 'RGBA'}
+        return self.find_node(layer_node_tree, node_details)
+
+    def find_uv_map_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'type': 'UVMAP'}
+        return self.find_node(layer_node_tree, node_details)
+
+    def find_opacity_mix_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'type': 'MIX', 'name': 'Opacity'}
+        return self.find_node(layer_node_tree, node_details) or self.find_color_mix_node()
+
+    def find_clip_mix_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'type': 'MIX', 'name': 'Clip'}
+        return self.find_node(layer_node_tree, node_details)
+
+    def find_image_texture_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'type': 'TEX_IMAGE'}
+        return self.find_node(layer_node_tree, node_details)
+
+    def find_rgb_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'name': 'RGB'}
+        return self.find_node(layer_node_tree, node_details)
+
+    def find_adjustment_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'label': 'Adjustment'}
+        return self.find_node(layer_node_tree, node_details)
+
+    def find_node_group(self, node_tree: NodeTree) -> Optional[Node]:
+        node_tree = self.get_active_group().node_tree
+        for node in node_tree.nodes:
+            if hasattr(node, 'node_tree') and node.node_tree and node.node_tree.name == node_tree.name:
+                return node
+        return None
+    
+    def find_attribute_node(self) -> Optional[Node]:
+        layer_node_tree = self.get_active_layer().node_tree
+        node_details = {'type': 'ATTRIBUTE'}
+        return self.find_node(layer_node_tree, node_details)
 
 classes = (
     MarkerAction,
@@ -1061,6 +1341,9 @@ classes = (
     Group,
     PaintSystemGlobalData,
     MaterialData,
+    LegacyPaintSystemLayer,
+    LegacyPaintSystemGroup,
+    LegacyPaintSystemGroups,
     )
 
 @persistent
