@@ -97,7 +97,7 @@ class MAT_PT_Brush(PSContextMixin, Panel, UnifiedPaintPanel):
             row.popover(
                 panel="MAT_PT_BrushTooltips",
                 text='Shortcuts!',
-                icon='INFO_LARGE'
+                icon='INFO_LARGE' if is_newer_than(4,3) else 'INFO'
             )
         col = box.column(align=True)
         scale_content(context, col, scale_x=1, scale_y=1.2)
