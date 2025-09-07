@@ -528,7 +528,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
             empty_object = bpy.data.objects.new(f"{ps_ctx.active_group.name} {self.layer_name}", None)
             empty_object.parent = ps_ctx.ps_object
             collection.objects.link(empty_object)
-        empty_object.location = ps_ctx.ps_object.location
+        # empty_object.location = ps_ctx.ps_object.location
         if self.gradient_type == 'LINEAR':
             empty_object.empty_display_type = 'SINGLE_ARROW'
         elif self.gradient_type == 'RADIAL':
@@ -539,6 +539,23 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
+
+
+class PAINTSYSTEM_OT_SelectGradientEmpty(PSContextMixin, Operator):
+    """Select the gradient empty"""
+    bl_idname = "paint_system.select_gradient_empty"
+    bl_label = "Select Gradient Empty"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    
+    def execute(self, context):
+        ps_ctx = self.ensure_context(context)
+        empty_object = ps_ctx.active_global_layer.empty_object
+        if empty_object:
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.context.view_layer.objects.active = empty_object
+            empty_object.select_set(True)
         return {'FINISHED'}
 
 
@@ -1161,6 +1178,7 @@ classes = (
     PAINTSYSTEM_OT_NewAdjustment,
     PAINTSYSTEM_OT_NewShader,
     PAINTSYSTEM_OT_NewGradient,
+    PAINTSYSTEM_OT_SelectGradientEmpty,
     PAINTSYSTEM_OT_NewRandomColor,
     PAINTSYSTEM_OT_NewCustomNodeGroup,
     PAINTSYSTEM_OT_DeleteItem,

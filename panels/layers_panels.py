@@ -423,6 +423,8 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     col.use_property_split = True
                     col.use_property_decorate = False
                     col.enabled = not global_layer.lock_layer
+                    col.operator("paint_system.select_gradient_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
+                    col.separator()
                     col.label(text="Gradient Settings:", icon='SHADERFX')
                     col.template_node_inputs(gradient_node)
                     col.separator()
