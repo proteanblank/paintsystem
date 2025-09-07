@@ -112,7 +112,7 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
                 row.operator("object.material_slot_select", text="Select")
                 row.operator("object.material_slot_deselect", text="Deselect")
         
-        if check_group_multiuser(ps_ctx.active_group.node_tree):
+        if ps_ctx.active_group and check_group_multiuser(ps_ctx.active_group.node_tree):
             # Show a warning
             box = layout.box()
             box.alert = True

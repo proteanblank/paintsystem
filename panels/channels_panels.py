@@ -70,7 +70,7 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
         ob = context.object
-        if check_group_multiuser(ps_ctx.active_group.node_tree):
+        if ps_ctx.active_group and check_group_multiuser(ps_ctx.active_group.node_tree):
             return False
         return ps_ctx.ps_mat_data and ps_ctx.active_group is not None and ob.mode == 'OBJECT'
     
