@@ -60,7 +60,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
     group_name: bpy.props.StringProperty(
         name="Group Name",
         description="Name of the new group",
-        default="New Group",
+        default="Paint System (New Group)",
     )
 
     use_alpha_blend: BoolProperty(
@@ -134,11 +134,11 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
         if self.set_view_transform:
             context.scene.view_settings.view_transform = 'Standard'
         
-        node_tree = bpy.data.node_groups.new(name=f"Paint System ({mat.name})", type='ShaderNodeTree')
+        node_tree = bpy.data.node_groups.new(name=self.group_name, type='ShaderNodeTree')
         ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         new_group = lm.add_item()
-        new_group.name = self.group_name
+        # new_group.name = self.group_name
         new_group.node_tree = node_tree
         new_group.update_node_tree(context)
         new_group.template = self.template

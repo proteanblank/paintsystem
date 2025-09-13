@@ -44,7 +44,7 @@ class MATERIAL_UL_PaintSystemGroups(PSContextMixin, UIList):
     bl_label = "Paint System Groups"
     
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
-        layout.prop(item, "name", text="", emboss=False)
+        layout.prop(item.node_tree, "name", text="", emboss=False)
 
 
 class MAT_PT_PaintSystemGroups(PSContextMixin, Panel):
@@ -105,6 +105,7 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
         if ob.type != 'MESH':
             return
         mat = ps_ctx.active_material
+        groups = ps_ctx.ps_mat_data.groups
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
             col = layout.column(align=True)
             row = col.row(align=True)
@@ -129,18 +130,20 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             #     op.index = idx
             
             # row.operator("object.material_slot_add", icon='ADD', text="")
-            row.operator("paint_system.new_group", icon='ADD', text="")
-            row.operator("paint_system.delete_group", icon='REMOVE', text="")
+            ops_row = row.row(align=True)
+            if groups:
+                ops_row.operator("paint_system.new_group", icon='ADD', text="")
+            ops_row.operator("paint_system.delete_group", icon='REMOVE', text="")
             if ob.mode == 'EDIT':
                 row = layout.row(align=True)
                 row.operator("object.material_slot_assign", text="Assign")
                 row.operator("object.material_slot_select", text="Select")
                 row.operator("object.material_slot_deselect", text="Deselect")
         
-        if len(ps_ctx.ps_mat_data.groups) > 1:
+        if len(groups) > 1:
             row = col.row(align=True)
             scale_content(context, row, 1.5, 1.2)
-            row.popover("MAT_PT_PaintSystemGroups", text="Select Group")
+            row.popover("MAT_PT_PaintSystemGroups", text=ps_ctx.active_group.node_tree.name, icon="NODETREE")
         
         if ps_ctx.active_group and check_group_multiuser(ps_ctx.active_group.node_tree):
             # Show a warning

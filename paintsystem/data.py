@@ -704,7 +704,7 @@ class Group(PropertyGroup):
         if not self.node_tree:
             return
         node_tree = self.node_tree
-        node_tree.name = f"Paint System ({self.name})"
+        # node_tree.name = f"Paint System ({self.name})"
         if not isinstance(node_tree, bpy.types.NodeTree):
             return
         
@@ -816,11 +816,11 @@ class Group(PropertyGroup):
                 node_builder.link(channel_name, "group_output", "Alpha", c_alpha_name)
         node_builder.compile()
     
-    name: StringProperty(
-        name="Name",
-        description="Group name",
-        default="Group"
-    )
+    # name: StringProperty(
+    #     name="Name",
+    #     description="Group name",
+    #     default="Paint System (Group)"
+    # )
     channels: CollectionProperty(
         type=Channel,
         name="Channels",
