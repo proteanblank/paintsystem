@@ -997,21 +997,21 @@ def parse_context(context: bpy.types.Context) -> PSContext:
         mat_data = mat.ps_mat_data
         groups = mat_data.groups
         if groups and mat_data.active_index >= 0:
-            active_group = groups[mat_data.active_index]
+            active_group = groups[min(mat_data.active_index, len(groups) - 1)]
     
     channels = None
     active_channel = None
     if active_group:
         channels = active_group.channels
         if channels and active_group.active_index >= 0:
-            active_channel = channels[active_group.active_index]
+            active_channel = channels[min(active_group.active_index, len(channels) - 1)]
 
     layers = None
     active_layer = None
     if active_channel:
         layers = active_channel.layers
         if layers and active_channel.active_index >= 0:
-            active_layer = layers[active_channel.active_index]
+            active_layer = layers[min(active_channel.active_index, len(layers) - 1)]
     return PSContext(
         ps_settings=ps_settings,
         ps_scene_data=ps_scene_data,
