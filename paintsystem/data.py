@@ -618,8 +618,8 @@ class Channel(BaseNestedListManager):
         default='COLOR'
     )
     use_alpha: BoolProperty(
-        name="Use Alpha",
-        description="Use alpha channel in the Paint System",
+        name="Expose Alpha Socket",
+        description="Expose alpha socket in the Paint System group",
         default=True,
         update=update_active_group
     )

@@ -37,29 +37,34 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         default='COLOR'
     )
     use_alpha: bpy.props.BoolProperty(
-        name="Use Alpha",
-        description="Use alpha for the new channel",
-        default=True
+        name="Expose Alpha Socket",
+        description="Expose alpha socket in the Paint System group",
+        default=False,
+        options={'SKIP_SAVE'}
     )
     use_normalize: bpy.props.BoolProperty(
         name="Normalize Channel",
         description="Normalize the channel",
-        default=False
+        default=False,
+        options={'SKIP_SAVE'}
     )
     use_max_min: bpy.props.BoolProperty(
         name="Use Max Min",
         description="Use max min for the channel",
-        default=False
+        default=False,
+        options={'SKIP_SAVE'}
     )
     factor_min: bpy.props.FloatProperty(
         name="Factor Value Min",
         description="Minimum value for the factor",
-        default=0
+        default=0,
+        options={'SKIP_SAVE'}
     )
     factor_max: bpy.props.FloatProperty(
         name="Factor Value Max",
         description="Maximum value for the factor",
-        default=1
+        default=1,
+        options={'SKIP_SAVE'}
     )
     
     def process_material(self, context):
@@ -94,7 +99,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         layout.prop(self, "channel_name", text="Name")
         layout.prop(self, "channel_type", text="Type")
         layout.prop(self, "color_space", text="Color Space")
-        layout.prop(self, "use_alpha", text="Use Alpha")
+        layout.prop(self, "use_alpha", text="Expose Alpha Socket")
         if self.channel_type == "VECTOR":
             layout.prop(self, "use_normalize", text="Normalize")
         unique_name = self.get_unique_channel_name(context)
