@@ -623,29 +623,23 @@ class Channel(BaseNestedListManager):
         default=True,
         update=update_active_group
     )
-    use_factor: BoolProperty(
-        name="Use Factor",
-        description="Use factor for the channel",
-        default=False,
-        update=update_node_tree
-    )
     use_max_min: BoolProperty(
         name="Use Max Min",
         description="Use max min for the channel",
         default=False,
-        update=update_node_tree
+        update=update_active_group
     )
     factor_min: FloatProperty(
         name="Factor Min",
         description="Minimum factor value",
         default=0,
-        update=update_node_tree
+        update=update_active_group
     )
     factor_max: FloatProperty(
         name="Factor Max",
         description="Maximum factor value",
         default=1,
-        update=update_node_tree
+        update=update_active_group
     )
     use_normalize: BoolProperty(
         name="Normalize",
@@ -766,9 +760,8 @@ class Group(PropertyGroup):
                         socket = nt_interface.new_socket(name=socket_name, socket_type=socket_type, in_out=in_out)
                         if hasattr(socket, "subtype") and use_max_min:
                             socket.subtype = "FACTOR"
-                            if use_max_min:
-                                socket.min_value = expected_sockets[idx].min_value
-                                socket.max_value = expected_sockets[idx].max_value
+                            socket.min_value = expected_sockets[idx].min_value
+                            socket.max_value = expected_sockets[idx].max_value
                         nt_interface.move(socket, idx + offset_idx)
                     case "REMOVE":
                         socket = output_sockets[idx]
@@ -786,13 +779,15 @@ class Group(PropertyGroup):
                 if socket.socket_type != expected_sockets[idx].socket_type:
                     socket.socket_type = expected_sockets[idx].socket_type
                 
-                expected_subtype = "FACTOR" if expected_sockets[idx].use_max_min else "NONE"
-                if hasattr(socket, "subtype") and expected_subtype != socket.subtype:
+                if hasattr(socket, "subtype"):
+                    expected_subtype = "FACTOR" if expected_sockets[idx].use_max_min else "NONE"
                     socket.subtype = expected_subtype
                     if expected_sockets[idx].use_max_min:
                         socket.min_value = expected_sockets[idx].min_value
                         socket.max_value = expected_sockets[idx].max_value
-                    socket.default_value = expected_sockets[idx].max_value
+                    else:
+                        socket.min_value = -1e39
+                        socket.max_value = 1e39
         
         ensure_sockets(expected_sockets, "OUTPUT")
         ensure_sockets(expected_sockets, "INPUT")

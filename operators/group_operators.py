@@ -183,11 +183,11 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                     connect_sockets(node_group.outputs['Color Alpha'], principled_node.inputs['Alpha'])
 
                 if self.pbr_add_metallic:
-                    bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Metallic', channel_type='FLOAT', use_alpha=False, use_factor=True)
+                    bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Metallic', channel_type='FLOAT', use_alpha=False, use_max_min=True)
                     transfer_connection(mat_node_tree, principled_node.inputs['Metallic'], node_group.inputs['Metallic'])
                     connect_sockets(node_group.outputs['Metallic'], principled_node.inputs['Metallic'])
                 if self.pbr_add_roughness:
-                    bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Roughness', channel_type='FLOAT', use_alpha=False, use_factor=True)
+                    bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Roughness', channel_type='FLOAT', use_alpha=False, use_max_min=True)
                     transfer_connection(mat_node_tree, principled_node.inputs['Roughness'], node_group.inputs['Roughness'])
                     connect_sockets(node_group.outputs['Roughness'], principled_node.inputs['Roughness'])
                 if self.pbr_add_normal:
