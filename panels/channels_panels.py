@@ -6,7 +6,7 @@ from .common import (
     PSContextMixin,
     get_icon_from_channel,
     get_group_node,
-    check_group_multiuser
+    check_group_multiuser,
 )
 
 class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
@@ -21,7 +21,7 @@ class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
         icon_row.prop(channel, "type", text="", icon_only=True, emboss=False)
         icon_row.prop(channel, "name", text="", emboss=False)
         if group_node and channel.type == "FLOAT":
-            split.prop(group_node.inputs[channel.name], "default_value", text="", slider=channel.use_factor)
+            split.prop(group_node.inputs[channel.name], "default_value", text="")
 
     # def filter_items(self, context, data, propname):
     #     channels = getattr(data, propname)
@@ -124,14 +124,20 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
     
     def draw(self, context):
         layout = self.layout
-        row = layout.row()
-        row.label(icon="BLANK1")
+        layout.use_property_split = True
+        layout.use_property_decorate = False
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
-        col = row.column(align=True)
+        col = layout.column(align=True)
+        col.prop(active_channel, "type", text="Type")
         col.prop(active_channel, "use_alpha")
         if active_channel.type == "VECTOR":
             col.prop(active_channel, "use_normalize")
+        if active_channel.type == "FLOAT":
+            col.prop(active_channel, "use_max_min")
+            if active_channel.use_max_min:
+                col.prop(active_channel, "factor_min")
+                col.prop(active_channel, "factor_max")
 
 
 classes = (
