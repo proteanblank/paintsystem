@@ -582,7 +582,7 @@ class Channel(BaseNestedListManager):
                     previous_data.clip_mode = True
                     clip_nt = get_library_nodetree(".Alpha Over")
                     clip_nt_identifier = f"clip_nt_{layer.id}"
-                    node_builder.add_node(clip_nt_identifier, "ShaderNodeGroup", {"node_tree": clip_nt})
+                    node_builder.add_node(clip_nt_identifier, "ShaderNodeGroup", {"node_tree": clip_nt}, {"Color": (0, 0, 0, 1), "Alpha": 0}, force_default_values=True)
                     node_builder.link(clip_nt_identifier, previous_data.color_name, "Color", previous_data.color_socket)
                     node_builder.link(clip_nt_identifier, previous_data.alpha_name, "Alpha", previous_data.alpha_socket)
                     previous_data.color_name = clip_nt_identifier
