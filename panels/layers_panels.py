@@ -71,7 +71,8 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             # Check if parent of the current item is enabled
             parent_item = active_channel.get_item_by_id(
                 item.parent_id)
-            if parent_item and not global_item.enabled:
+            global_parent_item = get_global_layer(parent_item)
+            if global_parent_item and not global_parent_item.enabled:
                 main_row.enabled = False
 
             row = main_row.row(align=True)
