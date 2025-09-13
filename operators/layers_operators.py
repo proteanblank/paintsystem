@@ -236,13 +236,15 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
         name="Width",
         default=1024,
         min=1,
-        description="Width of the image in pixels"
+        description="Width of the image in pixels",
+        subtype='PIXEL'
     )
     image_height: IntProperty(
         name="Height",
         default=1024,
         min=1,
-        description="Height of the image in pixels"
+        description="Height of the image in pixels",
+        subtype='PIXEL'
     )
     image_add_type: EnumProperty(
         name="Image Add Type",
@@ -320,8 +322,8 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
         self.get_coord_type(context)
         self.layer_name = self.get_next_image_name(context)
         if self.image_resolution != 'CUSTOM':
-            self.image_width = int(self.image_resolution.split('x')[0])
-            self.image_height = int(self.image_resolution.split('x')[1])
+            self.image_width = int(self.image_resolution)
+            self.image_height = int(self.image_resolution)
         if self.image_add_type == 'IMPORT':
             context.window_manager.fileselect_add(self)
             return {'RUNNING_MODAL'}
@@ -341,9 +343,9 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
             row = box.row(align=True)
             row.prop(self, "image_resolution", expand=True)
             if self.image_resolution == 'CUSTOM':
-                row = box.row(align=True)
-                row.prop(self, "image_width", text="Width")
-                row.prop(self, "image_height", text="Height")
+                col = box.column(align=True)
+                col.prop(self, "image_width", text="Width")
+                col.prop(self, "image_height", text="Height")
             
         elif self.image_add_type == 'EXISTING':
             layout.prop_search(self, "layer_name", bpy.data,
