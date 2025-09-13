@@ -338,7 +338,8 @@ class PAINTSYSTEM_OT_DeleteGroup(PSContextMixin, MultiMaterialOperator):
     
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Are you sure you want to delete Paint System?")
+        ps_ctx = self.parse_context(context)
+        layout.label(text=f"Are you sure you want to delete '{ps_ctx.active_group.name}' Group?")
 
 
 class PAINTSYSTEM_OT_MoveGroup(PSContextMixin, MultiMaterialOperator):

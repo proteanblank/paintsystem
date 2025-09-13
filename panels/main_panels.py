@@ -1,6 +1,6 @@
 import bpy
 from bpy.utils import register_classes_factory
-from bpy.types import Panel, Menu
+from bpy.types import Panel, Menu, UIList
 from .common import (
     PSContextMixin,
     get_icon,
@@ -38,6 +38,31 @@ class MAT_MT_PaintSystemMaterialSelectMenu(PSContextMixin, Menu):
 #         for template in TEMPLATE_ENUM:
 #             op = layout.operator("paint_system.new_group", text=template[0], icon=template[3])
 #             op.template = template[0]
+
+class MATERIAL_UL_PaintSystemGroups(PSContextMixin, UIList):
+    bl_idname = "MATERIAL_UL_PaintSystemGroups"
+    bl_label = "Paint System Groups"
+    
+    def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
+        layout.prop(item, "name", text="", emboss=False)
+
+
+class MAT_PT_PaintSystemGroups(PSContextMixin, Panel):
+    bl_idname = "MAT_PT_PaintSystemGroups"
+    bl_label = "Groups"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    # bl_category = 'Paint System'
+    # bl_parent_id = 'MAT_PT_LayerSettings'
+    # bl_options = {'DEFAULT_CLOSED'}
+    bl_ui_units_x = 12
+
+    def draw(self, context):
+        ps_ctx = self.parse_context(context)
+        layout = self.layout
+        layout.label(text="Groups")
+        scale_content(context, layout)
+        layout.template_list("MATERIAL_UL_PaintSystemGroups", "", ps_ctx.ps_mat_data, "groups", ps_ctx.ps_mat_data, "active_index")
 
 class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_PaintSystemMainPanel'
@@ -81,7 +106,8 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             return
         mat = ps_ctx.active_material
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
-            row = layout.row(align=True)
+            col = layout.column(align=True)
+            row = col.row(align=True)
             scale_content(context, row, 1.5, 1.2)
             # if not ps.preferences.use_compact_design:
             #     row.scale_x = 1.5
@@ -103,14 +129,18 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             #     op.index = idx
             
             # row.operator("object.material_slot_add", icon='ADD', text="")
-            col = row.row(align=True)
-            # col.operator("paint_system.new_material", icon='ADD', text="")
-            col.operator("paint_system.delete_group", icon='REMOVE', text="")
+            row.operator("paint_system.new_group", icon='ADD', text="")
+            row.operator("paint_system.delete_group", icon='REMOVE', text="")
             if ob.mode == 'EDIT':
                 row = layout.row(align=True)
                 row.operator("object.material_slot_assign", text="Assign")
                 row.operator("object.material_slot_select", text="Select")
                 row.operator("object.material_slot_deselect", text="Deselect")
+        
+        if len(ps_ctx.ps_mat_data.groups) > 1:
+            row = col.row(align=True)
+            scale_content(context, row, 1.5, 1.2)
+            row.popover("MAT_PT_PaintSystemGroups", text="Select Group")
         
         if ps_ctx.active_group and check_group_multiuser(ps_ctx.active_group.node_tree):
             # Show a warning
@@ -140,8 +170,10 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
 
 
 classes = (
+    MATERIAL_UL_PaintSystemGroups,
     MAT_MT_PaintSystemMaterialSelectMenu,
     MAT_PT_PaintSystemMainPanel,
+    MAT_PT_PaintSystemGroups,
 )
 
 register, unregister = register_classes_factory(classes)
