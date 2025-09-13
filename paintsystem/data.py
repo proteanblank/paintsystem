@@ -117,81 +117,6 @@ COLOR_SPACE_ENUM = [
     ('NONCOLOR', "Non-Color", "Non-Color"),
 ]
 
-# def _parse_context(context: bpy.types.Context) -> dict:
-#         """
-#         Parses the Blender context to extract relevant information for the paint system.
-        
-#         Args:
-#             context (bpy.types.Context): The Blender context to parse.
-            
-#         Returns:
-#             dict: A dictionary containing parsed context information.
-#         """
-#         if not context:
-#             raise ValueError("Context cannot be None")
-#         if not isinstance(context, bpy.types.Context):
-#             raise TypeError("context must be of type bpy.types.Context")
-        
-#         ps_settings = get_preferences(context)
-        
-#         ps_scene_data = context.scene.get("ps_scene_data", None)
-        
-        # ps_object = None
-        # obj = context.active_object
-        # match obj.type:
-        #     case 'EMPTY':
-        #         if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-        #             ps_object = obj.parent
-        #     case 'MESH':
-        #         ps_object = obj
-        #     case 'GREASEPENCIL':
-        #         if is_newer_than(4,3,0):
-        #             ps_object = obj
-        #     case _:
-        #         obj = None
-        #         ps_object = None
-
-#         mat = ps_object.active_material if ps_object else None
-        
-#         mat_data = None
-#         groups = None
-#         active_group = None
-#         if mat and hasattr(mat, 'ps_mat_data') and mat.ps_mat_data:
-#             mat_data = mat.ps_mat_data
-#             groups = mat_data.groups
-#             if groups and mat_data.active_index >= 0:
-#                 active_group = groups[mat_data.active_index]
-        
-#         channels = None
-#         active_channel = None
-#         if active_group:
-#             channels = active_group.channels
-#             if channels and active_group.active_index >= 0:
-#                 active_channel = channels[active_group.active_index]
-
-#         layers = None
-#         active_layer = None
-#         if active_channel:
-#             layers = active_channel.layers
-#             if layers and active_channel.active_index >= 0:
-#                 active_layer = layers[active_channel.active_index]
-        
-#         return {
-#             "ps_settings": ps_settings,
-#             "ps_scene_data": ps_scene_data,
-#             "active_object": obj,
-#             "ps_object": ps_object,
-#             "active_material": mat,
-#             "ps_mat_data": mat_data,
-#             "groups": groups,
-#             "active_group": active_group,
-#             "channels": channels,
-#             "active_channel": active_channel,
-#             "layers": layers,
-#             "active_layer": active_layer,
-#             "active_global_layer": get_global_layer(active_layer) if active_layer else None
-#         }
-
 def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
     if context.mode != 'PAINT_TEXTURE':
         return
@@ -1045,7 +970,7 @@ def parse_context(context: bpy.types.Context) -> PSContext:
     
     ps_settings = get_preferences(context)
     
-    ps_scene_data = context.scene.get("ps_scene_data", None)
+    ps_scene_data = context.scene.ps_scene_data
     
     ps_object = None
     obj = context.active_object
@@ -1375,29 +1300,28 @@ classes = (
 @persistent
 def save_handler(scene: bpy.types.Scene):
     print("Saving Paint System data...")
-    images = []
+    images = set()
     ps_ctx = parse_context(bpy.context)
     for layer in ps_ctx.ps_scene_data.layers:
         image = layer.image
         if image and (image.is_dirty):
-            images.append(image)
-        mask_image = layer.mask_image
-        if mask_image and (mask_image.is_dirty):
-            images.append(mask_image)
+            images.add(image)
             
     for image in images:
         if not image.is_dirty:
             continue
         if image.packed_file or image.filepath == '':
+            print(f"Packing image {image.name}")
             image.pack()
         else:
+            print(f"Saving image {image.name}")
             image.save()
 
 
 @persistent
 def refresh_image(scene: bpy.types.Scene):
     ps_ctx = parse_context(bpy.context)
-    active_layer = ps_ctx.active_layer
+    active_layer = ps_ctx.active_global_layer
     if active_layer and active_layer.image:
         active_layer.image.reload()
 
