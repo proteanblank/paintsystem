@@ -319,6 +319,9 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
     def invoke(self, context, event):
         self.get_coord_type(context)
         self.layer_name = self.get_next_image_name(context)
+        if self.image_resolution != 'CUSTOM':
+            self.image_width = int(self.image_resolution.split('x')[0])
+            self.image_height = int(self.image_resolution.split('x')[1])
         if self.image_add_type == 'IMPORT':
             context.window_manager.fileselect_add(self)
             return {'RUNNING_MODAL'}
