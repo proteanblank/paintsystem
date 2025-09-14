@@ -107,5 +107,3 @@ def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: s
         builder.add_node("geometry", "ShaderNodeGeometry")
         builder.link("geometry", node_name, "Position", socket_name)
     return builder
-
-

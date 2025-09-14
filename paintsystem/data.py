@@ -39,6 +39,7 @@ from .graph import (
     create_image_graph,
     create_random_graph,
     create_solid_graph,
+    get_alpha_over_nodetree,
 )
 from .graph.common import get_library_nodetree
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
@@ -504,7 +505,7 @@ class Channel(BaseNestedListManager):
                 #         pass
                 if global_layer.is_clip and not previous_data.clip_mode:
                     previous_data.clip_mode = True
-                    clip_nt = get_library_nodetree(".Alpha Over")
+                    clip_nt = get_alpha_over_nodetree()
                     clip_nt_identifier = f"clip_nt_{layer.id}"
                     node_builder.add_node(clip_nt_identifier, "ShaderNodeGroup", {"node_tree": clip_nt}, {"Color": (0, 0, 0, 1), "Alpha": 0}, force_default_values=True)
                     node_builder.link(clip_nt_identifier, previous_data.color_name, "Color", previous_data.color_socket)

@@ -86,3 +86,20 @@ def create_custom_graph(node_tree: bpy.types.NodeTree, custom_node_tree: bpy.typ
     if alpha_input != -1:
         builder.link("group_input", "custom_node_tree", "Alpha", alpha_input)
     return builder
+
+
+def get_alpha_over_nodetree():
+    if ".PS Alpha Over" in bpy.data.node_groups:
+        return bpy.data.node_groups[".PS Alpha Over"]
+    node_tree = bpy.data.node_groups.new(name=".PS Alpha Over", type="ShaderNodeTree")
+    node_tree.interface.new_socket("Clip", in_out="INPUT", socket_type="NodeSocketBool")
+    node_tree.interface.new_socket("Color", in_out="INPUT", socket_type="NodeSocketColor")
+    node_tree.interface.new_socket("Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
+    node_tree.interface.new_socket("Over Color", in_out="INPUT", socket_type="NodeSocketColor")
+    node_tree.interface.new_socket("Over Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
+    node_tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
+    node_tree.interface.new_socket("Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
+    builder = NodeTreeBuilder(node_tree, "Layer")
+    create_mixing_graph(builder, "group_input", "Over Color", "group_input", "Over Alpha")
+    builder.compile()
+    return node_tree
