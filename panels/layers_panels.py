@@ -331,7 +331,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             scale_content(context, row, scale_x=1, scale_y=1.5)
             row.template_list(
                 "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
-                rows=min(max(4, len(layers)), 7)
+                rows=max(5, len(layers))
             )
 
             col = row.column(align=True)
@@ -339,6 +339,9 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             col.menu("MAT_MT_AddLayer", icon_value=get_icon('layer_add'), text="")
             col.menu("MAT_MT_LayerMenu",
                     text="", icon='COLLAPSEMENU')
+            col.separator()
+            col.operator("paint_system.delete_item",
+                            text="", icon="TRASH")
             col.separator()
             # col.operator("paint_system.delete_item", icon="TRASH", text="")
             # col.separator()
@@ -655,9 +658,6 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
                         text="Paste Layer(s)", icon="PASTEDOWN").linked = False
         layout.operator("paint_system.paste_layer",
                         text="Paste Linked Layer(s)", icon="LINKED").linked = True
-        layout.separator()
-        layout.operator("paint_system.delete_item",
-                        text="Delete Layer", icon="TRASH")
 
 
 class MAT_MT_AddLayerMenu(Menu):
