@@ -105,7 +105,7 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
         if ob.type != 'MESH':
             return
         mat = ps_ctx.active_material
-        groups = ps_ctx.ps_mat_data.groups
+        groups = ps_ctx.ps_mat_data.groups if mat else []
         if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
             col = layout.column(align=True)
             row = col.row(align=True)
