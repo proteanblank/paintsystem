@@ -258,6 +258,8 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
             return get_next_unique_name("Image Layer", [layer.name for layer in ps_ctx.active_channel.layers])
 
     def process_material(self, context):
+        self.image_width = int(self.image_resolution)
+        self.image_height = int(self.image_resolution)
         self.store_coord_type(context)
         ps_ctx = self.parse_context(context)
         if self.image_add_type == 'NEW':
