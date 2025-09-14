@@ -125,6 +125,9 @@ class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, MultiMaterialOperator):
         ps_ctx = cls.parse_context(context)
         ps_mat_data = ps_ctx.ps_mat_data
         return bool(ps_mat_data and ps_mat_data.active_index >= 0)
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, title="Delete Channel", width=300)
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
@@ -138,6 +141,11 @@ class PAINTSYSTEM_OT_DeleteChannel(PSContextMixin, MultiMaterialOperator):
         ps_ctx.active_group.update_node_tree(context)
         redraw_panel(context)
         return {'FINISHED'}
+
+    def draw(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        layout.label(text=f"Are you sure you want to delete '{ps_ctx.active_group.channels[ps_ctx.active_group.active_index].name}' Channel?")
 
 
 class PAINTSYSTEM_OT_MoveChannelUp(PSContextMixin, MultiMaterialOperator):

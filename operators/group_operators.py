@@ -334,7 +334,7 @@ class PAINTSYSTEM_OT_DeleteGroup(PSContextMixin, MultiMaterialOperator):
     
     def invoke(self, context, event):
         # return context.window_manager.invoke_confirm(self, event, title="Delete Group", icon='ERROR', message="Are you sure you want to delete Paint System?")
-        return context.window_manager.invoke_props_dialog(self, title="Delete Group", width=300, cancel_default=True)
+        return context.window_manager.invoke_props_dialog(self, title="Delete Group", width=300)
     
     def draw(self, context):
         layout = self.layout
