@@ -21,7 +21,7 @@ from ..paintsystem.data import (
     is_global_layer_linked,
 )
 from ..utils import get_next_unique_name
-from .common import PSContextMixin, scale_content, get_icon, MultiMaterialOperator
+from .common import PSContextMixin, scale_content, get_icon, MultiMaterialOperator, PSUVOptionsMixin
 from .operators_utils import redraw_panel, intern_enum_items
 
 def get_object_uv_maps(self, context: Context):
@@ -193,7 +193,7 @@ def get_icon_from_type(type: str) -> int:
 #         layer = add_global_layer_to_channel(channel, global_layer)
 #         return True
 
-class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
+class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOperator):
     """Create a new image layer"""
     bl_idname = "paint_system.new_image_layer"
     bl_label = "New Image Layer"
@@ -204,19 +204,6 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
         ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
     
-    coord_type: EnumProperty(
-        name="Coordinate Type",
-        items=COORDINATE_TYPE_ENUM,
-        default='AUTO'
-    )
-    # uv_map_name: EnumProperty(
-    #     name="UV Map",
-    #     items=get_object_uv_maps
-    # )
-    uv_map_name: StringProperty(
-        name="UV Map",
-        description="Name of the UV map to use"
-    )
     layer_name: StringProperty(
         name="Layer Name",
         description="Name of the new image layer",
@@ -263,27 +250,6 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, MultiMaterialOperator):
         default='*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.bmp',
         options={'HIDDEN'}
     )
-
-    def store_coord_type(self, context):
-        """Store the coord_type from the operator to the active channel"""
-        ps_ctx = self.parse_context(context)
-        if ps_ctx.active_channel:
-            ps_ctx.active_channel.coord_type = self.coord_type
-
-    def get_coord_type(self, context):
-        """Get the coord_type from the active channel and set it on the operator"""
-        ps_ctx = self.parse_context(context)
-        if ps_ctx.active_channel:
-            self.coord_type = ps_ctx.active_channel.coord_type
-            
-    def select_coord_type_ui(self, layout, context):
-        layout.label(text="Coordinate Type", icon='UV')
-        layout.prop(self, "coord_type", text="")
-        if self.coord_type == 'UV':
-            row = layout.row(align=True)
-            row.prop_search(self, "uv_map_name", context.object.data, "uv_layers", text="")
-            if not self.uv_map_name:
-                row.alert = True
             
     def get_next_image_name(self, context):
         """Get the next image name from the active channel"""

@@ -1,10 +1,10 @@
 import bpy
-from ..paintsystem.data import PSContextMixin, get_global_layer
+from ..paintsystem.data import PSContextMixin, get_global_layer, COORDINATE_TYPE_ENUM
 from ..custom_icons import get_icon
 from ..preferences import get_preferences
 from ..utils.unified_brushes import get_unified_settings
 from bpy.types import Operator, Context
-from bpy.props import BoolProperty
+from bpy.props import BoolProperty, EnumProperty, StringProperty
 
 icons = bpy.types.UILayout.bl_rna.functions["prop"].parameters["icon"].enum_items.keys()
 
@@ -76,3 +76,38 @@ class MultiMaterialOperator(Operator):
         if len(context.selected_objects) > 1:
             box = layout.box()
             box.label(text="Applying to all selected objects", icon='INFO')
+
+
+class PSUVOptionsMixin():
+    coord_type: EnumProperty(
+        name="Coordinate Type",
+        items=COORDINATE_TYPE_ENUM,
+        default='AUTO'
+    )
+    uv_map_name: StringProperty(
+        name="UV Map",
+        description="Name of the UV map to use"
+    )
+    
+    def store_coord_type(self, context):
+        """Store the coord_type from the operator to the active channel"""
+        ps_ctx = PSContextMixin.parse_context(context)
+        if ps_ctx.active_group:
+            ps_ctx.active_group.coord_type = self.coord_type
+            ps_ctx.active_group.uv_map_name = self.uv_map_name
+    
+    def get_coord_type(self, context):
+        """Get the coord_type from the active channel and set it on the operator"""
+        ps_ctx = PSContextMixin.parse_context(context)
+        if ps_ctx.active_channel:
+            self.coord_type = ps_ctx.active_group.coord_type
+            self.uv_map_name = ps_ctx.active_group.uv_map_name
+            
+    def select_coord_type_ui(self, layout, context):
+        layout.label(text="Coordinate Type", icon='UV')
+        layout.prop(self, "coord_type", text="")
+        if self.coord_type == 'UV':
+            row = layout.row(align=True)
+            row.prop_search(self, "uv_map_name", context.object.data, "uv_layers", text="")
+            if not self.uv_map_name:
+                row.alert = True

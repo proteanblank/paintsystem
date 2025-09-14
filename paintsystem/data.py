@@ -646,12 +646,6 @@ class Channel(BaseNestedListManager):
         default=False,
         update=update_node_tree
     )
-    coord_type: EnumProperty(
-        items=COORDINATE_TYPE_ENUM,
-        name="Coordinate Type",
-        description="Coordinate type",
-        default='AUTO'
-    )
     bake_image: PointerProperty(
         name="Bake Image",
         type=Image
@@ -824,6 +818,17 @@ class Group(PropertyGroup):
         name="Template",
         items=TEMPLATE_ENUM,
         default='BASIC'
+    )
+    coord_type: EnumProperty(
+        items=COORDINATE_TYPE_ENUM,
+        name="Coordinate Type",
+        description="Coordinate type",
+        default='AUTO'
+    )
+    uv_map_name: StringProperty(
+        name="UV Map",
+        description="UV map",
+        default="UVMap"
     )
     hide_norm_paint_tips: BoolProperty(
         name="Hide Normal Painting Tips",

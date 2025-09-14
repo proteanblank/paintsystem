@@ -15,6 +15,7 @@ from ..utils.nodes import (
 from .common import (
     MultiMaterialOperator,
     PSContextMixin,
+    PSUVOptionsMixin,
     get_icon,
     scale_content,
 )
@@ -45,7 +46,7 @@ def get_right_most_node(mat_node_tree: NodeTree) -> Node:
             right_most_node = node
     return right_most_node
 
-class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
+class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOperator):
     """Create a new group in the Paint System"""
     bl_idname = "paint_system.new_group"
     bl_label = "New Group"
@@ -150,7 +151,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                 if self.add_layers:
                     bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
-                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
+                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
                 
                 right_most_node = get_right_most_node(mat_node_tree)
                 node_group, mix_shader = create_basic_setup(mat_node_tree, node_tree, right_most_node.location if right_most_node else Vector((0, 0)))
@@ -176,7 +177,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                     if self.add_layers:
                         bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
-                        bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
+                        bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
                     transfer_connection(mat_node_tree, principled_node.inputs['Base Color'], node_group.inputs['Color'])
                     transfer_connection(mat_node_tree, principled_node.inputs['Alpha'], node_group.inputs['Color Alpha'])
                     connect_sockets(node_group.outputs['Color'], principled_node.inputs['Base Color'])
@@ -213,7 +214,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
                 
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                 if self.add_layers:
-                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
+                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
                 
                 mat_output = get_material_output(mat_node_tree)
                 
@@ -238,7 +239,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
             case 'NORMAL':
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, use_normalize=True)
                 if self.add_layers:
-                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
+                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
                 right_most_node = get_right_most_node(mat_node_tree)
                 tex_coord = mat_node_tree.nodes.new(type='ShaderNodeTexCoord')
                 tex_coord.location = right_most_node.location + Vector((200, 0))
@@ -260,15 +261,17 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
             case _:
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
                 if self.add_layers:
-                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT')
+                    bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
                 right_most_node = get_right_most_node(mat_node_tree)
                 node_group = mat_node_tree.nodes.new(type='ShaderNodeGroup')
                 node_group.node_tree = node_tree
                 node_group.location = right_most_node.location + Vector((200, 0))
+        self.store_coord_type(context)
         redraw_panel(context)
         return {'FINISHED'}
     
     def invoke(self, context, event):
+        self.get_coord_type(context)
         return context.window_manager.invoke_props_dialog(self, width=300)
     
     def draw(self, context):
@@ -289,6 +292,12 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, MultiMaterialOperator):
             col.prop(self, "pbr_add_roughness", text="Roughness", icon_value=get_icon('float_socket'))
             col.prop(self, "pbr_add_normal", text="Normal", icon_value=get_icon('vector_socket'))
         
+        row = layout.row()
+        scale_content(context, row, 1.5, 1.5)
+        row.prop(self, "add_layers", text="Add Template Layers", icon_value=get_icon('layer_add'))
+        if self.add_layers:
+            box = layout.box()
+            self.select_coord_type_ui(box, context) 
         box = layout.box()
         row = box.row()
         row.alignment = "CENTER"
