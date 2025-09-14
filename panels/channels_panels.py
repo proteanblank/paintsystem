@@ -130,9 +130,9 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
         active_channel = ps_ctx.active_channel
         col = layout.column(align=True)
         col.prop(active_channel, "type", text="Type")
-        col.prop(active_channel, "use_alpha")
+        col.prop(active_channel, "use_alpha", text="Alpha Socket")
         if active_channel.type == "VECTOR":
-            col.prop(active_channel, "use_normalize")
+            col.prop(active_channel, "use_normalize", text="Normalize Input")
         if active_channel.type == "FLOAT":
             col.prop(active_channel, "use_max_min")
             if active_channel.use_max_min:
