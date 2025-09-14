@@ -557,6 +557,7 @@ class PAINTSYSTEM_OT_SelectGradientEmpty(PSContextMixin, Operator):
         ps_ctx = self.parse_context(context)
         empty_object = ps_ctx.active_global_layer.empty_object
         if empty_object:
+            bpy.ops.object.mode_set(mode='OBJECT')
             bpy.ops.object.select_all(action='DESELECT')
             bpy.context.view_layer.objects.active = empty_object
             empty_object.select_set(True)
