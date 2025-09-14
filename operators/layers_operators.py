@@ -746,19 +746,6 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
         #         empty_object = item.node_tree.nodes["Texture Coordinate"].object
         #     if empty_object and empty_object.type == 'EMPTY':
         #         bpy.data.objects.remove(empty_object, do_unlink=True)
-                
-        if item_id != -1 and active_channel.remove_item_and_children(item_id):
-            # Update active_index
-            active_channel.normalize_orders()
-            flattened = active_channel.flatten_hierarchy()
-            for i, item in enumerate(active_channel.layers):
-                if item.order == order and item.parent_id == parent_id:
-                    active_channel.active_index = i
-                    break
-
-            active_channel.update_node_tree(context)
-        active_channel.active_index = min(
-            active_channel.active_index, len(active_channel.layers) - 1)
         
         if not is_global_layer_linked(global_layer):
             # Delete the global layer
@@ -773,6 +760,18 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
                 if layer == global_layer:
                     global_layers.remove(i)
                     break
+                
+        if item_id != -1 and active_channel.remove_item_and_children(item_id):
+            # Update active_index
+            active_channel.normalize_orders()
+            for i, item in enumerate(active_channel.layers):
+                if item.order == order and item.parent_id == parent_id:
+                    active_channel.active_index = i
+                    break
+
+            active_channel.update_node_tree(context)
+        active_channel.active_index = min(
+            active_channel.active_index, len(active_channel.layers) - 1)
         
         redraw_panel(context)
         return {'FINISHED'}

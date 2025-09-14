@@ -904,10 +904,10 @@ def get_global_layer(layer: Layer) -> GlobalLayer | None:
     """Get the global layer data from the context."""
     if not layer or not bpy.context.scene or not bpy.context.scene.ps_scene_data:
         return None
-    for global_layer in bpy.context.scene.ps_scene_data.layers:
-        if global_layer.name == layer.ref_layer_id:
-            return global_layer
-    return None
+    # for global_layer in bpy.context.scene.ps_scene_data.layers[layer.ref_layer_id]:
+    #     if global_layer.name == layer.ref_layer_id:
+    #         return global_layer
+    return bpy.context.scene.ps_scene_data.layers.get(layer.ref_layer_id, None)
 
 def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
     """Check if the global layer is linked"""
