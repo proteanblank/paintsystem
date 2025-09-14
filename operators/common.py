@@ -86,7 +86,8 @@ class PSUVOptionsMixin():
     )
     uv_map_name: StringProperty(
         name="UV Map",
-        description="Name of the UV map to use"
+        description="Name of the UV map to use",
+        default="UVMap"
     )
     
     def store_coord_type(self, context):
