@@ -71,11 +71,13 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
         legacy_ps_ctx = LegacyPaintSystemContextParser(context)
         legacy_groups = legacy_ps_ctx.get_material_settings().groups
         ps_ctx = self.parse_context(context)
+        warning_messages = []
         for legacy_group in legacy_groups:
             bpy.ops.paint_system.new_group('EXEC_DEFAULT', group_name=legacy_group.name, add_layers=False, template='NONE')
             for legacy_layer in legacy_group.items:
                 if legacy_layer.type not in [layer[0] for layer in LAYER_TYPE_ENUM]:
                     print(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
+                    warning_messages.append(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
                     continue
                 new_global_layer = add_global_layer(legacy_layer.type, legacy_layer.name)
                 
@@ -103,7 +105,9 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                 # Apply node values
                 # Copy rgb node value
                 if legacy_layer.type == "SOLID_COLOR":
-                    new_global_layer.find_node('rgb').outputs[0].default_value = legacy_layer.color
+                    rgb_node = find_node_by_name(legacy_layer.node_tree, 'RGB')
+                    if rgb_node:
+                        new_global_layer.find_node('rgb').outputs[0].default_value = rgb_node.outputs[0].default_value
                 if legacy_layer.type == "ADJUSTMENT":
                     state = capture_node_state(legacy_ps_ctx.find_node(legacy_layer.node_tree, {'label': 'Adjustment'}))
                     apply_node_state(new_global_layer.find_node('adjustment'), state)
@@ -145,6 +149,8 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                 for link in output_links:
                     connect_sockets(link.to_socket, node_group.outputs[link.from_socket.name])
         legacy_groups.clear()
+        if warning_messages:
+            self.report({'WARNING'}, "\n".join(warning_messages))
         return {'FINISHED'}
 
 classes = (

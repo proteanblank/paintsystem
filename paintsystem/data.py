@@ -57,7 +57,6 @@ LAYER_TYPE_ENUM = [
     ('SOLID_COLOR', "Solid Color", "Solid Color layer"),
     ('ATTRIBUTE', "Attribute", "Attribute layer"),
     ('ADJUSTMENT', "Adjustment", "Adjustment layer"),
-    ('SHADER', "Shader", "Shader layer"),
     ('NODE_GROUP', "Node Group", "Node Group layer"),
     ('GRADIENT', "Gradient", "Gradient layer"),
     ('RANDOM', "Random", "Random Color layer"),
