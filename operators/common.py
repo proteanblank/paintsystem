@@ -106,6 +106,12 @@ class PSUVOptionsMixin():
     def select_coord_type_ui(self, layout, context):
         layout.label(text="Coordinate Type", icon='UV')
         layout.prop(self, "coord_type", text="")
+        if self.coord_type not in ['AUTO', 'UV']:
+            # Warning that painting may not work as expected
+            box = layout.box()
+            box.alert = True
+            box.label(text="Painting may not work in this mode", icon='ERROR')
+        
         if self.coord_type == 'UV':
             row = layout.row(align=True)
             row.prop_search(self, "uv_map_name", context.object.data, "uv_layers", text="")
