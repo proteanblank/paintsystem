@@ -633,6 +633,7 @@ class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
         layout.use_property_decorate = False
         ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
+        layout.enabled = not global_layer.lock_layer
         layout.prop(global_layer, "coord_type", text="Coordinate Type")
         if global_layer.coord_type == 'UV':
             layout.prop_search(global_layer, "uv_map_name", text="UV Map",
