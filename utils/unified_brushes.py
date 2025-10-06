@@ -38,10 +38,10 @@ def paint_settings(context):
 
 def get_unified_settings(context: bpy.types.Context, unified_name: str):
     tool_settings = UnifiedPaintPanel.paint_settings(context)
-    if is_newer_than(4,4):
-        ups = tool_settings.unified_paint_settings
-    else:
-        ups = context.tool_settings.unified_paint_settings
+    # if is_newer_than(4,4):
+    #     ups = tool_settings.unified_paint_settings
+    # else:
+    ups = context.tool_settings.unified_paint_settings
     brush = tool_settings.brush
     prop_owner = brush
     if unified_name and getattr(ups, unified_name):

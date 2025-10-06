@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import AddonPreferences
-from bpy.props import BoolProperty
+from bpy.props import BoolProperty, FloatProperty
 from bpy.utils import register_classes_factory
 from .common import find_keymap
 from ..preferences import addon_package
@@ -19,6 +19,14 @@ class PaintSystemPreferences(AddonPreferences):
         name="Use Compact Design",
         description="Use a more compact design for the UI",
         default=False
+    )
+    
+    color_picker_scale: FloatProperty(
+        name="Color Picker Scale",
+        description="Scale the color picker",
+        default=1.0,
+        min=0.5,
+        max=3.0
     )
 
     # name_layers_group: BoolProperty(
