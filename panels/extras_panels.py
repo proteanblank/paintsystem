@@ -145,7 +145,7 @@ class MAT_PT_BrushAdvanced(PSContextMixin, Panel):
 
 class MAT_PT_BrushColorSettings(PSContextMixin, Panel):
     bl_idname = "MAT_PT_BrushColorSettings"
-    bl_label = "Color Settings"
+    bl_label = "Color Picker Settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_ui_units_x = 12
@@ -221,7 +221,6 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
             row.scale_y = 1.2
             row.popover(
                 panel="MAT_PT_BrushColorSettings",
-                text="Color Settings",
                 icon="SETTINGS"
             )
             prop_owner = get_unified_settings(context, "use_unified_color")
