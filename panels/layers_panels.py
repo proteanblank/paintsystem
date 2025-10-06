@@ -515,7 +515,15 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.use_property_split = True
                         col.use_property_decorate = False
                         col.enabled = not global_layer.lock_layer
-                        col.operator("paint_system.select_gradient_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
+                        if global_layer.gradient_type in ('LINEAR', 'RADIAL'):
+                            if global_layer.empty_object and global_layer.empty_object.name in context.view_layer.objects:
+                                col.operator("paint_system.select_gradient_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
+                            else:
+                                err_box = col.box()
+                                err_box.alert = True
+                                err_col = err_box.column(align=True)
+                                err_col.label(text="Gradient Empty not found", icon='ERROR')
+                                err_col.operator("paint_system.fix_missing_gradient_empty", text="Fix Missing Gradient Empty")
                         col.separator()
                         col.label(text="Gradient Settings:", icon='SHADERFX')
                         col.template_node_inputs(gradient_node)
@@ -660,55 +668,60 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
                         text="Paste Linked Layer(s)", icon="LINKED").linked = True
 
 
+class MAT_MT_AddImageLayerMenu(Menu):
+    bl_label = "Add Image"
+    bl_idname = "MAT_MT_AddImageLayerMenu"
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("paint_system.new_image_layer", text="New Image Layer", icon='IMAGE_RGB_ALPHA')
+        layout.operator("paint_system.new_image_layer", text="Import Image Layer", icon='IMPORT')
+        layout.operator("paint_system.new_image_layer", text="Use Existing Image Layer", icon='IMAGE')
+
+
+class MAT_MT_AddGradientLayerMenu(Menu):
+    bl_label = "Add Gradient"
+    bl_idname = "MAT_MT_AddGradientLayerMenu"
+    
+    def draw(self, context):
+        layout = self.layout
+        for idx, (node_type, name, description) in enumerate(GRADIENT_TYPE_ENUM):
+            layout.operator("paint_system.new_gradient_layer",
+                text=name, icon='COLOR' if idx == 0 else 'NONE').gradient_type = node_type
+
+
+class MAT_MT_AddAdjustmentLayerMenu(Menu):
+    bl_label = "Add Adjustment"
+    bl_idname = "MAT_MT_AddAdjustmentLayerMenu"
+    
+    def draw(self, context):
+        layout = self.layout
+        for idx, (node_type, name, description) in enumerate(ADJUSTMENT_TYPE_ENUM):
+            layout.operator("paint_system.new_adjustment_layer",
+                text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
 class MAT_MT_AddLayerMenu(Menu):
     bl_label = "Add Layer"
     bl_idname = "MAT_MT_AddLayer"
 
     def draw(self, context):
         layout = self.layout
-        row = layout.row()
-        col = row.column()
-        # col.label(text="--- IMAGE ---")
+        col = layout.column()
         col.operator("paint_system.new_folder_layer",
                      icon_value=get_icon('folder'), text="Folder")
         col.separator()
-        col.operator("paint_system.new_image_layer",
-                     text="New Image Layer", icon_value=get_icon('image_plus')).image_add_type = "NEW"
-        col.operator("paint_system.new_image_layer",
-                     text="Import Image Layer", icon_value=get_icon('import')).image_add_type = "IMPORT"
-        col.operator("paint_system.new_image_layer",
-                     text="Use Existing Image Layer", icon_value=get_icon('image')).image_add_type = "EXISTING"
-        # col.operator("paint_system.open_image",
-        #              text="Open External Image")
-        # col.operator("paint_system.open_existing_image",
-        #              text="Use Existing Image")
-        col.separator()
-        # col.label(text="--- COLOR ---")
+        col.label(text="Basic:")
         col.operator("paint_system.new_solid_color_layer", text="Solid Color",
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
+        col.menu("MAT_MT_AddImageLayerMenu", text="Image", icon='IMAGE_RGB_ALPHA')
+        col.menu("MAT_MT_AddGradientLayerMenu", text="Gradient", icon='COLOR')
+        col.menu("MAT_MT_AddAdjustmentLayerMenu", text="Adjustment", icon='SHADERFX')
+        col.separator()
+        col.label(text="Advanced:")
         col.operator("paint_system.new_attribute_layer",
                      text="Attribute Color", icon='MESH_DATA')
         col.operator("paint_system.new_random_color_layer",
                      text="Random Color", icon='SEQ_HISTOGRAM')
-        col.separator()
-        # col.label(text="--- GRADIENT ---")
-        for idx, (node_type, name, description) in enumerate(GRADIENT_TYPE_ENUM):
-            col.operator("paint_system.new_gradient_layer",
-                         text=name, icon='COLOR' if idx == 0 else 'NONE').gradient_type = node_type
 
-        # col.separator()
-        # col.label(text="--- SHADER ---")
-        # for idx, (node_type, name, description) in enumerate(SHADER_ENUM):
-        #     col.operator("paint_system.new_shader_layer",
-        #                  text=name, icon='SHADING_RENDERED' if idx == 0 else 'NONE').shader_type = node_type
-
-        col = row.column()
-        # col.label(text="--- ADJUSTMENT ---")
-        for idx, (node_type, name, description) in enumerate(ADJUSTMENT_TYPE_ENUM):
-            col.operator("paint_system.new_adjustment_layer",
-                         text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
-        col.separator()
-        # col.label(text="--- CUSTOM ---")
         col.operator("paint_system.new_custom_node_group_layer",
                      text="Custom Node Tree", icon='NODETREE')
 
@@ -811,6 +824,9 @@ class MAT_PT_Actions(PSContextMixin, Panel):
 classes = (
     MAT_PT_UL_LayerList,
     MAT_MT_AddLayerMenu,
+    MAT_MT_AddImageLayerMenu,
+    MAT_MT_AddGradientLayerMenu,
+    MAT_MT_AddAdjustmentLayerMenu,
     MAT_MT_LayerMenu,
     MAT_PT_Layers,
     MAT_PT_LayerSettings,

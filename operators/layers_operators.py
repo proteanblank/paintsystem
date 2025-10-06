@@ -490,29 +490,27 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        view_layer = bpy.context.view_layer
-        with bpy.context.temp_override():
-            if "Paint System Collection" not in view_layer.layer_collection.collection.children:
-                collection = bpy.data.collections.new("Paint System Collection")
-                view_layer.layer_collection.collection.children.link(collection)
-            else:
-                collection = view_layer.layer_collection.collection.children["Paint System Collection"]
-            empty_object = bpy.data.objects.new(f"{ps_ctx.active_group.name} {self.layer_name}", None)
-            empty_object.parent = ps_ctx.ps_object
-            collection.objects.link(empty_object)
-        # empty_object.location = ps_ctx.ps_object.location
-        if self.gradient_type == 'LINEAR':
-            empty_object.empty_display_type = 'SINGLE_ARROW'
-        elif self.gradient_type == 'RADIAL':
-            empty_object.empty_display_type = 'SPHERE'
-        global_layer = add_global_layer("GRADIENT", self.layer_name)
+        global_layer = add_global_layer("GRADIENT", self.gradient_type.title())
         global_layer.gradient_type = self.gradient_type
-        global_layer.empty_object = empty_object
         layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
 
+
+class PAINTSYSTEM_OT_FixMissingGradientEmpty(PSContextMixin, Operator):
+    """Fix missing gradient empty"""
+    bl_idname = "paint_system.fix_missing_gradient_empty"
+    bl_label = "Fix Missing Gradient Empty"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        for layer in ps_ctx.active_channel.layers:
+            if layer.type == 'GRADIENT':
+                layer.update_node_tree(context)
+        ps_ctx.active_global_layer.update_node_tree(context)
+        return {'FINISHED'}
 
 
 class PAINTSYSTEM_OT_SelectGradientEmpty(PSContextMixin, Operator):
@@ -1146,6 +1144,7 @@ classes = (
     PAINTSYSTEM_OT_NewAdjustment,
     PAINTSYSTEM_OT_NewShader,
     PAINTSYSTEM_OT_NewGradient,
+    PAINTSYSTEM_OT_FixMissingGradientEmpty,
     PAINTSYSTEM_OT_SelectGradientEmpty,
     PAINTSYSTEM_OT_NewRandomColor,
     PAINTSYSTEM_OT_NewCustomNodeGroup,

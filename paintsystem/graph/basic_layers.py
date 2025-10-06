@@ -56,6 +56,9 @@ def create_gradient_graph(node_tree: bpy.types.NodeTree, gradient_type: str, emp
             builder.add_node("map_range", "ShaderNodeMapRange")
             builder.add_node("camera_data", "ShaderNodeCameraData")
             builder.link("camera_data", "map_range", "View Distance", "Value")
+        case "GRADIENT_MAP":
+            builder.add_node("map_range", "ShaderNodeMapRange")
+            builder.link("group_input", "map_range", "Color", "Value")
         case _:
             raise ValueError(f"Invalid gradient type: {gradient_type}")
     builder.link("map_range", "gradient", "Result", "Fac")

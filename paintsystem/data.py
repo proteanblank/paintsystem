@@ -70,6 +70,7 @@ CHANNEL_TYPE_ENUM = [
 ]
 
 GRADIENT_TYPE_ENUM = [
+    ('GRADIENT_MAP', "Gradient Map", "Gradient map"),
     ('LINEAR', "Linear Gradient", "Linear gradient"),
     ('RADIAL', "Radial Gradient", "Radial gradient"),
     ('DISTANCE', "Distance Gradient", "Distance gradient"),
@@ -249,6 +250,29 @@ class GlobalLayer(PropertyGroup):
             case "ADJUSTMENT":
                 layer_graph = create_adjustment_graph(self.node_tree, self.adjustment_type)
             case "GRADIENT":
+                def add_empty_to_collection(empty_object):
+                    view_layer = context.view_layer
+                    if "Paint System Collection" not in view_layer.layer_collection.collection.children:
+                        collection = bpy.data.collections.new("Paint System Collection")
+                        view_layer.layer_collection.collection.children.link(collection)
+                    else:
+                        collection = view_layer.layer_collection.collection.children["Paint System Collection"]
+                    collection.objects.link(empty_object)
+                    
+                if self.gradient_type in ('LINEAR', 'RADIAL'):
+                    if not self.empty_object:
+                        ps_ctx = parse_context(context)
+                        with bpy.context.temp_override():
+                            empty_object = bpy.data.objects.new(f"{self.name}", None)
+                            empty_object.parent = ps_ctx.ps_object
+                            add_empty_to_collection(empty_object)
+                        self.empty_object = empty_object
+                        if self.gradient_type == 'LINEAR':
+                            self.empty_object.empty_display_type = 'SINGLE_ARROW'
+                        elif self.gradient_type == 'RADIAL':
+                            self.empty_object.empty_display_type = 'SPHERE'
+                    elif self.empty_object.name not in context.view_layer.objects:
+                        add_empty_to_collection(self.empty_object)
                 layer_graph = create_gradient_graph(self.node_tree, self.gradient_type, self.empty_object)
             case "RANDOM":
                 layer_graph = create_random_graph(self.node_tree)
