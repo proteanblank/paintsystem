@@ -594,6 +594,13 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
         inputs.append(('-1', 'None', '', 'BLANK1', len(inputs)))
         return inputs
     
+    def get_outputs_enum_without_none(self, context: Context):
+        if not self.node_tree_name:
+            return []
+        custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        outputs = get_outputs(custom_node_tree, context)
+        return outputs
+    
     def get_outputs_enum(self, context: Context):
         if not self.node_tree_name:
             return []
@@ -646,7 +653,7 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
     custom_color_output: EnumProperty(
         name="Custom Color Output",
         description="Custom color output",
-        items=get_outputs_enum
+        items=get_outputs_enum_without_none
     )
     custom_alpha_output: EnumProperty(
         name="Custom Alpha Output",

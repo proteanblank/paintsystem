@@ -142,7 +142,8 @@ def create_custom_graph(global_layer: "GlobalLayer"):
     else:
         create_mixing_graph(builder, "custom_node_tree", color_output)
     builder.add_node("custom_node_tree", "ShaderNodeGroup", {"node_tree": custom_node_tree})
-    builder.link("group_input", "custom_node_tree", "Color", color_input)
+    if color_input != -1:
+        builder.link("group_input", "custom_node_tree", "Color", color_input)
     if alpha_input != -1:
         builder.link("group_input", "custom_node_tree", "Alpha", alpha_input)
     return builder
