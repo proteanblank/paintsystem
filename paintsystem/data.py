@@ -41,7 +41,7 @@ from .graph import (
     create_solid_graph,
     get_alpha_over_nodetree,
 )
-from .graph.common import get_library_nodetree
+from .graph.common import get_library_object
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 
 TEMPLATE_ENUM = [
@@ -137,12 +137,23 @@ def update_active_image(self=None, context: bpy.types.Context = None):
     obj = ps_ctx.ps_object
     mat = ps_ctx.active_material
     active_channel = ps_ctx.active_channel
+    if not obj.name == "PS Camera Plane":
+        # print("Setting last selected PS object: ", obj.name)
+        ps_ctx.ps_scene_data.last_selected_ps_object = obj
     if not mat or not active_channel:
         return
     global_layer = ps_ctx.active_global_layer
     update_brush_settings(self, context)
     if not global_layer:
         return
+    if not global_layer.attached_to_camera_plane:
+        context.view_layer.objects.active = obj
+        obj.select_set(True)
+    else:
+        ps_ctx.ps_object.select_set(False)
+        ps_ctx.camera_plane.select_set(True)
+        context.view_layer.objects.active = ps_ctx.camera_plane
+        bpy.ops.object.mode_set(mode=ps_ctx.ps_object.mode)
 
     if image_paint.mode == 'MATERIAL':
                 image_paint.mode = 'IMAGE'
@@ -154,11 +165,11 @@ def update_active_image(self=None, context: bpy.types.Context = None):
     else:
         # print("Selected image: ", selected_image)
         image_paint.canvas = selected_image
-        if global_layer.coord_type == 'AUTO':
-            obj.data.uv_layers["PS_UVMap"].active = True
-        elif global_layer.coord_type == 'UV':
+        if global_layer.coord_type == 'UV' or global_layer.attached_to_camera_plane:
             if global_layer.uv_map_name:
                 obj.data.uv_layers[global_layer.uv_map_name].active = True
+        elif global_layer.coord_type == 'AUTO':
+            obj.data.uv_layers["PS_UVMap"].active = True
 
 def update_active_layer(self, context):
     ps_ctx = parse_context(context)
@@ -304,6 +315,45 @@ class GlobalLayer(PropertyGroup):
             # Always unset the flag when done, even if errors occur
             self.update_node_tree(context)
             self.updating_name_flag = False
+    
+    def update_camera_plane(self, context):
+        ps_ctx = parse_context(context)
+        camera_plane = ps_ctx.camera_plane
+        if self.attached_to_camera_plane:
+            # Add the layer to the camera plane
+            # Always add to the end of the list
+            mat = None
+            if "PS Camera Plane Material" in bpy.data.materials:
+                mat = bpy.data.materials["PS Camera Plane Material"]
+            else:
+                mat = bpy.data.materials.new(name="PS Camera Plane Material")
+            if not camera_plane:
+                # Create the camera plane if it doesn't exist
+                if "PS Camera Plane" in bpy.data.objects:
+                    camera_plane = bpy.data.objects["PS Camera Plane"]
+                else:
+                    camera_plane = get_library_object("Camera Plane")
+                    ps_ctx.ps_scene_data.camera_plane = camera_plane
+                    camera_plane.hide_select = True
+                    camera_plane.data.materials.append(mat)
+                    get_paint_system_collection(context).objects.link(camera_plane)
+                    with context.temp_override(active_object=camera_plane, selected_objects=[camera_plane]):
+                        bpy.ops.paint_system.new_group(template='BASIC', add_layers=False)
+                    # Rename at the end of group creation
+                    camera_plane.name = "PS Camera Plane"
+            cam_channel = camera_plane.material_slots[0].material.ps_mat_data.groups[0].channels[0]
+            # Always add to the end of the list
+            cam_channel.active_index = len(cam_channel.layers) - 1
+            cam_channel.add_global_layer_to_channel(ps_ctx.active_global_layer, ps_ctx.active_layer.name)
+        else:
+            # Remove the layer from the camera plane
+            cam_channel = ps_ctx.camera_plane_channel
+            for i, layer in enumerate(cam_channel.layers):
+                if layer.ref_layer_id == self.name:
+                    cam_channel.layers.remove(i)
+        cam_channel.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        update_active_image(self, context)
             
     def find_node(self, identifier: str) -> Node | None:
         return get_node_from_nodetree(self.node_tree, identifier)
@@ -462,6 +512,12 @@ class GlobalLayer(PropertyGroup):
         default=False,
         update=update_brush_settings
     )
+    attached_to_camera_plane: BoolProperty(
+        name="Attached to Camera Plane",
+        description="Attached to camera plane",
+        default=False,
+        update=update_camera_plane
+    )
 
 class Layer(BaseNestedListItem):
     """Base class for material layers in the Paint System"""
@@ -522,6 +578,10 @@ class Channel(BaseNestedListManager):
                 previous_data = previous_dict.get(layer.parent_id, None)
                 global_layer = get_global_layer(layer)
                 if not global_layer:
+                    continue
+                # If the global layer is attached to camera plane and the channel is not a camera plane channel, skip
+                if global_layer.attached_to_camera_plane and not self.is_camera_plane_channel:
+                    # print("Skipping layer: ", layer.name, " because it is attached to camera plane and the channel is not a camera plane channel")
                     continue
                 layer_identifier = global_layer.name
                 node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree}, {"Clip": global_layer.is_clip})
@@ -710,6 +770,16 @@ class Channel(BaseNestedListManager):
         default=False,
         # update=update_node_tree
     )
+
+    @property
+    def is_camera_plane_channel(self) -> bool:
+        camera_plane = parse_context(bpy.context).camera_plane
+        if camera_plane and camera_plane.material_slots and camera_plane.material_slots[0].material:
+            camera_plane_material = camera_plane.material_slots[0].material
+            if camera_plane_material and camera_plane_material.ps_mat_data and camera_plane_material.ps_mat_data.groups and camera_plane_material.ps_mat_data.groups[0].channels:
+                camera_plane_channel = camera_plane_material.ps_mat_data.groups[0].channels[0]
+                return camera_plane_channel == self
+        return False
     
     def get_movement_menu_items(self, item_id, direction):
         """
@@ -913,14 +983,21 @@ class PaintSystemGlobalData(PropertyGroup):
         name="Clipboard Layers",
         description="Collection of layers in the clipboard"
     )
+    active_clipboard_index: IntProperty(name="Active Clipboard Layer Index")
     layers: CollectionProperty(
         type=GlobalLayer,
         name="Paint System Layers",
         description="Collection of layers in the Paint System"
     )
     active_index: IntProperty(name="Active Layer Index")
-    active_clipboard_index: IntProperty(name="Active Clipboard Layer Index")
-    
+    camera_plane: PointerProperty(
+        name="Camera Plane Object",
+        type=Object
+    )
+    last_selected_ps_object: PointerProperty(
+        name="Last Selected Object",
+        type=Object
+    )
 
 class MaterialData(PropertyGroup):
     """Custom data for channels in the Paint System"""
@@ -1008,7 +1085,9 @@ class PSContext:
     active_channel: Channel | None = None
     active_layer: Layer | None = None
     active_global_layer: GlobalLayer | None = None
-
+    camera_plane: bpy.types.Object | None = None
+    camera_plane_material: bpy.types.Material | None = None
+    camera_plane_channel: Channel | None = None
 
 def parse_context(context: bpy.types.Context) -> PSContext:
     """Parse the context and return a PSContext object."""
@@ -1036,6 +1115,9 @@ def parse_context(context: bpy.types.Context) -> PSContext:
             case _:
                 obj = None
                 ps_object = None
+        if obj.name == "PS Camera Plane":
+            obj = ps_scene_data.last_selected_ps_object
+            ps_object = obj
 
     mat = ps_object.active_material if ps_object else None
     
@@ -1061,6 +1143,18 @@ def parse_context(context: bpy.types.Context) -> PSContext:
         layers = active_channel.layers
         if layers and active_channel.active_index >= 0:
             active_layer = layers[min(active_channel.active_index, len(layers) - 1)]
+            
+    camera_plane = None
+    if ps_scene_data and ps_scene_data.camera_plane:
+        camera_plane = ps_scene_data.camera_plane
+    
+    camera_plane_channel = None
+    camera_plane_material = None
+    if camera_plane and camera_plane.material_slots and camera_plane.material_slots[0].material:
+        camera_plane_material = camera_plane.material_slots[0].material
+        if camera_plane_material and camera_plane_material.ps_mat_data and camera_plane_material.ps_mat_data.groups and camera_plane_material.ps_mat_data.groups[0].channels:
+            camera_plane_channel = camera_plane_material.ps_mat_data.groups[0].channels[0]
+    
     return PSContext(
         ps_settings=ps_settings,
         ps_scene_data=ps_scene_data,
@@ -1071,7 +1165,10 @@ def parse_context(context: bpy.types.Context) -> PSContext:
         active_group=active_group,
         active_channel=active_channel,
         active_layer=active_layer,
-        active_global_layer=get_global_layer(active_layer) if active_layer else None
+        active_global_layer=get_global_layer(active_layer) if active_layer else None,
+        camera_plane=camera_plane,
+        camera_plane_material=camera_plane_material,
+        camera_plane_channel=camera_plane_channel
     )
 
 class PSContextMixin:

@@ -39,7 +39,7 @@ class MultiMaterialOperator(Operator):
         objects.add(ps_ctx.ps_object)
         if self.multiple_objects:
             for obj in context.selected_objects:
-                if obj.type == 'MESH':
+                if obj.type == 'MESH' and obj.name != "PS Camera Plane":
                     objects.add(obj)
         
         seen_materials = set()

@@ -122,7 +122,10 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             if len(global_item.actions) > 0:
                 row.label(icon="KEYTYPE_KEYFRAME_VEC")
             if is_global_layer_linked(global_item):
-                row.label(icon="LINKED")
+                if global_item.attached_to_camera_plane:
+                    row.label(icon="VIEW_CAMERA")
+                else:
+                    row.label(icon="LINKED")
             row.prop(global_item, "enabled", text="",
                      icon="HIDE_OFF" if global_item.enabled else "HIDE_ON", emboss=False)
             self.draw_custom_properties(row, global_item)
@@ -181,7 +184,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     def draw_header_preset(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
-        if ps_ctx.ps_object.mode != 'TEXTURE_PAINT':
+        if context.mode != 'TEXTURE_PAINT':
             return
         if ps_ctx.active_channel:
             layout.popover(
@@ -433,6 +436,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
             if not active_layer:
                 return
                 # Settings
+            layout.prop(global_layer, "attached_to_camera_plane", text="")
             row = layout.row(align=True)
             scale_content(context, row)
             row.popover(
@@ -710,14 +714,14 @@ class MAT_MT_AddLayerMenu(Menu):
         col.operator("paint_system.new_folder_layer",
                      icon_value=get_icon('folder'), text="Folder")
         col.separator()
-        col.label(text="Basic:")
+        # col.label(text="Basic:")
         col.operator("paint_system.new_solid_color_layer", text="Solid Color",
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
         col.menu("MAT_MT_AddImageLayerMenu", text="Image", icon='IMAGE_RGB_ALPHA')
         col.menu("MAT_MT_AddGradientLayerMenu", text="Gradient", icon='COLOR')
         col.menu("MAT_MT_AddAdjustmentLayerMenu", text="Adjustment", icon='SHADERFX')
         col.separator()
-        col.label(text="Advanced:")
+        # col.label(text="Advanced:")
         col.operator("paint_system.new_attribute_layer",
                      text="Attribute Color", icon='MESH_DATA')
         col.operator("paint_system.new_random_color_layer",

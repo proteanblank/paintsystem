@@ -35,6 +35,9 @@ class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
     def execute(self, context):
         ps_ctx = self.parse_context(context)
         obj = ps_ctx.ps_object
+        # Set selected and active object
+        context.view_layer.objects.active = obj
+        obj.select_set(True)
         if obj.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
             return {'FINISHED'}
