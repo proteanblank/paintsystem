@@ -956,6 +956,60 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, MultiMaterialOperator):
         return {'CANCELLED'}
 
 
+class PAINTSYSTEM_OT_MoveUpCameraPlane(PSContextMixin, MultiMaterialOperator):
+    """Move the active item up camera plane"""
+    bl_idname = "paint_system.move_up_camera_plane"
+    bl_label = "Move Item Up"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Move the active item up"
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        active_channel = ps_ctx.camera_plane_channel
+        if not active_channel:
+            return False
+        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
+        options = active_channel.get_movement_options(item_id, 'UP')
+        return bool(options)
+    
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        active_channel = ps_ctx.camera_plane_channel
+        if not active_channel:
+            return {'CANCELLED'}
+        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
+        active_channel.execute_movement(item_id, 'UP', 'SKIP')
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_MoveDownCameraPlane(PSContextMixin, MultiMaterialOperator):
+    """Move the active item down camera plane"""
+    bl_idname = "paint_system.move_down_camera_plane"
+    bl_label = "Move Item Down"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_description = "Move the active item down"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        active_channel = ps_ctx.camera_plane_channel
+        if not active_channel:
+            return False
+        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
+        options = active_channel.get_movement_options(item_id, 'DOWN')
+        return bool(options)
+    
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        active_channel = ps_ctx.camera_plane_channel
+        if not active_channel:
+            return {'CANCELLED'}
+        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
+        active_channel.execute_movement(item_id, 'DOWN', 'SKIP')
+        return {'FINISHED'}
+
+
 class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
     """Copy the active layer"""
     bl_idname = "paint_system.copy_layer"
@@ -1150,6 +1204,8 @@ classes = (
     PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,
+    PAINTSYSTEM_OT_MoveUpCameraPlane,
+    PAINTSYSTEM_OT_MoveDownCameraPlane,
     PAINTSYSTEM_OT_CopyLayer,
     PAINTSYSTEM_OT_CopyAllLayers,
     PAINTSYSTEM_OT_PasteLayer,

@@ -15,6 +15,7 @@ from .common import (
 
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
 from ..paintsystem.data import (
+    GlobalLayer,
     ADJUSTMENT_TYPE_ENUM, 
     GRADIENT_TYPE_ENUM, 
     is_global_layer_linked,
@@ -59,6 +60,38 @@ def is_basic_setup(node_tree: NodeTree) -> bool:
     return is_basic_setup
 
 
+def draw_global_layer_icon(global_item: GlobalLayer, layout: bpy.types.UILayout):
+    match global_item.type:
+        case 'IMAGE':
+            if not global_item.image.preview:
+                global_item.image.asset_generate_preview()
+            if global_item.image.preview and is_image_painted(global_item.image.preview):
+                layout.label(
+                    icon_value=global_item.image.preview.icon_id)
+            else:
+                layout.label(icon_value=get_icon('image'))
+        case 'FOLDER':
+            layout.prop(global_item, "is_expanded", text="", icon_only=True, icon_value=get_icon(
+                'folder_open') if global_item.is_expanded else get_icon('folder'), emboss=False)
+        case 'SOLID_COLOR':
+            rgb_node = global_item.find_node("rgb")
+            if rgb_node:
+                layout.prop(
+                    rgb_node.outputs[0], "default_value", text="", icon='IMAGE_RGB_ALPHA')
+        case 'ADJUSTMENT':
+            layout.label(icon='SHADERFX')
+        case 'SHADER':
+            layout.label(icon='SHADING_RENDERED')
+        case 'NODE_GROUP':
+            layout.label(icon='NODETREE')
+        case 'ATTRIBUTE':
+            layout.label(icon='MESH_DATA')
+        case 'GRADIENT':
+            layout.label(icon='COLOR')
+        case 'RANDOM':
+            layout.label(icon='SEQ_HISTOGRAM')
+        case _:
+            layout.label(icon='BLANK1')
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
         # The UIList passes channel as 'data'
@@ -78,37 +111,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             row = main_row.row(align=True)
             for _ in range(level):
                 row.label(icon='BLANK1')
-            match global_item.type:
-                case 'IMAGE':
-                    if not global_item.image.preview:
-                        global_item.image.asset_generate_preview()
-                    if global_item.image.preview and is_image_painted(global_item.image.preview):
-                        row.label(
-                            icon_value=global_item.image.preview.icon_id)
-                    else:
-                        row.label(icon_value=get_icon('image'))
-                case 'FOLDER':
-                    row.prop(global_item, "is_expanded", text="", icon_only=True, icon_value=get_icon(
-                        'folder_open') if global_item.is_expanded else get_icon('folder'), emboss=False)
-                case 'SOLID_COLOR':
-                    rgb_node = global_item.find_node("rgb")
-                    if rgb_node:
-                        row.prop(
-                            rgb_node.outputs[0], "default_value", text="", icon='IMAGE_RGB_ALPHA')
-                case 'ADJUSTMENT':
-                    row.label(icon='SHADERFX')
-                case 'SHADER':
-                    row.label(icon='SHADING_RENDERED')
-                case 'NODE_GROUP':
-                    row.label(icon='NODETREE')
-                case 'ATTRIBUTE':
-                    row.label(icon='MESH_DATA')
-                case 'GRADIENT':
-                    row.label(icon='COLOR')
-                case 'RANDOM':
-                    row.label(icon='SEQ_HISTOGRAM')
-                case _:
-                    row.label(icon='BLANK1')
+            draw_global_layer_icon(global_item, row)
 
             row = main_row.row(align=True)
             row.prop(item, "name", text="", emboss=False)
@@ -436,7 +439,6 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
             if not active_layer:
                 return
                 # Settings
-            layout.prop(global_layer, "attached_to_camera_plane", text="")
             row = layout.row(align=True)
             scale_content(context, row)
             row.popover(
@@ -561,6 +563,99 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 case _:
                     pass
 
+
+class MAT_PT_UL_CameraPlaneLayerList(PSContextMixin, UIList):
+    def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
+        # The UIList passes channel as 'data'
+        active_channel = data
+        flattened = active_channel.flatten_hierarchy()
+        if index < len(flattened):
+            global_item = get_global_layer(item)
+            level = active_channel.get_item_level_from_id(item.id)
+            main_row = layout.row()
+            # Check if parent of the current item is enabled
+            parent_item = active_channel.get_item_by_id(
+                item.parent_id)
+            global_parent_item = get_global_layer(parent_item)
+            if global_parent_item and not global_parent_item.enabled:
+                main_row.enabled = False
+
+            # row = main_row.row(align=True)
+            # draw_global_layer_icon(global_item, row)
+
+            row = main_row.row(align=True)
+            # row.label(text=global_item.name)
+            # row.label(text=f"Order: {item.order}")
+            if self.parse_context(context).active_global_layer == global_item:
+                row.label(text=f"Camera Plane {item.order} (Current)", icon="SOLO_ON")
+            else:
+                row.label(text=f"Camera Plane {item.order}")
+                row.enabled = False
+    
+    def filter_items(self, context, data, propname):
+        layers = getattr(data, propname).values()
+        flattened_layers = [v[0] for v in data.flatten_hierarchy()]
+
+        # Default return values.
+        flt_flags = []
+        flt_neworder = []
+
+        # Filtering by name
+        flt_flags = [self.bitflag_filter_item] * len(layers)
+        for idx, layer in enumerate(layers):
+            flt_neworder.append(flattened_layers.index(layer))
+            while layer.parent_id != -1:
+                layer = data.get_item_by_id(layer.parent_id)
+                global_layer = get_global_layer(layer)
+                if global_layer and not global_layer.is_expanded:
+                    flt_flags[idx] &= ~self.bitflag_filter_item
+                    break
+
+        return flt_flags, flt_neworder
+
+class MAT_PT_LayerCameraPlaneSettings(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_LayerCameraPlaneSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Camera Plane"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.ps_object.type == 'MESH'
+    
+    def draw_header_preset(self, context):
+        ps_ctx = self.parse_context(context)
+        layout = self.layout
+        global_layer = ps_ctx.active_global_layer
+        attached_to_camera_plane = global_layer.attached_to_camera_plane
+        layout.prop(global_layer, "attached_to_camera_plane", text="Remove" if attached_to_camera_plane else "Attach", icon="NONE" if attached_to_camera_plane else "ADD", toggle = 1)
+    
+    def draw(self, context):
+        ps_ctx = self.parse_context(context)
+        layout = self.layout
+        global_layer = ps_ctx.active_global_layer
+        # layout.prop(global_layer, "attached_to_camera_plane", text="Remove from Camera Plane" if global_layer.attached_to_camera_plane else "Attach to Camera Plane", icon="VIEW_CAMERA")
+        
+        box = layout.box()
+        box.enabled = global_layer.attached_to_camera_plane
+        row = box.row()
+        row.alignment = 'CENTER'
+        row.label(text="Layers in Camera Plane:", icon="VIEW_CAMERA")
+        row = box.row()
+        col = row.column()
+        col.template_list(
+            "MAT_PT_UL_CameraPlaneLayerList", "", ps_ctx.camera_plane_channel, "layers", ps_ctx.camera_plane_channel, "active_index",
+            rows=max(5, len(ps_ctx.camera_plane_channel.layers))
+        )
+        col = row.column(align=True)
+        col.operator("paint_system.move_up_camera_plane", icon="TRIA_UP", text="")
+        col.operator("paint_system.move_down_camera_plane", icon="TRIA_DOWN", text="")
+        
+
 # Grease Pencil Layer Settings
 
 def disable_if_lock(self, context):
@@ -616,7 +711,7 @@ class MAT_PT_GreasePencilOnionSkinningSettings(PSContextMixin, Panel):
 
 
 # Paint System Layer Settings Advanced
-class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
+class MAT_PT_LayerSettingsAdvanced(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_PaintSystemLayerSettingsAdvanced'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -638,7 +733,12 @@ class MAT_PT_PaintSystemLayerSettingsAdvanced(PSContextMixin, Panel):
         ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         layout.enabled = not global_layer.lock_layer
-        layout.prop(global_layer, "coord_type", text="Coordinate Type")
+        box = layout.box()
+        box.label(text="Coordinate Type:")
+        box.prop(global_layer, "coord_type", text="")
+        if global_layer.attached_to_camera_plane:
+            box.label(text="This layer is attached to the camera plane", icon='ERROR')
+            
         if global_layer.coord_type == 'UV':
             layout.prop_search(global_layer, "uv_map_name", text="UV Map",
                                 search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
@@ -835,9 +935,11 @@ classes = (
     MAT_MT_LayerMenu,
     MAT_PT_Layers,
     MAT_PT_LayerSettings,
+    MAT_PT_UL_CameraPlaneLayerList,
+    MAT_PT_LayerCameraPlaneSettings,
     MAT_PT_GreasePencilMaskSettings,
     MAT_PT_GreasePencilOnionSkinningSettings,
-    MAT_PT_PaintSystemLayerSettingsAdvanced,
+    MAT_PT_LayerSettingsAdvanced,
     MAT_PT_Actions,
     PAINTSYSTEM_UL_Actions,
 )
