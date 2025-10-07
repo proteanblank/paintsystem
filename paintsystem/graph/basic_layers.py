@@ -47,9 +47,6 @@ def create_image_graph(global_layer: "GlobalLayer"):
     builder = NodeTreeBuilder(node_tree, "Layer", version=IMAGE_LAYER_VERSION)
     create_mixing_graph(builder, "image", "Color", "image", "Alpha")
     builder.add_node("image", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest"})
-    # If global_layer is attached to camera plane, force the coord type to UV
-    if global_layer.attached_to_camera_plane:
-        coord_type = "UV"
     create_coord_graph(builder, coord_type, uv_map_name, 'image', 'Vector')
     return builder
 

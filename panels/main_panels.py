@@ -10,6 +10,29 @@ from .common import (
 
 from ..paintsystem.data import LegacyPaintSystemContextParser
 
+creators = [
+    ("Tawan Sunflower", "https://x.com/himawari_hito"),
+    ("@blastframe", "https://github.com/blastframe"),
+    ("Pink.Ninjaa", "https://pinkninjaa.net/")
+]
+
+class MAT_PT_Support(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_Support'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Support"
+    bl_ui_units_x = 10
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Addon created by:")
+        for creator in creators:
+            layout.operator('wm.url_open', text=creator[0],
+                            icon='URL').url = creator[1]
+        layout.separator()
+        layout.operator('wm.url_open', text="Support us!",
+                        icon='FUND', depress=True).url = "https://tawansunflower.gumroad.com/l/paint_system"
+
 class MAT_MT_PaintSystemMaterialSelectMenu(PSContextMixin, Menu):
     bl_label = "Material Select Menu"
     bl_idname = "MAT_MT_PaintSystemMaterialSelectMenu"
@@ -71,12 +94,9 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
     bl_label = "Paint System"
     bl_category = 'Paint System'
     
-    # def draw_header_preset(self, context):
-    #     layout = self.layout
-    #     row = layout.row(align=True)
-    #     row.scale_y = 1.2
-    #     row.operator("paint_system.new_group", text="Add", icon="ADD")
-    #     row.operator("paint_system.delete_group", text="", icon="REMOVE")
+    def draw_header_preset(self, context):
+        layout = self.layout
+        layout.popover("MAT_PT_Support", icon="FUND", text="Wah!")
     
     @classmethod
     def poll(cls, context):
@@ -170,6 +190,7 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
 
 
 classes = (
+    MAT_PT_Support,
     MATERIAL_UL_PaintSystemGroups,
     MAT_MT_PaintSystemMaterialSelectMenu,
     MAT_PT_PaintSystemMainPanel,

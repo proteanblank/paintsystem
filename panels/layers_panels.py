@@ -753,11 +753,12 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
         if global_layer.coord_type == 'UV':
             col.prop_search(global_layer, "uv_map_name", text="UV Map",
                                 search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
-        if global_layer.attached_to_camera_plane:
+        if global_layer.coord_type not in ['UV', 'AUTO']:
             info_box = col.box()
+            info_box.alert = True
             info_col = info_box.column(align=True)
-            info_col.label(text="Has no effect when attached", icon='INFO')
-            info_col.label(text="to the camera plane", icon='BLANK1')
+            info_col.label(text="Painting may not work", icon='ERROR')
+            info_col.label(text="as expected.", icon='BLANK1')
         
         mapping_node = global_layer.find_node("mapping")
         if mapping_node:
