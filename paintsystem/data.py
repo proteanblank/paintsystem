@@ -354,6 +354,7 @@ class GlobalLayer(PropertyGroup):
         cam_channel.update_node_tree(context)
         cam_channel.normalize_orders()
         ps_ctx.active_channel.update_node_tree(context)
+        self.update_node_tree(context)
         update_active_image(self, context)
             
     def find_node(self, identifier: str) -> Node | None:
