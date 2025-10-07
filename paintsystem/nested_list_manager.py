@@ -91,6 +91,7 @@ class BaseNestedListManager(PropertyGroup):
                 setattr(new_item, key, value)
 
         self.next_id += 1
+        self.normalize_orders()
         return new_item
 
     def remove_item_and_children(self, item_id, on_delete=None):
@@ -120,6 +121,7 @@ class BaseNestedListManager(PropertyGroup):
                 getattr(self, self.collection_name).remove(index)
 
             return True
+        self.normalize_orders()
         return False
 
     def get_next_order(self, parent_id):
