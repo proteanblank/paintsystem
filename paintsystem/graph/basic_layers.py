@@ -60,7 +60,7 @@ def create_solid_graph(global_layer: "GlobalLayer"):
     node_tree = global_layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer", version=SOLID_COLOR_LAYER_VERSION)
     create_mixing_graph(builder, "rgb", "Color")
-    builder.add_node("rgb", "ShaderNodeRGB")
+    builder.add_node("rgb", "ShaderNodeRGB", default_outputs={0: (1, 1, 1, 1)})
     return builder
 
 def create_attribute_graph(global_layer: "GlobalLayer"):
