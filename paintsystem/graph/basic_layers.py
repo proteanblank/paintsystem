@@ -15,6 +15,7 @@ ADJUSTMENT_LAYER_VERSION = 1
 GRADIENT_LAYER_VERSION = 1
 RANDOM_LAYER_VERSION = 1
 CUSTOM_LAYER_VERSION = 1
+TEXTURE_LAYER_VERSION = 1
 
 ALPHA_OVER_LAYER_VERSION = 1
 
@@ -36,6 +37,8 @@ def get_layer_version_for_type(type: str) -> int:
             return RANDOM_LAYER_VERSION
         case "CUSTOM":
             return CUSTOM_LAYER_VERSION
+        case "TEXTURE":
+            return TEXTURE_LAYER_VERSION
         case _:
             raise ValueError(f"Invalid layer type: {type}")
 
@@ -148,6 +151,16 @@ def create_custom_graph(global_layer: "GlobalLayer"):
         builder.link("group_input", "custom_node_tree", "Alpha", alpha_input)
     return builder
 
+def create_texture_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
+    texture_type = global_layer.texture_type
+    coord_type = global_layer.coord_type
+    uv_map_name = global_layer.uv_map_name
+    builder = NodeTreeBuilder(node_tree, "Layer", version=TEXTURE_LAYER_VERSION)
+    create_mixing_graph(builder, "texture", "Color")
+    builder.add_node("texture", texture_type)
+    create_coord_graph(builder, coord_type, uv_map_name, 'texture', 'Vector')
+    return builder
 
 def get_alpha_over_nodetree():
     if ".PS Alpha Over" in bpy.data.node_groups:

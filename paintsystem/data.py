@@ -40,6 +40,7 @@ from .graph import (
     create_random_graph,
     create_solid_graph,
     get_alpha_over_nodetree,
+    create_texture_graph,
 )
 from .graph.common import get_library_object
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
@@ -61,6 +62,7 @@ LAYER_TYPE_ENUM = [
     ('NODE_GROUP', "Node Group", "Node Group layer"),
     ('GRADIENT', "Gradient", "Gradient layer"),
     ('RANDOM', "Random", "Random Color layer"),
+    ('TEXTURE', "Texture", "Texture layer"),
 ]
 
 CHANNEL_TYPE_ENUM = [
@@ -83,6 +85,18 @@ ADJUSTMENT_TYPE_ENUM = [
     ('ShaderNodeInvert', "Invert", ""),
     ('ShaderNodeRGBCurve', "RGB Curves", ""),
     # ('ShaderNodeAmbientOcclusion', "Ambient Occlusion", ""),
+]
+
+TEXTURE_TYPE_ENUM = [
+    ('ShaderNodeTexBrick', "Brick Texture", ""),
+    ('ShaderNodeTexChecker', "Checker Texture", ""),
+    ('ShaderNodeTexGabor', "Gabor Texture", ""),
+    ('ShaderNodeTexGradient', "Gradient Texture", ""),
+    ('ShaderNodeTexMagic', "Magic Texture", ""),
+    ('ShaderNodeTexNoise', "Noise Texture", ""),
+    ('ShaderNodeTexVoronoi', "Voronoi Texture", ""),
+    ('ShaderNodeTexWave', "Wave Texture", ""),
+    ('ShaderNodeTexWhiteNoise', "White Noise Texture", ""),
 ]
 
 COORDINATE_TYPE_ENUM = [
@@ -293,8 +307,10 @@ class GlobalLayer(PropertyGroup):
                 layer_graph = create_random_graph(self)
             case "NODE_GROUP":
                 layer_graph = create_custom_graph(self)
+            case "TEXTURE":
+                layer_graph = create_texture_graph(self)
             case _:
-                pass
+                raise ValueError(f"Invalid layer type: {self.type}")
         if not self.enabled:
             layer_graph.link("group_input", "group_output", "Color", "Color")
             layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
@@ -469,6 +485,12 @@ class GlobalLayer(PropertyGroup):
         name="Gradient Type",
         description="Gradient type",
         default='LINEAR',
+        update=update_node_tree
+    )
+    texture_type: EnumProperty(
+        items=TEXTURE_TYPE_ENUM,
+        name="Texture Type",
+        description="Texture type",
         update=update_node_tree
     )
     type: EnumProperty(

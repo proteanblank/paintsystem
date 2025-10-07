@@ -14,7 +14,7 @@ from ..paintsystem.data import (
     ACTION_TYPE_ENUM,
     ADJUSTMENT_TYPE_ENUM,
     ATTRIBUTE_TYPE_ENUM,
-    COORDINATE_TYPE_ENUM,
+    TEXTURE_TYPE_ENUM,
     GRADIENT_TYPE_ENUM,
     get_global_layer,
     is_global_layer_linked,
@@ -722,6 +722,51 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
             box.prop(self, "custom_color_output", text="Color")
             box.prop(self, "custom_alpha_output", text="Alpha")
 
+
+class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialOperator):
+    """Create a new texture layer"""
+    bl_idname = "paint_system.new_texture_layer"
+    bl_label = "New Texture Layer"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    layer_name: StringProperty(
+        name="Layer Name",
+        description="Name of the new texture layer",
+        default="Texture Layer"
+    )
+
+    texture_type: EnumProperty(
+        name="Texture Type",
+        description="Type of texture to create",
+        items=TEXTURE_TYPE_ENUM,
+    )
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.active_channel is not None
+    
+    def invoke(self, context, event):
+        self.get_coord_type(context)
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        self.multiple_objects_ui(layout, context)
+        box = layout.box()
+        self.select_coord_type_ui(box, context)
+    
+    def process_material(self, context):
+        ps_ctx = self.parse_context(context)
+        global_layer = add_global_layer("TEXTURE")
+        global_layer.texture_type = self.texture_type
+        global_layer.coord_type = self.coord_type
+        global_layer.uv_map_name = self.uv_map_name
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
 class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
     """Remove the active item"""
     bl_idname = "paint_system.delete_item"
@@ -1209,6 +1254,7 @@ classes = (
     PAINTSYSTEM_OT_FixMissingGradientEmpty,
     PAINTSYSTEM_OT_SelectGradientEmpty,
     PAINTSYSTEM_OT_NewRandomColor,
+    PAINTSYSTEM_OT_NewTexture,
     PAINTSYSTEM_OT_NewCustomNodeGroup,
     PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,

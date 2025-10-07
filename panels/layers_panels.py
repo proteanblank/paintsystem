@@ -18,6 +18,7 @@ from ..paintsystem.data import (
     GlobalLayer,
     ADJUSTMENT_TYPE_ENUM, 
     GRADIENT_TYPE_ENUM, 
+    TEXTURE_TYPE_ENUM,
     is_global_layer_linked,
     sort_actions
 )
@@ -90,6 +91,8 @@ def draw_global_layer_icon(global_item: GlobalLayer, layout: bpy.types.UILayout)
             layout.label(icon='COLOR')
         case 'RANDOM':
             layout.label(icon='SEQ_HISTOGRAM')
+        case 'TEXTURE':
+            layout.label(icon='TEXTURE')
         case _:
             layout.label(icon='BLANK1')
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
@@ -564,6 +567,12 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.label(text="Random Settings:", icon='SHADERFX')
                         col.prop(
                             random_node.inputs[1], "default_value", text="Random Seed")
+                case 'TEXTURE':
+                    texture_node = global_layer.find_node("texture")
+                    if texture_node:
+                        col.enabled = not global_layer.lock_layer
+                        col.label(text="Texture Settings:", icon='TEXTURE')
+                        col.template_node_inputs(texture_node)
                 case _:
                     pass
 
@@ -735,7 +744,7 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
-        return global_layer and global_layer.type in ('IMAGE')
+        return global_layer and global_layer.type in ('IMAGE', 'TEXTURE')
     
     def draw_header(self, context):
         layout = self.layout
@@ -857,6 +866,18 @@ class MAT_MT_AddAdjustmentLayerMenu(Menu):
         for idx, (node_type, name, description) in enumerate(ADJUSTMENT_TYPE_ENUM):
             layout.operator("paint_system.new_adjustment_layer",
                 text=name, icon='SHADERFX' if idx == 0 else 'NONE').adjustment_type = node_type
+
+
+class MAT_MT_AddTextureLayerMenu(Menu):
+    bl_label = "Add Texture"
+    bl_idname = "MAT_MT_AddTextureLayerMenu"
+    
+    def draw(self, context):
+        layout = self.layout
+        for idx, (node_type, name, description) in enumerate(TEXTURE_TYPE_ENUM):
+            layout.operator("paint_system.new_texture_layer",
+                text=name, icon='TEXTURE' if idx == 0 else 'NONE').texture_type = node_type
+
 class MAT_MT_AddLayerMenu(Menu):
     bl_label = "Add Layer"
     bl_idname = "MAT_MT_AddLayer"
@@ -873,6 +894,7 @@ class MAT_MT_AddLayerMenu(Menu):
         col.menu("MAT_MT_AddImageLayerMenu", text="Image", icon_value=get_icon('image'))
         col.menu("MAT_MT_AddGradientLayerMenu", text="Gradient", icon='COLOR')
         col.menu("MAT_MT_AddAdjustmentLayerMenu", text="Adjustment", icon='SHADERFX')
+        col.menu("MAT_MT_AddTextureLayerMenu", text="Texture", icon='TEXTURE')
         col.separator()
         # col.label(text="Advanced:")
         col.operator("paint_system.new_attribute_layer",
@@ -985,6 +1007,7 @@ classes = (
     MAT_MT_AddImageLayerMenu,
     MAT_MT_AddGradientLayerMenu,
     MAT_MT_AddAdjustmentLayerMenu,
+    MAT_MT_AddTextureLayerMenu,
     MAT_MT_LayerMenu,
     MAT_PT_Layers,
     MAT_PT_LayerSettings,
