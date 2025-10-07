@@ -1043,6 +1043,8 @@ def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
     # Check all material in the scene and count the number of times the global layer is used
     count = 0
     for material in bpy.data.materials:
+        if material.name == "PS Camera Plane Material":
+            continue
         if hasattr(material, 'ps_mat_data'):
             for group in material.ps_mat_data.groups:
                 for channel in group.channels:

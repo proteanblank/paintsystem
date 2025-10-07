@@ -745,6 +745,8 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
         #         bpy.data.objects.remove(empty_object, do_unlink=True)
         
         if not is_global_layer_linked(global_layer):
+            # Check if global layer is used in the camera plane channel
+            global_layer.attached_to_camera_plane = False
             # Delete the global layer
             if global_layer.empty_object:
                 bpy.data.objects.remove(global_layer.empty_object, do_unlink=True)
