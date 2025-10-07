@@ -7,6 +7,7 @@ from .common import (
     get_icon_from_channel,
     get_group_node,
     check_group_multiuser,
+    get_icon,
 )
 
 class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
@@ -74,9 +75,9 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
             return False
         return ps_ctx.ps_mat_data and ps_ctx.active_group is not None and ob.mode == 'OBJECT'
     
-    # def draw_header(self, context):
-    #     layout = self.layout
-    #     layout.label(icon_value=get_icon('channel'))
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(icon_value=get_icon('channel'))
         
     def draw_header_preset(self, context):
         layout = self.layout

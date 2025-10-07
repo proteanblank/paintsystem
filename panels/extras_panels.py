@@ -2,7 +2,7 @@ import bpy
 from bpy.types import Panel
 from bpy.utils import register_classes_factory
 
-from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name, scale_content
+from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name, scale_content, get_icon
 from ..utils.version import is_newer_than
 from ..utils.unified_brushes import get_unified_settings
 
@@ -63,23 +63,23 @@ class MAT_PT_Brush(PSContextMixin, Panel, UnifiedPaintPanel):
 
     def draw_header(self, context):
         layout = self.layout
-        layout.label(icon="BRUSHES_ALL")
+        layout.label(icon_value=get_icon('brush'))
 
-    def draw_header_preset(self, context):
-        layout = self.layout
-        ps_ctx = self.parse_context(context)
-        settings = self.paint_settings(context)
-        brush = settings.brush
-        obj = ps_ctx.ps_object
-        row = layout.row()
-        match obj.type:
-            case 'GREASEPENCIL':
-                row.label(text="Grease Pencil", icon="GREASEPENCIL")
-            case 'MESH':
-                self.prop_unified(row, context, brush, "size",
-                    "use_unified_size", icon="WORLD", text="Size", slider=True, header=True)
-            case _:
-                pass
+    # def draw_header_preset(self, context):
+    #     layout = self.layout
+    #     ps_ctx = self.parse_context(context)
+    #     settings = self.paint_settings(context)
+    #     brush = settings.brush
+    #     obj = ps_ctx.ps_object
+    #     row = layout.row()
+    #     match obj.type:
+    #         case 'GREASEPENCIL':
+    #             row.label(text="Grease Pencil", icon="GREASEPENCIL")
+    #         case 'MESH':
+    #             self.prop_unified(row, context, brush, "size",
+    #                 "use_unified_size", icon="WORLD", text="Size", slider=True, header=True)
+    #         case _:
+    #             pass
             
     def draw(self, context):
         layout = self.layout
@@ -197,7 +197,7 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
 
     def draw_header(self, context):
         layout = self.layout
-        layout.label(icon="COLOR")
+        layout.label(icon_value=get_icon('color'))
 
     def draw_header_preset(self, context):
         ps_ctx = self.parse_context(context)

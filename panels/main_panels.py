@@ -89,6 +89,8 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
         legacy_ps_ctx = LegacyPaintSystemContextParser(context)
         legacy_material_settings = legacy_ps_ctx.get_material_settings()
         if legacy_material_settings and legacy_material_settings.groups:
@@ -139,6 +141,8 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
                 row.operator("object.material_slot_assign", text="Assign")
                 row.operator("object.material_slot_select", text="Select")
                 row.operator("object.material_slot_deselect", text="Deselect")
+            
+            layout.prop(mat, "surface_render_method", text="Render Method", icon="RENDER_RESULT")
         
         if len(groups) > 1:
             row = col.row(align=True)
@@ -161,13 +165,6 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             row.scale_y = 2
             row.operator("paint_system.new_group", text="Add Paint System", icon="ADD")
             return
-        brush_imported = False
-        for brush in bpy.data.brushes:
-            if brush.name.startswith("PS_"):
-                brush_imported = True
-                break
-        if not brush_imported:
-            layout.operator('paint_system.add_preset_brushes')
         # layout.label(text="Welcome to the Paint System!")
         # layout.operator("paint_system.new_image_layer", text="Create New Image Layer")
 

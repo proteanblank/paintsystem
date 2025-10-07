@@ -183,11 +183,15 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         if ps_ctx.active_group and check_group_multiuser(ps_ctx.active_group.node_tree):
             return False
         return (ps_ctx.active_channel is not None or ps_ctx.ps_object.type == 'GREASEPENCIL')
+    
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(icon_value=get_icon('layers'))
 
     def draw_header_preset(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
-        if context.mode != 'TEXTURE_PAINT':
+        if context.mode != 'PAINT_TEXTURE':
             return
         if ps_ctx.active_channel:
             layout.popover(
@@ -223,14 +227,14 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         row.scale_x = 1.7
         # if contains_mat_setup:
         row.operator("paint_system.toggle_paint_mode",
-                    text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon('paintbrush'))
+                    text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon_from_channel(ps_ctx.active_channel))
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             grease_pencil = context.grease_pencil
             layers = grease_pencil.layers
             is_layer_active = layers.active is not None
             is_group_active = grease_pencil.layer_groups.active is not None
             row.operator("wm.save_mainfile",
-                text="", icon="FILE_TICK")
+                text="", icon_value=get_icon('save'))
             row = box.row()
             scale_content(context, row, scale_x=1, scale_y=1.2)
             row.template_grease_pencil_layer_tree()
@@ -283,7 +287,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                 row.operator("paint_system.preview_active_channel",
                             text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
             row.operator("wm.save_mainfile",
-                        text="", icon="FILE_TICK")
+                        text="", icon_value=get_icon('save'))
             # Baking and Exporting
             row = col.row(align=True)
             row.scale_y = 1.5
@@ -386,9 +390,9 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         else:
             return False
 
-    # def draw_header(self, context):
-    #     layout = self.layout
-    #     layout.label(icon="SETTINGS")
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(icon="PREFERENCES")
         
     # def draw_header_preset(self, context):
     #     layout = self.layout
@@ -629,7 +633,7 @@ class MAT_PT_LayerCameraPlaneSettings(PSContextMixin, Panel):
     
     def draw_header(self, context):
         layout = self.layout
-        layout.label(icon="VIEW_CAMERA")
+        layout.label(icon="CAMERA_DATA")
     
     def draw_header_preset(self, context):
         ps_ctx = self.parse_context(context)
@@ -641,9 +645,11 @@ class MAT_PT_LayerCameraPlaneSettings(PSContextMixin, Panel):
     def draw(self, context):
         ps_ctx = self.parse_context(context)
         layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
         global_layer = ps_ctx.active_global_layer
         # layout.prop(global_layer, "attached_to_camera_plane", text="Remove from Camera Plane" if global_layer.attached_to_camera_plane else "Attach to Camera Plane", icon="VIEW_CAMERA")
-        
+        layout.prop(ps_ctx.camera_plane_material, "surface_render_method", text="Render Method")
         box = layout.box()
         box.enabled = global_layer.attached_to_camera_plane
         row = box.row()

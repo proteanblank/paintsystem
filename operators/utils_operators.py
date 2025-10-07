@@ -250,8 +250,7 @@ class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.parse_context(context)
-        return context.area.type == 'VIEW_3D' and ps_ctx.ps_object.mode == 'TEXTURE_PAINT'
+        return context.area.type == 'VIEW_3D' and context.mode == 'PAINT_TEXTURE'
 
     def invoke(self, context, event):
         self.x = event.mouse_x
