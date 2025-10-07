@@ -1,5 +1,8 @@
 import bpy
-from .data import sort_actions
+from .data import sort_actions, parse_context
+from .graph.basic_layers import get_layer_version_for_type
+import time
+from .graph.nodetree_builder import get_nodetree_version
 
 @bpy.app.handlers.persistent
 def frame_change_pre(scene):
@@ -33,8 +36,25 @@ def frame_change_pre(scene):
             global_layer.enabled = enabled
 
 
+@bpy.app.handlers.persistent
+def load_post(scene):
+    start_time = time.time()
+    ps_ctx = parse_context(bpy.context)
+    if not ps_ctx.ps_scene_data:
+        return
+    # Layer Versioning
+    for global_layer in ps_ctx.ps_scene_data.layers:
+        target_version = get_layer_version_for_type(global_layer.type)
+        if get_nodetree_version(global_layer.node_tree) != target_version:
+            print(f"Updating layer {global_layer.name} to version {target_version}")
+            global_layer.update_node_tree(bpy.context)
+    print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers)} layers in {round((time.time() - start_time) * 1000, 2)} ms")
+
+
 def register():
     bpy.app.handlers.frame_change_pre.append(frame_change_pre)
+    bpy.app.handlers.load_post.append(load_post)
 
 def unregister():
     bpy.app.handlers.frame_change_pre.remove(frame_change_pre)
+    bpy.app.handlers.load_post.remove(load_post)

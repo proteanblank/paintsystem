@@ -87,7 +87,7 @@ ADJUSTMENT_TYPE_ENUM = [
 
 COORDINATE_TYPE_ENUM = [
     ('AUTO', "Auto UV", "Automatically create a new UV Map"),
-    ('UV', "Use Existing UV", "Open an existing UV Map"),
+    ('UV', "UV", "Open an existing UV Map"),
     # ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
     ('OBJECT', "Object", "Use a object output of Texture Coordinate node"),
     ('CAMERA', "Camera", "Use a camera output of Texture Coordinate node"),

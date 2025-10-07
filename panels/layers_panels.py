@@ -627,6 +627,10 @@ class MAT_PT_LayerCameraPlaneSettings(PSContextMixin, Panel):
         ps_ctx = cls.parse_context(context)
         return ps_ctx.ps_object.type == 'MESH'
     
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(icon="VIEW_CAMERA")
+    
     def draw_header_preset(self, context):
         ps_ctx = self.parse_context(context)
         layout = self.layout
@@ -711,11 +715,58 @@ class MAT_PT_GreasePencilOnionSkinningSettings(PSContextMixin, Panel):
 
 
 # Paint System Layer Settings Advanced
-class MAT_PT_LayerSettingsAdvanced(PSContextMixin, Panel):
-    bl_idname = 'MAT_PT_PaintSystemLayerSettingsAdvanced'
+
+class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_LayerCoordinateSettings'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_label = "Advanced Settings"
+    bl_label = "Transform"
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        global_layer = ps_ctx.active_global_layer
+        return global_layer and global_layer.type in ('IMAGE')
+    
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(icon="EMPTY_ARROWS")
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        ps_ctx = self.parse_context(context)
+        global_layer = ps_ctx.active_global_layer
+        layout.enabled = not global_layer.lock_layer
+        col = layout.column()
+        col.prop(global_layer, "coord_type", text="Coord Type")
+        if global_layer.coord_type == 'UV':
+            col.prop_search(global_layer, "uv_map_name", text="UV Map",
+                                search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
+        if global_layer.attached_to_camera_plane:
+            info_box = col.box()
+            info_col = info_box.column(align=True)
+            info_col.label(text="Has no effect when attached", icon='INFO')
+            info_col.label(text="to the camera plane", icon='BLANK1')
+        
+        mapping_node = global_layer.find_node("mapping")
+        if mapping_node:
+            box = col.box()
+            box.use_property_split = False
+            col = box.column()
+            col.label(text="Mapping Settings:", icon="EMPTY_ARROWS")
+            col.template_node_inputs(mapping_node)
+
+
+class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
+    bl_idname = 'MAT_PT_ImageLayerSettings'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "Image"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_LayerSettings'
     bl_options = {'DEFAULT_CLOSED'}
@@ -725,6 +776,10 @@ class MAT_PT_LayerSettingsAdvanced(PSContextMixin, Panel):
         ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         return global_layer and global_layer.type == 'IMAGE'
+    
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(icon_value=get_icon('image'))
 
     def draw(self, context):
         layout = self.layout
@@ -733,28 +788,19 @@ class MAT_PT_LayerSettingsAdvanced(PSContextMixin, Panel):
         ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         layout.enabled = not global_layer.lock_layer
-        box = layout.box()
-        box.label(text="Coordinate Type:")
-        box.prop(global_layer, "coord_type", text="")
-        if global_layer.attached_to_camera_plane:
-            box.label(text="This layer is attached to the camera plane", icon='ERROR')
-            
-        if global_layer.coord_type == 'UV':
-            layout.prop_search(global_layer, "uv_map_name", text="UV Map",
-                                search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
 
         image_node = global_layer.find_node("image")
         if image_node:
             box = layout.box()
-            box.label(text="Image Settings:")
-            box.template_node_inputs(image_node)
-            box.prop(image_node, "interpolation",
+            col = box.column()
+            col.template_node_inputs(image_node)
+            col.prop(image_node, "interpolation",
                      text="")
-            box.prop(image_node, "projection",
+            col.prop(image_node, "projection",
                      text="")
-            box.prop(image_node, "extension",
+            col.prop(image_node, "extension",
                      text="")
-            box.prop(global_layer.image, "source",
+            col.prop(global_layer.image, "source",
                      text="")
 
 class MAT_MT_LayerMenu(PSContextMixin, Menu):
@@ -779,9 +825,9 @@ class MAT_MT_AddImageLayerMenu(Menu):
     
     def draw(self, context):
         layout = self.layout
-        layout.operator("paint_system.new_image_layer", text="New Image Layer", icon='IMAGE_RGB_ALPHA')
-        layout.operator("paint_system.new_image_layer", text="Import Image Layer", icon='IMPORT')
-        layout.operator("paint_system.new_image_layer", text="Use Existing Image Layer", icon='IMAGE')
+        layout.operator("paint_system.new_image_layer", text="New Image Layer", icon_value=get_icon('image')).image_add_type = 'NEW'
+        layout.operator("paint_system.new_image_layer", text="Import Image Layer").image_add_type = 'IMPORT'
+        layout.operator("paint_system.new_image_layer", text="Use Existing Image Layer").image_add_type = 'EXISTING'
 
 
 class MAT_MT_AddGradientLayerMenu(Menu):
@@ -817,7 +863,7 @@ class MAT_MT_AddLayerMenu(Menu):
         # col.label(text="Basic:")
         col.operator("paint_system.new_solid_color_layer", text="Solid Color",
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
-        col.menu("MAT_MT_AddImageLayerMenu", text="Image", icon='IMAGE_RGB_ALPHA')
+        col.menu("MAT_MT_AddImageLayerMenu", text="Image", icon_value=get_icon('image'))
         col.menu("MAT_MT_AddGradientLayerMenu", text="Gradient", icon='COLOR')
         col.menu("MAT_MT_AddAdjustmentLayerMenu", text="Adjustment", icon='SHADERFX')
         col.separator()
@@ -828,7 +874,7 @@ class MAT_MT_AddLayerMenu(Menu):
                      text="Random Color", icon='SEQ_HISTOGRAM')
 
         col.operator("paint_system.new_custom_node_group_layer",
-                     text="Custom Node Tree", icon='NODETREE')
+                     text="Custom Layer", icon='NODETREE')
 
 
 class PAINTSYSTEM_UL_Actions(PSContextMixin, UIList):
@@ -939,7 +985,8 @@ classes = (
     MAT_PT_LayerCameraPlaneSettings,
     MAT_PT_GreasePencilMaskSettings,
     MAT_PT_GreasePencilOnionSkinningSettings,
-    MAT_PT_LayerSettingsAdvanced,
+    MAT_PT_LayerTransformSettings,
+    MAT_PT_ImageLayerSettings,
     MAT_PT_Actions,
     PAINTSYSTEM_UL_Actions,
 )

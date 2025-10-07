@@ -179,6 +179,13 @@ def apply_node_state(node: bpy.types.Node, state: dict) -> None:
     apply_node_properties(node, state['properties'])
     apply_node_defaults(node, state['inputs'], state['outputs'])
 
+
+def get_nodetree_version(node_tree: bpy.types.NodeTree) -> int:
+    version_frame = node_tree.nodes.get("versioning")
+    if version_frame:
+        return int(version_frame.label)
+    return 0
+
 @dataclass
 class Edge:
     """
@@ -235,7 +242,7 @@ class NodeTreeBuilder:
     Once the graph is defined, the `compile` method builds the actual node tree.
     """
 
-    def __init__(self, node_tree: bpy.types.NodeTree, frame_name, frame_color: Sequence[float] = None, adjustable: bool = False, clear: bool = False, node_width: int = 140, verbose: bool = False):
+    def __init__(self, node_tree: bpy.types.NodeTree, frame_name, frame_color: Sequence[float] = None, adjustable: bool = False, clear: bool = False, node_width: int = 140, verbose: bool = False, version: int = 1):
         """
         Initializes the NodeTreeBuilder.
 
@@ -249,6 +256,7 @@ class NodeTreeBuilder:
             raise ValueError("A valid node_tree must be provided.")
 
         self._id = str(uuid4())  # Unique identifier for this graph instance
+        self.version: int = version
         self.tree = node_tree
         self.node_width: float = node_width
         self.adjustable: bool = adjustable
@@ -894,6 +902,7 @@ class NodeTreeBuilder:
         """
         Builds the node tree by creating all the defined links and arranging the nodes.
         """
+            
         self._log(f"Compiling graph {self.frame.label}")
         # Capture current node state so we can restore user-changed values on recompilation
         saved_state: Dict[str, dict] = {}
@@ -949,6 +958,15 @@ class NodeTreeBuilder:
         start_time_arrange_nodes = time.time()
         if arrange_nodes:
             self._arrange_nodes()
+            
+        # Create version frame
+        if "versioning" not in self.tree.nodes:
+            version_frame = self.tree.nodes.new(type='NodeFrame')
+            version_frame.name = "versioning"
+            version_frame.label = str(self.version)
+            version_frame.location = Vector((200, 0))
+        else:
+            self.tree.nodes["versioning"].label = str(self.version)
         self._log(f"Time taken to arrange nodes: {time.time() - start_time_arrange_nodes} seconds")
         self._log("Updating node tree")
         self.compiled = True
