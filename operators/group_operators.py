@@ -121,8 +121,8 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         ps_ctx = self.parse_context(context)
         # See if there is any material slot on the active object
         if not ps_ctx.active_material:
-            bpy.data.materials.new(name="New Material")
-            ps_ctx.ps_object.active_material = bpy.data.materials[-1]
+            mat = bpy.data.materials.new(name="New Material")
+            ps_ctx.ps_object.active_material = mat
         ps_ctx = self.parse_context(context)
         mat = ps_ctx.active_material
         mat.use_nodes = True
