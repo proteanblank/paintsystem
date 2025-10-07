@@ -568,6 +568,12 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.prop(
                             random_node.inputs[1], "default_value", text="Random Seed")
                 case 'TEXTURE':
+                    col.use_property_decorate = False
+                    col.use_property_split = True
+                    col.prop(global_layer, "texture_type", text="Texture Type")
+                    box = col.box()
+                    col = box.column()
+                    col.use_property_split = False
                     texture_node = global_layer.find_node("texture")
                     if texture_node:
                         col.enabled = not global_layer.lock_layer

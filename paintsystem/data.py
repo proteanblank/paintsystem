@@ -90,7 +90,7 @@ ADJUSTMENT_TYPE_ENUM = [
 TEXTURE_TYPE_ENUM = [
     ('ShaderNodeTexBrick', "Brick Texture", ""),
     ('ShaderNodeTexChecker', "Checker Texture", ""),
-    ('ShaderNodeTexGabor', "Gabor Texture", ""),
+    # ('ShaderNodeTexGabor', "Gabor Texture", ""),
     ('ShaderNodeTexGradient', "Gradient Texture", ""),
     ('ShaderNodeTexMagic', "Magic Texture", ""),
     ('ShaderNodeTexNoise', "Noise Texture", ""),
