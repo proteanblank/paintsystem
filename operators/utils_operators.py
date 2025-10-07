@@ -8,6 +8,8 @@ from bpy.types import Operator
 from bpy.utils import register_classes_factory
 from bpy_extras.node_utils import connect_sockets
 
+from ..paintsystem.data import update_active_image
+
 # ---
 from ..preferences import addon_package
 from ..utils.nodes import find_node, get_material_output
@@ -48,6 +50,8 @@ class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
             # Change shading mode
             if bpy.context.space_data.shading.type != ('RENDERED' if not is_cycles else 'MATERIAL'):
                 bpy.context.space_data.shading.type = ('RENDERED' if not is_cycles else 'MATERIAL')
+        
+        update_active_image(self, context)
 
             # if ps.preferences.unified_brush_color:
             #     bpy.context.scene.tool_settings.unified_paint_settings.use_unified_color = True
