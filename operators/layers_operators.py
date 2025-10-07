@@ -8,7 +8,6 @@ from bpy.utils import register_classes_factory
 
 from ..paintsystem.create import (
     add_global_layer,
-    add_global_layer_to_channel,
 )
 from ..paintsystem.data import (
     ACTION_BIND_ENUM,
@@ -281,7 +280,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         global_layer.image = img
         global_layer.coord_type = self.coord_type
         global_layer.uv_map_name = self.uv_map_name
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -343,7 +342,7 @@ class PAINTSYSTEM_OT_NewFolder(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("FOLDER")
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -369,7 +368,7 @@ class PAINTSYSTEM_OT_NewSolidColor(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("SOLID_COLOR")
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -405,7 +404,7 @@ class PAINTSYSTEM_OT_NewAttribute(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("ATTRIBUTE")
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -433,7 +432,7 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
         global_layer = add_global_layer("ADJUSTMENT")
         global_layer.adjustment_type = self.adjustment_type
         layer_name = next(name for adjustment_type, name, description in ADJUSTMENT_TYPE_ENUM if adjustment_type == self.adjustment_type)
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -459,7 +458,7 @@ class PAINTSYSTEM_OT_NewShader(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("SHADER")
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -492,7 +491,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("GRADIENT", self.gradient_type.title())
         global_layer.gradient_type = self.gradient_type
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -550,7 +549,7 @@ class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("RANDOM")
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -671,7 +670,7 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
         global_layer.custom_alpha_input = int(self.custom_alpha_input if self.custom_alpha_input != "" else "-1")
         global_layer.custom_color_output = int(self.custom_color_output)
         global_layer.custom_alpha_output = int(self.custom_alpha_output if self.custom_alpha_output != "" else "-1")
-        layer = add_global_layer_to_channel(ps_ctx.active_channel, global_layer, self.node_tree_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.node_tree_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -1032,7 +1031,7 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
         for layer in clipboard_layers:
             global_layer = get_global_layer(layer)
             if self.linked:
-                add_global_layer_to_channel(ps_ctx.active_channel, global_layer, layer.name)
+                ps_ctx.active_channel.add_global_layer_to_channel(global_layer, layer.name)
             else:
                 # Create a new global layer and copy everything except the uid
                 new_global_layer = add_global_layer(global_layer.type, layer.name)
@@ -1043,7 +1042,7 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
                     if pid in {"name", "node_tree", "type"}:
                         continue
                     setattr(new_global_layer, pid, getattr(global_layer, pid))
-                layer = add_global_layer_to_channel(ps_ctx.active_channel, new_global_layer, layer.name)
+                layer = ps_ctx.active_channel.add_global_layer_to_channel(new_global_layer, layer.name)
         ps_ctx.active_channel.update_node_tree(context)
         
         return {'FINISHED'}

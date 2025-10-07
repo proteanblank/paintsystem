@@ -8,7 +8,7 @@ from ..paintsystem.data import (
     LegacyPaintSystemLayer,
     LAYER_TYPE_ENUM,
 )
-from ..paintsystem.create import add_global_layer, add_global_layer_to_channel
+from ..paintsystem.create import add_global_layer
 from ..paintsystem.graph.nodetree_builder import capture_node_state, apply_node_state
 from ..utils.nodes import find_nodes
 from bpy_extras.node_utils import connect_sockets
@@ -121,7 +121,7 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                     new_global_layer.pre_mix_node.inputs['Opacity'].default_value = opacity_node.inputs[0].default_value
                     
                 ps_ctx = self.parse_context(context)
-                add_global_layer_to_channel(ps_ctx.active_channel, new_global_layer, legacy_layer.name)
+                ps_ctx.active_channel.add_global_layer_to_channel(new_global_layer, legacy_layer.name)
                 # refresh paintsystem context
             ps_ctx.active_channel.update_node_tree(context)
             ps_ctx.active_group.update_node_tree(context)

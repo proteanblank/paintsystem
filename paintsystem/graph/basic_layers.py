@@ -1,31 +1,49 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import bpy
 from .common import create_mixing_graph, NodeTreeBuilder, create_coord_graph
 
-def create_image_graph(node_tree: bpy.types.NodeTree, img: bpy.types.Image, coord_type: str, uv_map_name: str):
+if TYPE_CHECKING:
+    from ..data import GlobalLayer
+
+def create_image_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
+    img = global_layer.image
+    coord_type = global_layer.coord_type
+    uv_map_name = global_layer.uv_map_name
     builder = NodeTreeBuilder(node_tree, "Layer")
     create_mixing_graph(builder, "image", "Color", "image", "Alpha")
     builder.add_node("image", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest"})
+    # If global_layer is attached to camera plane, force the coord type to UV
+    if global_layer.attached_to_camera_plane:
+        coord_type = "UV"
     create_coord_graph(builder, coord_type, uv_map_name, 'image', 'Vector')
     return builder
 
-def create_folder_graph(node_tree: bpy.types.NodeTree):
+def create_folder_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer")
     create_mixing_graph(builder, "group_input", "Over Color", "group_input", "Over Alpha")
     return builder
 
-def create_solid_graph(node_tree: bpy.types.NodeTree):
+def create_solid_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer")
     create_mixing_graph(builder, "rgb", "Color")
     builder.add_node("rgb", "ShaderNodeRGB")
     return builder
 
-def create_attribute_graph(node_tree: bpy.types.NodeTree):
+def create_attribute_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer")
     create_mixing_graph(builder, "attribute", "Color")
     builder.add_node("attribute", "ShaderNodeAttribute")
     return builder
 
-def create_adjustment_graph(node_tree: bpy.types.NodeTree, adjustment_type: str):
+def create_adjustment_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
+    adjustment_type = global_layer.adjustment_type
     builder = NodeTreeBuilder(node_tree, "Layer")
     create_mixing_graph(builder, "adjustment", "Color")
     builder.add_node("adjustment", adjustment_type)
@@ -35,7 +53,10 @@ def create_adjustment_graph(node_tree: bpy.types.NodeTree, adjustment_type: str)
     builder.link("group_input", "adjustment", "Color", "Color")
     return builder
 
-def create_gradient_graph(node_tree: bpy.types.NodeTree, gradient_type: str, empty_object: bpy.types.Object):
+def create_gradient_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
+    gradient_type = global_layer.gradient_type
+    empty_object = global_layer.empty_object
     builder = NodeTreeBuilder(node_tree, "Layer")
     create_mixing_graph(builder, "gradient", "Color", "gradient", "Alpha")
     builder.add_node("gradient", "ShaderNodeValToRGB")
@@ -64,7 +85,8 @@ def create_gradient_graph(node_tree: bpy.types.NodeTree, gradient_type: str, emp
     builder.link("map_range", "gradient", "Result", "Fac")
     return builder
 
-def create_random_graph(node_tree: bpy.types.NodeTree):
+def create_random_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer")
     create_mixing_graph(builder, "white_noise", "Color")
     builder.add_node("object_info", "ShaderNodeObjectInfo")
@@ -77,7 +99,13 @@ def create_random_graph(node_tree: bpy.types.NodeTree):
     builder.link("add_2", "white_noise", "Value", "W")
     return builder
 
-def create_custom_graph(node_tree: bpy.types.NodeTree, custom_node_tree: bpy.types.NodeTree, color_input: str|int, alpha_input: str|int, color_output: str|int = -1, alpha_output: str|int = -1):
+def create_custom_graph(global_layer: "GlobalLayer"):
+    node_tree = global_layer.node_tree
+    custom_node_tree = global_layer.custom_node_tree
+    color_input = global_layer.custom_color_input
+    alpha_input = global_layer.custom_alpha_input
+    color_output = global_layer.custom_color_output
+    alpha_output = global_layer.custom_alpha_output
     builder = NodeTreeBuilder(node_tree, "Layer")
     if alpha_output != -1:
         create_mixing_graph(builder, "custom_node_tree", color_output, "custom_node_tree", alpha_output)

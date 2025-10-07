@@ -6,18 +6,20 @@ from .nodetree_builder import NodeTreeBuilder
 
 import bpy
 
+LIBRARY_FILENAME = "library2.blend"
 
-def _resolve_library_path(filename: str = "library2.blend") -> Path:
+
+def _resolve_library_path(filename: str = LIBRARY_FILENAME) -> Path:
     """
     Resolve the absolute path to the given library filename.
 
-    `library2.blend` resides with this file.
+    `LIBRARY_FILENAME` resides with this file.
     """
-    folder_root = Path(__file__).resolve().parent
+    folder_root = Path(__file__).resolve().parent.parent
     return folder_root / filename
 
 
-def get_library_nodetree(tree_name: str, library_filename: str = "library2.blend") -> bpy.types.NodeTree:
+def get_library_nodetree(tree_name: str, library_filename: str = LIBRARY_FILENAME) -> bpy.types.NodeTree:
     """
     Return a `bpy.types.NodeTree` by name, appending it from the given library if needed.
 
@@ -26,7 +28,7 @@ def get_library_nodetree(tree_name: str, library_filename: str = "library2.blend
 
     Args:
         tree_name: Name of the node tree (node group) to retrieve.
-        library_filename: Blend file to append from. Defaults to "library2.blend".
+        library_filename: Blend file to append from. Defaults to LIBRARY_FILENAME.
 
     Returns:
         The resolved `bpy.types.NodeTree` instance.
@@ -67,6 +69,20 @@ def get_library_nodetree(tree_name: str, library_filename: str = "library2.blend
                 f"Unexpected error: Node tree '{tree_name}' was not appended from '{library_filename}'."
             )
     return appended_tree
+
+def get_library_object(object_name: str, library_filename: str = LIBRARY_FILENAME) -> bpy.types.Object:
+    """
+    Return a `bpy.types.Object` by name, appending it from the given library if needed.
+    """
+    library_path = _resolve_library_path(library_filename)
+    if not library_path.exists():
+        raise FileNotFoundError(f"Library file not found: {library_path}")
+    library_path_str = str(library_path)
+    with bpy.data.libraries.load(library_path_str, link=False) as (data_from, data_to):
+        if object_name not in data_from.objects:
+            raise ValueError(f"Object '{object_name}' not found in '{library_filename}'.\nAvailable: {list(data_from.objects)}")
+        data_to.objects = [object_name]
+    return bpy.data.objects.get(object_name)
 
 def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str = None, color_socket: str = None, alpha_node_name: str = None, alpha_socket: str = None) -> NodeTreeBuilder:
     pre_mix = get_library_nodetree(".PS Pre Mix")

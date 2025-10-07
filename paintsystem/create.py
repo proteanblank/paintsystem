@@ -24,24 +24,3 @@ def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLa
     global_layer.type = layer_type
     global_layer.node_tree = node_tree
     return global_layer
-
-def add_global_layer_to_channel(channel: Channel, global_layer: GlobalLayer, layer_name: str) -> Layer:
-    parent_id, insert_order = channel.get_insertion_data()
-    # Adjust existing items' order
-    channel.adjust_sibling_orders(parent_id, insert_order)
-    layer = channel.add_item(
-            global_layer.name,
-            "ITEM" if global_layer.type != 'FOLDER' else "FOLDER",
-            parent_id=parent_id,
-            order=insert_order
-        )
-    layer.ref_layer_id = global_layer.name
-    layer.name = layer_name
-    # Update active index
-    new_id = layer.id
-    if new_id != -1:
-        for i, item in enumerate(channel.layers):
-            if item.id == new_id:
-                channel.active_index = i
-                break
-    return layer

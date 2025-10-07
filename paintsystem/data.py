@@ -206,6 +206,15 @@ def is_valid_ps_nodetree(node_tree: NodeTree) -> bool:
         return has_color_input and has_alpha_input and has_color_output and has_alpha_output
 
 
+def get_paint_system_collection(context: bpy.types.Context) -> bpy.types.Collection:
+    view_layer = context.view_layer
+    if "Paint System Collection" not in view_layer.layer_collection.collection.children:
+        collection = bpy.data.collections.new("Paint System Collection")
+        view_layer.layer_collection.collection.children.link(collection)
+    else:
+        collection = view_layer.layer_collection.collection.children["Paint System Collection"]
+    return collection
+
 class MarkerAction(PropertyGroup):
     action_bind: EnumProperty(
         name="Action Bind",
@@ -240,23 +249,18 @@ class GlobalLayer(PropertyGroup):
         
         match self.type:
             case "IMAGE":
-                layer_graph = create_image_graph(self.node_tree, self.image, self.coord_type, self.uv_map_name)
+                layer_graph = create_image_graph(self)
             case "FOLDER":
-                layer_graph = create_folder_graph(self.node_tree)
+                layer_graph = create_folder_graph(self)
             case "SOLID_COLOR":
-                layer_graph = create_solid_graph(self.node_tree)
+                layer_graph = create_solid_graph(self)
             case "ATTRIBUTE":
-                layer_graph = create_attribute_graph(self.node_tree)
+                layer_graph = create_attribute_graph(self)
             case "ADJUSTMENT":
-                layer_graph = create_adjustment_graph(self.node_tree, self.adjustment_type)
+                layer_graph = create_adjustment_graph(self)
             case "GRADIENT":
                 def add_empty_to_collection(empty_object):
-                    view_layer = context.view_layer
-                    if "Paint System Collection" not in view_layer.layer_collection.collection.children:
-                        collection = bpy.data.collections.new("Paint System Collection")
-                        view_layer.layer_collection.collection.children.link(collection)
-                    else:
-                        collection = view_layer.layer_collection.collection.children["Paint System Collection"]
+                    collection = get_paint_system_collection(context)
                     collection.objects.link(empty_object)
                     
                 if self.gradient_type in ('LINEAR', 'RADIAL'):
@@ -273,11 +277,11 @@ class GlobalLayer(PropertyGroup):
                             self.empty_object.empty_display_type = 'SPHERE'
                     elif self.empty_object.name not in context.view_layer.objects:
                         add_empty_to_collection(self.empty_object)
-                layer_graph = create_gradient_graph(self.node_tree, self.gradient_type, self.empty_object)
+                layer_graph = create_gradient_graph(self)
             case "RANDOM":
-                layer_graph = create_random_graph(self.node_tree)
+                layer_graph = create_random_graph(self)
             case "NODE_GROUP":
-                layer_graph = create_custom_graph(self.node_tree, self.custom_node_tree, self.custom_color_input, self.custom_alpha_input, self.custom_color_output, self.custom_alpha_output)
+                layer_graph = create_custom_graph(self)
             case _:
                 pass
         if not self.enabled:
@@ -599,6 +603,27 @@ class Channel(BaseNestedListManager):
             self.name = new_name
         self.updating_name_flag = False
         update_active_group(self, context)
+    
+    def add_global_layer_to_channel(self, global_layer: GlobalLayer, layer_name: str) -> Layer:
+        parent_id, insert_order = self.get_insertion_data()
+        # Adjust existing items' order
+        self.adjust_sibling_orders(parent_id, insert_order)
+        layer = self.add_item(
+                global_layer.name,
+                "ITEM" if global_layer.type != 'FOLDER' else "FOLDER",
+                parent_id=parent_id,
+                order=insert_order
+            )
+        layer.ref_layer_id = global_layer.name
+        layer.name = layer_name
+        # Update active index
+        new_id = layer.id
+        if new_id != -1:
+            for i, item in enumerate(self.layers):
+                if item.id == new_id:
+                    self.active_index = i
+                    break
+        return layer
         
     @property
     def item_type(self):
