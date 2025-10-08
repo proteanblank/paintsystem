@@ -766,6 +766,7 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("TEXTURE")
+        self.store_coord_type(context)
         global_layer.texture_type = self.texture_type
         global_layer.coord_type = self.coord_type
         global_layer.uv_map_name = self.uv_map_name
