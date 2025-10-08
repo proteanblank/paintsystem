@@ -11,6 +11,7 @@ from bpy.props import (
     IntProperty,
     PointerProperty,
     StringProperty,
+    FloatVectorProperty,
 )
 from bpy.types import (
     Image,
@@ -544,6 +545,18 @@ class GlobalLayer(PropertyGroup):
         default=False,
         update=update_camera_plane
     )
+    camera_plane_position: FloatVectorProperty(
+        name="Camera Plane Position",
+        description="Camera plane position",
+        default=(0, 0, 0),
+        update=update_camera_plane
+    )
+    camera_plane_rotation: FloatVectorProperty(
+        name="Camera Plane Rotation",
+        description="Camera plane rotation",
+        default=(0, 0, 0),
+        update=update_camera_plane
+    )
 
 class Layer(BaseNestedListItem):
     """Base class for material layers in the Paint System"""
@@ -1051,6 +1064,20 @@ class MaterialData(PropertyGroup):
         name="Original Socket Name",
         description="Original socket name of the channel"
     )
+
+
+class CameraPlaneData(PropertyGroup):
+    position: FloatVectorProperty(
+        name="Position",
+        description="Position of the camera plane",
+        default=(0, 0, 0)
+    )
+    rotation: FloatVectorProperty(
+        name="Rotation",
+        description="Rotation of the camera plane",
+        default=(0, 0, 0)
+    )
+    ref_layer_id: StringProperty()
 
 
 def get_global_layer(layer: Layer) -> GlobalLayer | None:
