@@ -739,12 +739,6 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
     bl_label = "New Texture Layer"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
-    layer_name: StringProperty(
-        name="Layer Name",
-        description="Name of the new texture layer",
-        default="Texture Layer"
-    )
-
     texture_type: EnumProperty(
         name="Texture Type",
         description="Type of texture to create",
@@ -772,7 +766,8 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
         global_layer.texture_type = self.texture_type
         global_layer.coord_type = self.coord_type
         global_layer.uv_map_name = self.uv_map_name
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
+        layer_name = next(name for texture_type, name, description in TEXTURE_TYPE_ENUM if texture_type == self.texture_type)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
