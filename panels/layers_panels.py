@@ -128,10 +128,9 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             if len(global_item.actions) > 0:
                 row.label(icon="KEYTYPE_KEYFRAME_VEC")
             if is_global_layer_linked(global_item):
-                if global_item.attached_to_camera_plane:
+                row.label(icon="LINKED")
+            if global_item.attached_to_camera_plane:
                     row.label(icon="VIEW_CAMERA")
-                else:
-                    row.label(icon="LINKED")
             row.prop(global_item, "enabled", text="",
                      icon="HIDE_OFF" if global_item.enabled else "HIDE_ON", emboss=False)
             self.draw_custom_properties(row, global_item)
@@ -644,18 +643,18 @@ class MAT_PT_LayerCameraPlaneSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.ps_object.type == 'MESH'
+        return ps_ctx.ps_object.type == 'MESH' and ps_ctx.active_global_layer.attached_to_camera_plane
     
     def draw_header(self, context):
         layout = self.layout
         layout.label(icon="CAMERA_DATA")
     
-    def draw_header_preset(self, context):
-        ps_ctx = self.parse_context(context)
-        layout = self.layout
-        global_layer = ps_ctx.active_global_layer
-        attached_to_camera_plane = global_layer.attached_to_camera_plane
-        layout.prop(global_layer, "attached_to_camera_plane", text="Remove" if attached_to_camera_plane else "Attach", icon="NONE" if attached_to_camera_plane else "ADD", toggle = 1)
+    # def draw_header_preset(self, context):
+    #     ps_ctx = self.parse_context(context)
+    #     layout = self.layout
+    #     global_layer = ps_ctx.active_global_layer
+    #     attached_to_camera_plane = global_layer.attached_to_camera_plane
+    #     layout.prop(global_layer, "attached_to_camera_plane", text="Remove" if attached_to_camera_plane else "Attach", icon="NONE" if attached_to_camera_plane else "ADD", toggle = 1)
     
     def draw(self, context):
         ps_ctx = self.parse_context(context)
@@ -663,6 +662,7 @@ class MAT_PT_LayerCameraPlaneSettings(PSContextMixin, Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         global_layer = ps_ctx.active_global_layer
+        layout.enabled = not global_layer.lock_layer
         # layout.prop(global_layer, "attached_to_camera_plane", text="Remove from Camera Plane" if global_layer.attached_to_camera_plane else "Attach to Camera Plane", icon="VIEW_CAMERA")
         layout.prop(ps_ctx.camera_plane_material, "surface_render_method", text="Render Method")
         box = layout.box()
@@ -850,6 +850,10 @@ class MAT_MT_AddImageLayerMenu(Menu):
         layout.operator("paint_system.new_image_layer", text="New Image Layer", icon_value=get_icon('image')).image_add_type = 'NEW'
         layout.operator("paint_system.new_image_layer", text="Import Image Layer").image_add_type = 'IMPORT'
         layout.operator("paint_system.new_image_layer", text="Use Existing Image Layer").image_add_type = 'EXISTING'
+        layout.separator()
+        op = layout.operator("paint_system.new_image_layer", text="Camera Plane", icon="VIEW_CAMERA")
+        op.image_add_type = 'NEW'
+        op.attach_to_camera_plane = True
 
 
 class MAT_MT_AddGradientLayerMenu(Menu):

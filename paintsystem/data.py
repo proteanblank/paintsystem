@@ -360,18 +360,20 @@ class GlobalLayer(PropertyGroup):
             cam_channel = camera_plane.material_slots[0].material.ps_mat_data.groups[0].channels[0]
             # Always add to the end of the list
             cam_channel.active_index = len(cam_channel.layers) - 1
-            cam_channel.add_global_layer_to_channel(ps_ctx.active_global_layer, ps_ctx.active_layer.name)
+            cam_channel.add_global_layer_to_channel(self, "Camera Plane")
         else:
             # Remove the layer from the camera plane
             cam_channel = ps_ctx.camera_plane_channel
-            for i, layer in enumerate(cam_channel.layers):
-                if layer.ref_layer_id == self.name:
-                    cam_channel.layers.remove(i)
-        cam_channel.update_node_tree(context)
-        cam_channel.normalize_orders()
-        ps_ctx.active_channel.update_node_tree(context)
-        self.update_node_tree(context)
-        update_active_image(self, context)
+            if cam_channel:
+                for i, layer in enumerate(cam_channel.layers):
+                    if layer.ref_layer_id == self.name:
+                        cam_channel.layers.remove(i)
+        if cam_channel:
+            cam_channel.update_node_tree(context)
+            cam_channel.normalize_orders()
+            ps_ctx.active_channel.update_node_tree(context)
+            self.update_node_tree(context)
+            update_active_image(self, context)
             
     def find_node(self, identifier: str) -> Node | None:
         return get_node_from_nodetree(self.node_tree, identifier)

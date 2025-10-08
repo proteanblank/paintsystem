@@ -198,6 +198,13 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
     bl_label = "New Image Layer"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     
+    attach_to_camera_plane: BoolProperty(
+        name="Attach to Camera Plane",
+        description="Attach the image layer to the camera plane",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
+
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
@@ -280,6 +287,9 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         global_layer.image = img
         global_layer.coord_type = self.coord_type
         global_layer.uv_map_name = self.uv_map_name
+        if self.attach_to_camera_plane:
+            global_layer.attached_to_camera_plane = True
+            bpy.ops.view3d.view_camera('INVOKE_DEFAULT')
         layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
