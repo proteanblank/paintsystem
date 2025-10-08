@@ -348,7 +348,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
 
             col = row.column(align=True)
             col.scale_x = 1.2
-            col.menu("MAT_MT_AddLayer", icon_value=get_icon('layer_add'), text="")
+            col.operator("wm.call_menu", text="", icon_value=get_icon('layer_add')).name = "MAT_MT_AddLayerMenu"
             col.menu("MAT_MT_LayerMenu",
                     text="", icon='COLLAPSEMENU')
             col.separator()
@@ -890,11 +890,24 @@ class MAT_MT_AddTextureLayerMenu(Menu):
 
 class MAT_MT_AddLayerMenu(Menu):
     bl_label = "Add Layer"
-    bl_idname = "MAT_MT_AddLayer"
+    bl_idname = "MAT_MT_AddLayerMenu"
+    bl_options = {'SEARCH_ON_KEY_PRESS'}
 
     def draw(self, context):
         layout = self.layout
         col = layout.column()
+        
+        if layout.operator_context == 'EXEC_REGION_WIN':
+            layout.operator_context = 'INVOKE_REGION_WIN'
+            col.operator(
+                "WM_OT_search_single_menu",
+                text="Search...",
+                icon='VIEWZOOM',
+            ).menu_idname = "MAT_MT_AddLayerMenu"
+            col.separator()
+
+        layout.operator_context = 'INVOKE_REGION_WIN'
+        
         col.operator("paint_system.new_folder_layer",
                      icon_value=get_icon('folder'), text="Folder")
         col.separator()
