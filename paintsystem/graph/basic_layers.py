@@ -42,6 +42,29 @@ def get_layer_version_for_type(type: str) -> int:
         case _:
             raise ValueError(f"Invalid layer type: {type}")
 
+def get_texture_identifier(texture_type: str) -> str:
+    identifier_mapping = {
+        'TEX_BRICK': 'ShaderNodeTexBrick',
+        'TEX_CHECKER': 'ShaderNodeTexChecker',
+        'TEX_GRADIENT': 'ShaderNodeTexGradient',
+        'TEX_MAGIC': 'ShaderNodeTexMagic',
+        'TEX_NOISE': 'ShaderNodeTexNoise',
+        'TEX_VORONOI': 'ShaderNodeTexVoronoi',
+        'TEX_WAVE': 'ShaderNodeTexWave',
+        'TEX_WHITE_NOISE': 'ShaderNodeTexWhiteNoise',
+    }
+    return identifier_mapping.get(texture_type, "")
+
+def get_adjustment_identifier(adjustment_type: str) -> str:
+    identifier_mapping = {
+        'BRIGHTCONSTRAST': 'ShaderNodeBrightContrast',
+        'GAMMA': 'ShaderNodeGamma',
+        'HUE_SAT': 'ShaderNodeHueSaturation',
+        'INVERT': 'ShaderNodeInvert',
+        'CURVE_RGB': 'ShaderNodeRGBCurve',
+    }
+    return identifier_mapping.get(adjustment_type, "")
+
 def create_image_graph(global_layer: "GlobalLayer"):
     node_tree = global_layer.node_tree
     img = global_layer.image
@@ -75,7 +98,7 @@ def create_attribute_graph(global_layer: "GlobalLayer"):
 
 def create_adjustment_graph(global_layer: "GlobalLayer"):
     node_tree = global_layer.node_tree
-    adjustment_type = global_layer.adjustment_type
+    adjustment_type = get_adjustment_identifier(global_layer.adjustment_type)
     builder = NodeTreeBuilder(node_tree, "Layer", version=ADJUSTMENT_LAYER_VERSION)
     create_mixing_graph(builder, "adjustment", "Color")
     builder.add_node("adjustment", adjustment_type)
@@ -153,7 +176,7 @@ def create_custom_graph(global_layer: "GlobalLayer"):
 
 def create_texture_graph(global_layer: "GlobalLayer"):
     node_tree = global_layer.node_tree
-    texture_type = global_layer.texture_type
+    texture_type = get_texture_identifier(global_layer.texture_type)
     coord_type = global_layer.coord_type
     uv_map_name = global_layer.uv_map_name
     builder = NodeTreeBuilder(node_tree, "Layer", version=TEXTURE_LAYER_VERSION)

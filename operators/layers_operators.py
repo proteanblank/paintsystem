@@ -437,7 +437,6 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
     adjustment_type: EnumProperty(
         name="Adjustment Type",
         items=ADJUSTMENT_TYPE_ENUM,
-        default='ShaderNodeBrightContrast'
     )
 
     def process_material(self, context):

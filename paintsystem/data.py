@@ -80,24 +80,24 @@ GRADIENT_TYPE_ENUM = [
 ]
 
 ADJUSTMENT_TYPE_ENUM = [
-    ('ShaderNodeBrightContrast', "Brightness and Contrast", ""),
-    ('ShaderNodeGamma', "Gamma", ""),
-    ('ShaderNodeHueSaturation', "Hue Saturation Value", ""),
-    ('ShaderNodeInvert', "Invert", ""),
-    ('ShaderNodeRGBCurve', "RGB Curves", ""),
+    ('BRIGHTCONTRAST', "Brightness and Contrast", ""),
+    ('GAMMA', "Gamma", ""),
+    ('HUE_SAT', "Hue Saturation Value", ""),
+    ('INVERT', "Invert", ""),
+    ('CURVE_RGB', "RGB Curves", ""),
     # ('ShaderNodeAmbientOcclusion', "Ambient Occlusion", ""),
 ]
 
 TEXTURE_TYPE_ENUM = [
-    ('ShaderNodeTexBrick', "Brick Texture", ""),
-    ('ShaderNodeTexChecker', "Checker Texture", ""),
+    ('TEX_BRICK', "Brick Texture", ""),
+    ('TEX_CHECKER', "Checker Texture", ""),
     # ('ShaderNodeTexGabor', "Gabor Texture", ""),
-    ('ShaderNodeTexGradient', "Gradient Texture", ""),
-    ('ShaderNodeTexMagic', "Magic Texture", ""),
-    ('ShaderNodeTexNoise', "Noise Texture", ""),
-    ('ShaderNodeTexVoronoi', "Voronoi Texture", ""),
-    ('ShaderNodeTexWave', "Wave Texture", ""),
-    ('ShaderNodeTexWhiteNoise', "White Noise Texture", ""),
+    ('TEX_GRADIENT', "Gradient Texture", ""),
+    ('TEX_MAGIC', "Magic Texture", ""),
+    ('TEX_NOISE', "Noise Texture", ""),
+    ('TEX_VORONOI', "Voronoi Texture", ""),
+    ('TEX_WAVE', "Wave Texture", ""),
+    ('TEX_WHITE_NOISE', "White Noise Texture", ""),
 ]
 
 COORDINATE_TYPE_ENUM = [
@@ -475,7 +475,6 @@ class GlobalLayer(PropertyGroup):
         items=ADJUSTMENT_TYPE_ENUM,
         name="Adjustment Type",
         description="Adjustment type",
-        default='ShaderNodeBrightContrast',
         update=update_node_tree
     )
     empty_object: PointerProperty(
