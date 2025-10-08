@@ -57,7 +57,7 @@ def get_texture_identifier(texture_type: str) -> str:
 
 def get_adjustment_identifier(adjustment_type: str) -> str:
     identifier_mapping = {
-        'BRIGHTCONSTRAST': 'ShaderNodeBrightContrast',
+        'BRIGHTCONTRAST': 'ShaderNodeBrightContrast',
         'GAMMA': 'ShaderNodeGamma',
         'HUE_SAT': 'ShaderNodeHueSaturation',
         'INVERT': 'ShaderNodeInvert',
