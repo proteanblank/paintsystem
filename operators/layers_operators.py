@@ -287,10 +287,13 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         global_layer.image = img
         global_layer.coord_type = self.coord_type
         global_layer.uv_map_name = self.uv_map_name
-        if self.attach_to_camera_plane:
-            global_layer.attached_to_camera_plane = True
+        global_layer.attached_to_camera_plane = self.attach_to_camera_plane
+        if self.attach_to_camera_plane and context.region_data.view_perspective != 'CAMERA':
             bpy.ops.view3d.view_camera('INVOKE_DEFAULT')
         layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
+        world_matrix = context.scene.camera.matrix_world
+        layer.camera_plane_position = world_matrix.translation
+        layer.camera_plane_rotation = world_matrix.to_euler()
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -434,7 +437,6 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
     adjustment_type: EnumProperty(
         name="Adjustment Type",
         items=ADJUSTMENT_TYPE_ENUM,
-        default='ShaderNodeBrightContrast'
     )
 
     def process_material(self, context):
@@ -763,6 +765,7 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("TEXTURE")
+        self.store_coord_type(context)
         global_layer.texture_type = self.texture_type
         global_layer.coord_type = self.coord_type
         global_layer.uv_map_name = self.uv_map_name

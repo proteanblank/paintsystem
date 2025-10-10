@@ -850,10 +850,10 @@ class MAT_MT_AddImageLayerMenu(Menu):
         layout.operator("paint_system.new_image_layer", text="New Image Layer", icon_value=get_icon('image')).image_add_type = 'NEW'
         layout.operator("paint_system.new_image_layer", text="Import Image Layer").image_add_type = 'IMPORT'
         layout.operator("paint_system.new_image_layer", text="Use Existing Image Layer").image_add_type = 'EXISTING'
-        layout.separator()
-        op = layout.operator("paint_system.new_image_layer", text="Camera Plane", icon="VIEW_CAMERA")
-        op.image_add_type = 'NEW'
-        op.attach_to_camera_plane = True
+        # layout.separator()
+        # op = layout.operator("paint_system.new_image_layer", text="Camera Plane", icon="VIEW_CAMERA")
+        # op.image_add_type = 'NEW'
+        # op.attach_to_camera_plane = True
 
 
 class MAT_MT_AddGradientLayerMenu(Menu):
@@ -916,8 +916,8 @@ class MAT_MT_AddLayerMenu(Menu):
                      icon=icon_parser('STRIP_COLOR_03', "SEQUENCE_COLOR_03"))
         col.menu("MAT_MT_AddImageLayerMenu", text="Image", icon_value=get_icon('image'))
         col.menu("MAT_MT_AddGradientLayerMenu", text="Gradient", icon='COLOR')
-        col.menu("MAT_MT_AddAdjustmentLayerMenu", text="Adjustment", icon='SHADERFX')
         col.menu("MAT_MT_AddTextureLayerMenu", text="Texture", icon='TEXTURE')
+        col.menu("MAT_MT_AddAdjustmentLayerMenu", text="Adjustment", icon='SHADERFX')
         col.separator()
         # col.label(text="Advanced:")
         col.operator("paint_system.new_attribute_layer",

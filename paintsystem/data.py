@@ -11,6 +11,7 @@ from bpy.props import (
     IntProperty,
     PointerProperty,
     StringProperty,
+    FloatVectorProperty,
 )
 from bpy.types import (
     Image,
@@ -79,24 +80,24 @@ GRADIENT_TYPE_ENUM = [
 ]
 
 ADJUSTMENT_TYPE_ENUM = [
-    ('ShaderNodeBrightContrast', "Brightness and Contrast", ""),
-    ('ShaderNodeGamma', "Gamma", ""),
-    ('ShaderNodeHueSaturation', "Hue Saturation Value", ""),
-    ('ShaderNodeInvert', "Invert", ""),
-    ('ShaderNodeRGBCurve', "RGB Curves", ""),
+    ('BRIGHTCONTRAST', "Brightness and Contrast", ""),
+    ('GAMMA', "Gamma", ""),
+    ('HUE_SAT', "Hue Saturation Value", ""),
+    ('INVERT', "Invert", ""),
+    ('CURVE_RGB', "RGB Curves", ""),
     # ('ShaderNodeAmbientOcclusion', "Ambient Occlusion", ""),
 ]
 
 TEXTURE_TYPE_ENUM = [
-    ('ShaderNodeTexBrick', "Brick Texture", ""),
-    ('ShaderNodeTexChecker', "Checker Texture", ""),
+    ('TEX_BRICK', "Brick Texture", ""),
+    ('TEX_CHECKER', "Checker Texture", ""),
     # ('ShaderNodeTexGabor', "Gabor Texture", ""),
-    ('ShaderNodeTexGradient', "Gradient Texture", ""),
-    ('ShaderNodeTexMagic', "Magic Texture", ""),
-    ('ShaderNodeTexNoise', "Noise Texture", ""),
-    ('ShaderNodeTexVoronoi', "Voronoi Texture", ""),
-    ('ShaderNodeTexWave', "Wave Texture", ""),
-    ('ShaderNodeTexWhiteNoise', "White Noise Texture", ""),
+    ('TEX_GRADIENT', "Gradient Texture", ""),
+    ('TEX_MAGIC', "Magic Texture", ""),
+    ('TEX_NOISE', "Noise Texture", ""),
+    ('TEX_VORONOI', "Voronoi Texture", ""),
+    ('TEX_WAVE', "Wave Texture", ""),
+    ('TEX_WHITE_NOISE', "White Noise Texture", ""),
 ]
 
 COORDINATE_TYPE_ENUM = [
@@ -474,7 +475,6 @@ class GlobalLayer(PropertyGroup):
         items=ADJUSTMENT_TYPE_ENUM,
         name="Adjustment Type",
         description="Adjustment type",
-        default='ShaderNodeBrightContrast',
         update=update_node_tree
     )
     empty_object: PointerProperty(
@@ -542,6 +542,18 @@ class GlobalLayer(PropertyGroup):
         name="Attached to Camera Plane",
         description="Attached to camera plane",
         default=False,
+        update=update_camera_plane
+    )
+    camera_plane_position: FloatVectorProperty(
+        name="Camera Plane Position",
+        description="Camera plane position",
+        default=(0, 0, 0),
+        update=update_camera_plane
+    )
+    camera_plane_rotation: FloatVectorProperty(
+        name="Camera Plane Rotation",
+        description="Camera plane rotation",
+        default=(0, 0, 0),
         update=update_camera_plane
     )
 
@@ -1051,6 +1063,20 @@ class MaterialData(PropertyGroup):
         name="Original Socket Name",
         description="Original socket name of the channel"
     )
+
+
+class CameraPlaneData(PropertyGroup):
+    position: FloatVectorProperty(
+        name="Position",
+        description="Position of the camera plane",
+        default=(0, 0, 0)
+    )
+    rotation: FloatVectorProperty(
+        name="Rotation",
+        description="Rotation of the camera plane",
+        default=(0, 0, 0)
+    )
+    ref_layer_id: StringProperty()
 
 
 def get_global_layer(layer: Layer) -> GlobalLayer | None:
