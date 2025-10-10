@@ -561,11 +561,26 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
 
                 case 'RANDOM':
                     random_node = global_layer.find_node("add_2")
-                    if random_node:
+                    hue_math = global_layer.find_node("hue_multiply_add")
+                    saturation_math = global_layer.find_node("saturation_multiply_add")
+                    value_math = global_layer.find_node("value_multiply_add")
+                    hue_saturation_value = global_layer.find_node("hue_saturation_value")
+                    if random_node and hue_math and saturation_math and value_math and hue_saturation_value:
                         col.enabled = not global_layer.lock_layer
                         col.label(text="Random Settings:", icon='SHADERFX')
                         col.prop(
                             random_node.inputs[1], "default_value", text="Random Seed")
+                        col = col.column()
+                        col.use_property_split = True
+                        col.use_property_decorate = False
+                        col.prop(
+                            hue_saturation_value.inputs['Color'], "default_value", text="Base Color")
+                        col.prop(
+                            hue_math.inputs[1], "default_value", text="Hue")
+                        col.prop(
+                            saturation_math.inputs[1], "default_value", text="Saturation")
+                        col.prop(
+                            value_math.inputs[1], "default_value", text="Value")
                 case 'TEXTURE':
                     col.use_property_decorate = False
                     col.use_property_split = True

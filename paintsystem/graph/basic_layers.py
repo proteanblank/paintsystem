@@ -13,7 +13,7 @@ SOLID_COLOR_LAYER_VERSION = 1
 ATTRIBUTE_LAYER_VERSION = 1
 ADJUSTMENT_LAYER_VERSION = 1
 GRADIENT_LAYER_VERSION = 1
-RANDOM_LAYER_VERSION = 1
+RANDOM_LAYER_VERSION = 2
 CUSTOM_LAYER_VERSION = 1
 TEXTURE_LAYER_VERSION = 1
 
@@ -155,15 +155,29 @@ def create_gradient_graph(global_layer: "GlobalLayer"):
 def create_random_graph(global_layer: "GlobalLayer"):
     node_tree = global_layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer", version=RANDOM_LAYER_VERSION)
-    create_mixing_graph(builder, "white_noise", "Color")
+    create_mixing_graph(builder, "hue_saturation_value", "Color")
     builder.add_node("object_info", "ShaderNodeObjectInfo")
     builder.add_node("white_noise", "ShaderNodeTexWhiteNoise", {"noise_dimensions": "1D"})
     builder.add_node("add", "ShaderNodeMath", {"operation": "ADD"})
     builder.add_node("add_2", "ShaderNodeMath", {"operation": "ADD"}, {1: 0})
+    builder.add_node("vector_math", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, default_values={1: (2, 2, 2), 2: (-1, -1, -1)})
+    builder.add_node("separate_xyz", "ShaderNodeSeparateXYZ")
+    builder.add_node("hue_multiply_add", "ShaderNodeMath", {"operation": "MULTIPLY_ADD"}, default_values={1: 1, 2: 0.5})
+    builder.add_node("saturation_multiply_add", "ShaderNodeMath", {"operation": "MULTIPLY_ADD"}, default_values={1: 1, 2: 1})
+    builder.add_node("value_multiply_add", "ShaderNodeMath", {"operation": "MULTIPLY_ADD"}, default_values={1: 1, 2: 1})
+    builder.add_node("hue_saturation_value", "ShaderNodeHueSaturation", default_values={"Color": (0.5, 0.25, 0.25, 1)})
     builder.link("object_info", "add", "Material Index", 0)
     builder.link("object_info", "add", "Random", 1)
     builder.link("add", "add_2", "Value", 0)
     builder.link("add_2", "white_noise", "Value", "W")
+    builder.link("white_noise", "vector_math", "Color", "Vector")
+    builder.link("vector_math", "separate_xyz", "Vector", "Vector")
+    builder.link("separate_xyz", "hue_multiply_add", "X", "Value")
+    builder.link("separate_xyz", "saturation_multiply_add", "Y", "Value")
+    builder.link("separate_xyz", "value_multiply_add", "Z", "Value")
+    builder.link("hue_multiply_add", "hue_saturation_value", "Value", "Hue")
+    builder.link("saturation_multiply_add", "hue_saturation_value", "Value", "Saturation")
+    builder.link("value_multiply_add", "hue_saturation_value", "Value", "Value")
     return builder
 
 def create_custom_graph(global_layer: "GlobalLayer"):
