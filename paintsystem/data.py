@@ -27,6 +27,7 @@ from typing import Optional
 # ---
 from ..custom_icons import get_icon
 from ..utils.version import is_newer_than
+from ..utils.nodes import find_node
 from ..preferences import get_preferences
 from ..utils import get_next_unique_name
 from .common import PaintSystemPreferences
@@ -847,6 +848,10 @@ class Channel(BaseNestedListManager):
 
 class Group(PropertyGroup):
     """Base class for Paint System groups"""
+    
+    def get_group_node(self, node_tree: NodeTree) -> bpy.types.Node:
+        return find_node(node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': self.node_tree})
+    
     def update_node_tree(self, context):
         if not self.node_tree:
             return

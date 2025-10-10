@@ -5,7 +5,6 @@ from bpy.types import Panel
 from .common import (
     PSContextMixin,
     get_icon_from_channel,
-    get_group_node,
     check_group_multiuser,
     get_icon,
 )
@@ -17,7 +16,7 @@ class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
         channel = item
         ps_ctx = self.parse_context(context)
         split = layout.split(factor=0.6)
-        group_node = get_group_node(context)
+        group_node = ps_ctx.active_group.get_group_node(ps_ctx.active_material.node_tree)
         icon_row = split.row(align=True)
         icon_row.prop(channel, "type", text="", icon_only=True, emboss=False)
         icon_row.prop(channel, "name", text="", emboss=False)

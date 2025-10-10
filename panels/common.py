@@ -31,11 +31,6 @@ def get_icon_from_channel(channel: Channel) -> int:
     return get_icon(type_to_icon.get(channel.type, 'color_socket'))
 
 
-def get_group_node(context: bpy.types.Context) -> bpy.types.Node:
-    ps_ctx = PSContextMixin.parse_context(context)
-    if not ps_ctx.active_group:
-        return None
-    return find_node(ps_ctx.active_material.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
 
 
 def get_event_icons(kmi: bpy.types.KeyMapItem) -> list[str]:
