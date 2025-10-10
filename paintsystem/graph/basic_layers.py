@@ -62,6 +62,8 @@ def get_adjustment_identifier(adjustment_type: str) -> str:
         'HUE_SAT': 'ShaderNodeHueSaturation',
         'INVERT': 'ShaderNodeInvert',
         'CURVE_RGB': 'ShaderNodeRGBCurve',
+        'RGBTOBW': 'ShaderNodeRGBToBW',
+        'MAP_RANGE': 'ShaderNodeMapRange',
     }
     return identifier_mapping.get(adjustment_type, "")
 
@@ -100,12 +102,22 @@ def create_adjustment_graph(global_layer: "GlobalLayer"):
     node_tree = global_layer.node_tree
     adjustment_type = get_adjustment_identifier(global_layer.adjustment_type)
     builder = NodeTreeBuilder(node_tree, "Layer", version=ADJUSTMENT_LAYER_VERSION)
-    create_mixing_graph(builder, "adjustment", "Color")
+    input_socket_name = "Color"
+    output_socket_name = "Color"
     builder.add_node("adjustment", adjustment_type)
-    if adjustment_type in {"ShaderNodeHueSaturation", "ShaderNodeInvert", "ShaderNodeRGBCurve"}:
-        builder.add_node("value", "ShaderNodeValue", default_outputs={0:1})
-        builder.link("value", "adjustment", "Value", "Fac")
-    builder.link("group_input", "adjustment", "Color", "Color")
+    match adjustment_type:
+        case "ShaderNodeRGBToBW":
+            output_socket_name = "Val"
+        case "ShaderNodeMapRange":
+            input_socket_name = "Value"
+            output_socket_name = "Result"
+        case _:
+            if adjustment_type in {"ShaderNodeHueSaturation", "ShaderNodeInvert", "ShaderNodeRGBCurve"}:
+                # Remove factor input if it exists
+                builder.add_node("value", "ShaderNodeValue", default_outputs={0:1})
+                builder.link("value", "adjustment", "Value", "Fac")
+    create_mixing_graph(builder, "adjustment", output_socket_name)
+    builder.link("group_input", "adjustment", "Color", input_socket_name)
     return builder
 
 def create_gradient_graph(global_layer: "GlobalLayer"):

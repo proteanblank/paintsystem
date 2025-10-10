@@ -85,6 +85,8 @@ ADJUSTMENT_TYPE_ENUM = [
     ('HUE_SAT', "Hue Saturation Value", ""),
     ('INVERT', "Invert", ""),
     ('CURVE_RGB', "RGB Curves", ""),
+    ('RGBTOBW', "RGB to BW", ""),
+    ('MAP_RANGE', "Map Range", ""),
     # ('ShaderNodeAmbientOcclusion', "Ambient Occlusion", ""),
 ]
 
