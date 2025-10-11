@@ -20,6 +20,10 @@ def get_material_output(mat_node_tree: NodeTree) -> Node:
     for node in mat_node_tree.nodes:
         if node.bl_idname == 'ShaderNodeOutputMaterial' and node.is_active_output:
             return node
+    # Try to find Group Output node instead
+    for node in mat_node_tree.nodes:
+        if node.bl_idname == 'NodeGroupOutput':
+            return node
     if node is None:
         node = mat_node_tree.nodes.new(type='ShaderNodeOutputMaterial')
         node.is_active_output = True
