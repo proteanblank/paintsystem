@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Panel
+from bpy.types import Panel, Menu
 from bpy.utils import register_classes_factory
 
 from .common import PSContextMixin, get_event_icons, find_keymap, find_keymap_by_name, scale_content, get_icon
@@ -148,13 +148,13 @@ class MAT_PT_BrushColorSettings(PSContextMixin, Panel):
     bl_label = "Color Picker Settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_ui_units_x = 12
+    bl_ui_units_x = 10
     
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
         layout.prop(context.preferences.view, "color_picker_type", text="")
-        layout.prop(ps_ctx.ps_settings, "color_picker_scale", text="Color Picker Scale")
+        layout.prop(ps_ctx.ps_settings, "color_picker_scale", text="Color Picker Scale", slider=True)
 
 class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
     bl_idname = 'MAT_PT_BrushColor'

@@ -197,3 +197,18 @@ def check_group_multiuser(group_node_tree: bpy.types.NodeTree) -> bool:
                 if group.node_tree == group_node_tree:
                     user_count += 1
     return user_count > 1
+
+
+def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node):
+    if image_node:
+        box = layout.box()
+        col = box.column()
+        col.template_node_inputs(image_node)
+        col.prop(image_node, "interpolation",
+                    text="")
+        col.prop(image_node, "projection",
+                    text="")
+        col.prop(image_node, "extension",
+                    text="")
+        col.prop(image_node.image, "source",
+                    text="")

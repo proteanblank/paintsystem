@@ -10,7 +10,8 @@ from .common import (
     icon_parser,
     get_icon,
     get_icon_from_channel,
-    check_group_multiuser
+    check_group_multiuser,
+    image_node_settings
 )
 
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
@@ -171,6 +172,32 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             layout.label(text=str(item.order))
 
 
+class MAT_MT_PaintSystemMergeAndExport(PSContextMixin, Menu):
+    bl_label = "Baked and Export"
+    bl_idname = "MAT_MT_PaintSystemMergeAndExport"
+    
+    def draw(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        active_channel = ps_ctx.active_channel
+        if active_channel.bake_image:
+            layout.prop(active_channel, "use_bake_image",
+                    text="Use Baked Image", icon='CHECKBOX_HLT' if active_channel.use_bake_image else 'CHECKBOX_DEHLT')
+            layout.separator()
+        layout.label(text="Bake")
+        if not active_channel.bake_image:
+            layout.operator("paint_system.bake_channel", text=f"Baked Channel ({active_channel.name})", icon_value=get_icon_from_channel(active_channel))
+        else:
+            layout.operator("paint_system.bake_channel", text=f"Re-bake Channel ({active_channel.name})", icon_value=get_icon_from_channel(active_channel))
+        # layout.operator("paint_system.bake_all_channels", text="Bake all Channels")
+        layout.separator()
+        layout.label(text="Export")
+        if not active_channel.bake_image:
+            layout.label(text="Please bake the channel first!", icon='ERROR')
+            return
+        layout.operator("paint_system.export_baked_image", text="Export Baked Image", icon='EXPORT')
+        layout.operator("paint_system.delete_bake_image", text="Delete Baked Image", icon='TRASH')
+
 class MAT_PT_Layers(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_Layers'
     bl_space_type = "VIEW_3D"
@@ -193,14 +220,16 @@ class MAT_PT_Layers(PSContextMixin, Panel):
     def draw_header_preset(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
-        if context.mode != 'PAINT_TEXTURE':
-            return
-        if ps_ctx.active_channel:
+        if context.mode == 'PAINT_TEXTURE' and ps_ctx.active_channel:
             layout.popover(
                 panel="MAT_PT_ChannelsSelect",
                 text=ps_ctx.active_channel.name if ps_ctx.active_channel else "No Channel",
                 icon_value=get_icon_from_channel(ps_ctx.active_channel)
             )
+        else:
+            if ps_ctx.active_channel.bake_image:
+                layout.prop(ps_ctx.active_channel, "use_bake_image",
+                        text="Use Baked", toggle = 1)
 
     # def draw_header_preset(self, context):
     #     layout = self.layout
@@ -223,13 +252,15 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         layout = self.layout
         current_mode = context.mode
         box = layout.box()
-        col = box.column()
+        col = box.column(align=True)
         row = col.row(align=True)
         row.scale_y = 1.7
         row.scale_x = 1.7
         # if contains_mat_setup:
-        row.operator("paint_system.toggle_paint_mode",
-                    text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon_from_channel(ps_ctx.active_channel))
+        paint_col = row.column(align=True)
+        paint_col.enabled = not ps_ctx.active_channel.use_bake_image
+        paint_col.operator("paint_system.toggle_paint_mode",
+            text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon_from_channel(ps_ctx.active_channel))
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             grease_pencil = context.grease_pencil
             layers = grease_pencil.layers
@@ -277,9 +308,9 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             if not group_node:
                 warning_box = box.box()
                 warning_box.alert = True
-                col = warning_box.column(align=True)
-                col.label(text="Paint System not connected", icon='ERROR')
-                col.label(text="to material output!", icon='BLANK1')
+                warning_col = warning_box.column(align=True)
+                warning_col.label(text="Paint System not connected", icon='ERROR')
+                warning_col.label(text="to material output!", icon='BLANK1')
             # else:
             #     row.alert = True
             #     row.operator("paint_system.create_template_setup",
@@ -291,10 +322,11 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             row.operator("wm.save_mainfile",
                         text="", icon_value=get_icon('save'))
             # Baking and Exporting
-            row = col.row(align=True)
-            row.scale_y = 1.5
-            row.scale_x = 1.5
+            
             if ps_ctx.ps_settings.show_tooltips and not active_group.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
+                row = col.row(align=True)
+                row.scale_y = 1.5
+                row.scale_x = 1.5
                 tip_box = col.box()
                 tip_box.scale_x = 1.4
                 tip_row = tip_box.row()
@@ -305,25 +337,21 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                 tip_row.operator("paint_system.hide_normal_painting_tips",
                             text="", icon='X')
 
-            # TODO: Bake and Export options
-            # if not active_channel.bake_image:
-            #     row.menu("MAT_MT_PaintSystemMergeAndExport",
-            #              icon='EXPORT', text="Merge and Bake")
+            row = col.row(align=True)
+            row.scale_y = 1.3
+            row.scale_x = 1.2
+            
+            row.menu("MAT_MT_PaintSystemMergeAndExport",
+                        text="Bake and Export", icon_value=get_icon('merge'))
 
-            if active_channel.bake_image:
-                row = box.row(align=True)
-                scale_content(context, row)
-                row.prop(active_channel, "use_bake_image",
-                        text="Use Merged Image", icon='CHECKBOX_HLT' if active_channel.use_bake_image else 'CHECKBOX_DEHLT')
-                row.operator("paint_system.export_baked_image",
-                            icon='EXPORT', text="")
-                col = row.column(align=True)
-                col.menu("MAT_MT_PaintSystemMergeOptimize",
-                        icon='COLLAPSEMENU', text="")
-                if active_channel.use_bake_image:
-                    box.label(
-                        text="Merged Image Used. It's faster!", icon='SOLO_ON')
-                    return
+            if active_channel.use_bake_image:
+                info_box = box.box()
+                info_col = info_box.column(align=True)
+                info_col.label(text="Baked image used", icon="INFO")
+                info_col.label(text="It's faster!", icon='BLANK1')
+                image_node = find_node(active_channel.node_tree, {'bl_idname': 'ShaderNodeTexImage', 'image': active_channel.bake_image})
+                image_node_settings(box, image_node)
+                return
 
             # if active_layer.mask_image:
             #     row = box.row(align=True)
@@ -382,6 +410,8 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
+        if ps_ctx.active_channel.use_bake_image:
+            return False
         if ps_ctx.ps_object.type == 'MESH':
             active_layer = ps_ctx.active_layer
             return active_layer is not None
@@ -658,6 +688,8 @@ class MAT_PT_LayerCameraPlaneSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
+        if ps_ctx.active_channel.use_bake_image:
+            return False
         return ps_ctx.ps_object.type == 'MESH' and ps_ctx.active_global_layer.attached_to_camera_plane
     
     def draw_header(self, context):
@@ -765,6 +797,8 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
+        if ps_ctx.active_channel.use_bake_image:
+            return False
         return global_layer and global_layer.type in ('IMAGE', 'TEXTURE')
     
     def draw_header(self, context):
@@ -812,6 +846,8 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
+        if ps_ctx.active_channel.use_bake_image:
+            return False
         return global_layer and global_layer.type == 'IMAGE'
     
     def draw_header(self, context):
@@ -827,18 +863,7 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         layout.enabled = not global_layer.lock_layer
 
         image_node = global_layer.find_node("image")
-        if image_node:
-            box = layout.box()
-            col = box.column()
-            col.template_node_inputs(image_node)
-            col.prop(image_node, "interpolation",
-                     text="")
-            col.prop(image_node, "projection",
-                     text="")
-            col.prop(image_node, "extension",
-                     text="")
-            col.prop(global_layer.image, "source",
-                     text="")
+        image_node_settings(layout, image_node)
 
 class MAT_MT_LayerMenu(PSContextMixin, Menu):
     bl_label = "Layer Menu"
@@ -1047,6 +1072,7 @@ classes = (
     MAT_MT_AddAdjustmentLayerMenu,
     MAT_MT_AddTextureLayerMenu,
     MAT_MT_LayerMenu,
+    MAT_MT_PaintSystemMergeAndExport,
     MAT_PT_Layers,
     MAT_PT_LayerSettings,
     MAT_PT_UL_CameraPlaneLayerList,

@@ -14,6 +14,7 @@ from bpy.props import (
     FloatVectorProperty,
 )
 from bpy.types import (
+    Context,
     Image,
     Node,
     NodeTree,
@@ -22,12 +23,13 @@ from bpy.types import (
     Material,
 )
 from bpy.utils import register_classes_factory
+from bpy_extras.node_utils import connect_sockets
 from typing import Optional
 
 # ---
 from ..custom_icons import get_icon
 from ..utils.version import is_newer_than
-from ..utils.nodes import find_node
+from ..utils.nodes import find_node, get_material_output
 from ..preferences import get_preferences
 from ..utils import get_next_unique_name
 from .common import PaintSystemPreferences
@@ -578,7 +580,67 @@ class Layer(BaseNestedListItem):
         default="Layer",
         update=update_node_tree
     )
+    
+def save_cycles_settings():
+    settings = {}
+    scene = bpy.context.scene
+    settings['render_engine'] = scene.render.engine
+    settings['device'] = scene.cycles.device
+    settings['samples'] = scene.cycles.samples
+    settings['preview_samples'] = scene.cycles.preview_samples
+    settings['denoiser'] = scene.cycles.denoiser
+    settings['use_denoising'] = scene.cycles.use_denoising
+    settings['use_adaptive_sampling'] = scene.cycles.use_adaptive_sampling
+    return settings
 
+def restore_cycles_settings(settings):
+    scene = bpy.context.scene
+    scene.render.engine = settings['render_engine']
+    scene.cycles.device = settings['device']
+    scene.cycles.samples = settings['samples']
+    scene.cycles.preview_samples = settings['preview_samples']
+    scene.cycles.denoiser = settings['denoiser']
+    scene.cycles.use_denoising = settings['use_denoising']
+    scene.cycles.use_adaptive_sampling = settings['use_adaptive_sampling']
+
+def ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu=True):
+    node_tree = mat.node_tree
+    
+    image_node = node_tree.nodes.new(type='ShaderNodeTexImage')
+    image_node.image = bake_image
+    
+    cycles_settings = save_cycles_settings()
+    # Switch to Cycles if needed
+    
+    with context.temp_override(active_object=obj, selected_objects=[obj]):
+        bake_params = {
+            "type": 'EMIT',
+        }
+        if context.scene.render.engine != 'CYCLES':
+            context.scene.render.engine = 'CYCLES'
+        cycles = context.scene.cycles
+        cycles.device = 'GPU' if use_gpu else 'CPU'
+        cycles.samples = 1
+        cycles.use_denoising = False
+        cycles.use_adaptive_sampling = False
+        for node in node_tree.nodes:
+            node.select = False
+
+        image_node.select = True
+        node_tree.nodes.active = image_node
+        try:
+            bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
+        except Exception as e:
+            # Try baking with CPU if GPU fails
+            cycles.device = 'CPU'
+            bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
+
+    # Delete bake nodes
+    node_tree.nodes.remove(image_node)
+    
+    restore_cycles_settings(cycles_settings)
+
+    return bake_image
 
 class Channel(BaseNestedListManager):
     """Custom data for material layers in the Paint System"""
@@ -594,6 +656,16 @@ class Channel(BaseNestedListManager):
         node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200, clear=True)
         node_builder.add_node("group_input", "NodeGroupInput")
         node_builder.add_node("group_output", "NodeGroupOutput")
+        
+        if self.use_bake_image:
+            node_builder.add_node("uv_map", "ShaderNodeUVMap", {"uv_map": self.bake_uv_map})
+            node_builder.add_node("bake_image", "ShaderNodeTexImage", {"image": self.bake_image})
+            node_builder.link("uv_map", "bake_image", "UV", "Vector")
+            node_builder.link("bake_image", "group_output", "Color", "Color")
+            node_builder.link("bake_image", "group_output", "Alpha", "Alpha")
+            node_builder.compile()
+            return
+        
         flattened_layers = self.flatten_hierarchy()
         @dataclass
         class PreviousLayer:
@@ -725,6 +797,100 @@ class Channel(BaseNestedListManager):
                     self.active_index = i
                     break
         return layer
+    
+    def bake_channel(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True):
+        """Bake the channel
+
+        Args:
+            context (Context): The context
+            mat (Material): The material
+            bake_image (Image): The bake image
+            uv_layer (str): The UV layer
+            use_gpu (bool, optional): Whether to use the GPU. Defaults to True.
+            use_group_tree (bool, optional): Whether to use the group tree if found. Defaults to True.
+
+        Raises:
+            ValueError: If the node tree is not found
+        """
+        
+        node_tree = mat.node_tree
+        if not node_tree:
+            raise ValueError("Node tree not found")
+        self.use_bake_image = False
+        self.bake_uv_map = uv_layer
+        ps_context = parse_context(context)
+        obj = ps_context.ps_object
+        
+        material_output = get_material_output(node_tree)
+        surface_socket = material_output.inputs['Surface']
+        from_socket = surface_socket.links[0].from_socket if surface_socket.links else None
+        
+        temp_alpha_image = bake_image.copy()
+        temp_alpha_image.colorspace_settings.name = 'Non-Color'
+        
+        # Bake as output of group ps if exists in the node tree
+        bake_node = None
+        to_be_deleted_nodes = []
+        color_output = None
+        alpha_output = None
+        
+        if hasattr(mat, "ps_mat_data") and mat.ps_mat_data.groups and use_group_tree:
+            for group in mat.ps_mat_data.groups:
+                if group.node_tree and self.name in group.channels:
+                    bake_node = find_node(node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': group.node_tree})
+                    color_output = bake_node.outputs[self.name]
+                    alpha_output = bake_node.outputs[f'{self.name} Alpha']
+                    break
+        
+        if not bake_node:
+            # Use channel node group instead
+            bake_node = node_tree.nodes.new(type='ShaderNodeGroup')
+            bake_node.node_tree = self.node_tree
+            color_output = bake_node.outputs['Color']
+            alpha_output = bake_node.outputs['Alpha']
+            to_be_deleted_nodes.append(bake_node)
+        
+        # Bake image
+        connect_sockets(surface_socket, color_output)
+        bake_image = ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu)
+        
+        connect_sockets(surface_socket, alpha_output)
+        temp_alpha_image = ps_bake(context, obj, mat, uv_layer, temp_alpha_image, use_gpu)
+    
+        if bake_image and temp_alpha_image:
+            # Get pixel data
+            image_pixels = bake_image.pixels[:]
+            alpha_pixels = temp_alpha_image.pixels[:]
+            
+            # Create a new pixel array
+            new_pixels = list(image_pixels)
+            
+            # Apply red channel of alpha image to alpha channel of main image
+            for i in range(0, len(image_pixels), 4):
+                # Get the red channel value from alpha image (every 4 values)
+                alpha_value = alpha_pixels[i]  # Red channel
+                # Set the alpha channel of the main image (index + 3)
+                new_pixels[i + 3] = alpha_value
+            
+            # Update the image with the new pixel data
+            bake_image.pixels = new_pixels
+            bake_image.update()
+
+        for node in to_be_deleted_nodes:
+            node_tree.nodes.remove(node)
+        bpy.data.images.remove(temp_alpha_image)
+        
+        # Restore surface socket
+        if from_socket:
+            connect_sockets(surface_socket, from_socket)
+            
+        self.use_bake_image = True
+
+    def update_bake_image(self, context):
+        if self.use_bake_image:
+            # Force to object mode
+            bpy.ops.object.mode_set(mode="OBJECT")
+        self.update_node_tree(context)
         
     @property
     def item_type(self):
@@ -799,17 +965,18 @@ class Channel(BaseNestedListManager):
     )
     bake_image: PointerProperty(
         name="Bake Image",
-        type=Image
+        type=Image,
+        update=update_bake_image
     )
     bake_uv_map: StringProperty(
         name="Bake Image UV Map",
         default="UVMap",
-        # update=update_node_tree
+        update=update_bake_image
     )
     use_bake_image: BoolProperty(
         name="Use Bake Image",
         default=False,
-        # update=update_node_tree
+        update=update_bake_image
     )
 
     @property
