@@ -770,22 +770,15 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
         order = int(active_layer.order)
         parent_id = int(active_layer.parent_id)
         
-        # In case Item type is GRADIENT
-        # if item.type == 'GRADIENT':
-        #     empty_object = None
-        #     if item.node_tree:
-        #         empty_object = item.node_tree.nodes["Texture Coordinate"].object
-        #     if empty_object and empty_object.type == 'EMPTY':
-        #         bpy.data.objects.remove(empty_object, do_unlink=True)
-        
         if not is_global_layer_linked(global_layer):
             # Check if global layer is used in the camera plane channel
             global_layer.attached_to_camera_plane = False
             # Delete the global layer
             if global_layer.empty_object:
                 bpy.data.objects.remove(global_layer.empty_object, do_unlink=True)
-            if global_layer.image:
-                bpy.data.images.remove(global_layer.image)
+            # TODO: The following causes some issue when undoing
+            # if global_layer.image:
+            #     bpy.data.images.remove(global_layer.image)
             if global_layer.node_tree:
                 bpy.data.node_groups.remove(global_layer.node_tree)
             global_layers = context.scene.ps_scene_data.layers
