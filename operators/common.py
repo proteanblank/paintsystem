@@ -154,9 +154,9 @@ class PSImageCreateMixin():
     )
     
     def image_create_ui(self, layout, context, show_name=True):
-        row = layout.row(align=True)
-        scale_content(context, row)
         if show_name:
+            row = layout.row(align=True)
+            scale_content(context, row)
             row.prop(self, "image_name")
         box = layout.box()
         box.label(text="Image Resolution", icon='IMAGE_DATA')

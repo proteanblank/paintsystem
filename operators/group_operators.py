@@ -61,7 +61,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
     group_name: bpy.props.StringProperty(
         name="Group Name",
         description="Name of the new group",
-        default="Paint System (New Group)",
+        default="New Group",
     )
 
     use_alpha_blend: BoolProperty(

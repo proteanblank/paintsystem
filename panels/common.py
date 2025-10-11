@@ -199,16 +199,29 @@ def check_group_multiuser(group_node_tree: bpy.types.NodeTree) -> bool:
     return user_count > 1
 
 
-def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node):
+def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, text="", icon="NONE", icon_value=None):
+    image = image_node.image
     if image_node:
         box = layout.box()
         col = box.column()
-        col.template_node_inputs(image_node)
+        if text or icon != "NONE" or icon_value:
+            col.label(text=text, icon=icon)
+            if icon_value:
+                col.label(text=text, icon_value=icon_value)
+            col.separator()
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.operator("paint_system.export_image", text="Save As...", icon="EXPORT").image_name = image_node.image.name
+        col.separator()
+        col.template_ID(image_node, "image", text="")
         col.prop(image_node, "interpolation",
                     text="")
         col.prop(image_node, "projection",
                     text="")
         col.prop(image_node, "extension",
                     text="")
-        col.prop(image_node.image, "source",
+        col.prop(image, "source",
                     text="")
+        # Color space settings
+        col.prop(image.colorspace_settings, "name", text="Color Space")
+        col.prop(image, "alpha_mode", text="Alpha")

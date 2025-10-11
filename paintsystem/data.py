@@ -164,8 +164,22 @@ def update_active_image(self=None, context: bpy.types.Context = None):
         return
     global_layer = ps_ctx.active_global_layer
     update_brush_settings(self, context)
-    if not global_layer:
+
+    if image_paint.mode == 'MATERIAL':
+        image_paint.mode = 'IMAGE'
+    if not global_layer or global_layer.lock_layer or active_channel.use_bake_image:
+        image_paint.canvas = None
+        # Unable to paint
         return
+    
+    selected_image: Image = global_layer.image
+    image_paint.canvas = selected_image
+    if global_layer.coord_type == 'UV' or global_layer.attached_to_camera_plane:
+        if global_layer.uv_map_name and obj.data.uv_layers.get(global_layer.uv_map_name):
+            obj.data.uv_layers[global_layer.uv_map_name].active = True
+    elif global_layer.coord_type == 'AUTO' and obj.data.uv_layers.get("PS_UVMap"):
+        obj.data.uv_layers["PS_UVMap"].active = True
+
     if not global_layer.attached_to_camera_plane:
         context.view_layer.objects.active = obj
         obj.select_set(True)
@@ -174,22 +188,6 @@ def update_active_image(self=None, context: bpy.types.Context = None):
         ps_ctx.camera_plane.select_set(True)
         context.view_layer.objects.active = ps_ctx.camera_plane
         bpy.ops.object.mode_set(mode=ps_ctx.ps_object.mode)
-
-    if image_paint.mode == 'MATERIAL':
-                image_paint.mode = 'IMAGE'
-    selected_image: Image = global_layer.image
-    if not selected_image or global_layer.lock_layer or active_channel.use_bake_image:
-        image_paint.canvas = None
-        # Unable to paint
-        return
-    else:
-        # print("Selected image: ", selected_image)
-        image_paint.canvas = selected_image
-        if global_layer.coord_type == 'UV' or global_layer.attached_to_camera_plane:
-            if global_layer.uv_map_name:
-                obj.data.uv_layers[global_layer.uv_map_name].active = True
-        elif global_layer.coord_type == 'AUTO':
-            obj.data.uv_layers["PS_UVMap"].active = True
 
 def update_active_layer(self, context):
     ps_ctx = parse_context(context)
@@ -317,6 +315,12 @@ class GlobalLayer(PropertyGroup):
                 layer_graph = create_texture_graph(self)
             case _:
                 raise ValueError(f"Invalid layer type: {self.type}")
+        
+        # Clean up
+        if self.empty_object and self.type != "GRADIENT":
+            collection = get_paint_system_collection(context)
+            collection.objects.unlink(self.empty_object)
+        
         if not self.enabled:
             layer_graph.link("group_input", "group_output", "Color", "Color")
             layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
@@ -770,7 +774,7 @@ class Channel(BaseNestedListManager):
         self.node_tree.name = f".PS_Channel ({self.name})"
         self.updating_name_flag = True
         parsed_context = parse_context(context)
-        active_group = parsed_context.get("active_group")
+        active_group = parsed_context.active_group
         new_name = get_next_unique_name(self.name, [channel.name for channel in active_group.channels if channel != self])
         if new_name != self.name:
             self.name = new_name
@@ -798,7 +802,7 @@ class Channel(BaseNestedListManager):
                     break
         return layer
     
-    def bake_channel(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True):
+    def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True):
         """Bake the channel
 
         Args:
@@ -816,8 +820,6 @@ class Channel(BaseNestedListManager):
         node_tree = mat.node_tree
         if not node_tree:
             raise ValueError("Node tree not found")
-        self.use_bake_image = False
-        self.bake_uv_map = uv_layer
         ps_context = parse_context(context)
         obj = ps_context.ps_object
         
@@ -839,7 +841,8 @@ class Channel(BaseNestedListManager):
                 if group.node_tree and self.name in group.channels:
                     bake_node = find_node(node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': group.node_tree})
                     color_output = bake_node.outputs[self.name]
-                    alpha_output = bake_node.outputs[f'{self.name} Alpha']
+                    if self.use_alpha:
+                        alpha_output = bake_node.outputs[f'{self.name} Alpha']
                     break
         
         if not bake_node:
@@ -847,44 +850,44 @@ class Channel(BaseNestedListManager):
             bake_node = node_tree.nodes.new(type='ShaderNodeGroup')
             bake_node.node_tree = self.node_tree
             color_output = bake_node.outputs['Color']
-            alpha_output = bake_node.outputs['Alpha']
+            if self.use_alpha:
+                alpha_output = bake_node.outputs['Alpha']
             to_be_deleted_nodes.append(bake_node)
         
         # Bake image
         connect_sockets(surface_socket, color_output)
         bake_image = ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu)
         
-        connect_sockets(surface_socket, alpha_output)
-        temp_alpha_image = ps_bake(context, obj, mat, uv_layer, temp_alpha_image, use_gpu)
+        if self.use_alpha:
+            connect_sockets(surface_socket, alpha_output)
+            temp_alpha_image = ps_bake(context, obj, mat, uv_layer, temp_alpha_image, use_gpu)
     
-        if bake_image and temp_alpha_image:
-            # Get pixel data
-            image_pixels = bake_image.pixels[:]
-            alpha_pixels = temp_alpha_image.pixels[:]
-            
-            # Create a new pixel array
-            new_pixels = list(image_pixels)
-            
-            # Apply red channel of alpha image to alpha channel of main image
-            for i in range(0, len(image_pixels), 4):
-                # Get the red channel value from alpha image (every 4 values)
-                alpha_value = alpha_pixels[i]  # Red channel
-                # Set the alpha channel of the main image (index + 3)
-                new_pixels[i + 3] = alpha_value
-            
-            # Update the image with the new pixel data
-            bake_image.pixels = new_pixels
-            bake_image.update()
+            if bake_image and temp_alpha_image:
+                # Get pixel data
+                image_pixels = bake_image.pixels[:]
+                alpha_pixels = temp_alpha_image.pixels[:]
+                
+                # Create a new pixel array
+                new_pixels = list(image_pixels)
+                
+                # Apply red channel of alpha image to alpha channel of main image
+                for i in range(0, len(image_pixels), 4):
+                    # Get the red channel value from alpha image (every 4 values)
+                    alpha_value = alpha_pixels[i]  # Red channel
+                    # Set the alpha channel of the main image (index + 3)
+                    new_pixels[i + 3] = alpha_value
+                
+                # Update the image with the new pixel data
+                bake_image.pixels = new_pixels
+                bake_image.update()
+            bpy.data.images.remove(temp_alpha_image)
 
         for node in to_be_deleted_nodes:
             node_tree.nodes.remove(node)
-        bpy.data.images.remove(temp_alpha_image)
         
         # Restore surface socket
         if from_socket:
             connect_sockets(surface_socket, from_socket)
-            
-        self.use_bake_image = True
 
     def update_bake_image(self, context):
         if self.use_bake_image:
@@ -1175,12 +1178,15 @@ class Group(PropertyGroup):
     
     def update_channel(self, context):
         ps_ctx = parse_context(context)
-        update_active_image(self, context)
         ps_mat_data = ps_ctx.ps_mat_data
         if ps_mat_data.preview_channel:
             # Call paint_system.preview_active_channel twice to ensure it's updated
             bpy.ops.paint_system.preview_active_channel('EXEC_DEFAULT')
             bpy.ops.paint_system.preview_active_channel('EXEC_DEFAULT')
+        if ps_ctx.active_channel.use_bake_image:
+            # Force to object mode
+            bpy.ops.object.mode_set(mode="OBJECT")
+        update_active_image(self, context)
     
     active_index: IntProperty(name="Active Channel Index", update=update_channel)
     node_tree: PointerProperty(
@@ -1671,34 +1677,6 @@ classes = (
     LegacyPaintSystemGroups,
     )
 
-@persistent
-def save_handler(scene: bpy.types.Scene):
-    print("Saving Paint System data...")
-    images = set()
-    ps_ctx = parse_context(bpy.context)
-    for layer in ps_ctx.ps_scene_data.layers:
-        image = layer.image
-        if image and (image.is_dirty):
-            images.add(image)
-            
-    for image in images:
-        if not image.is_dirty:
-            continue
-        if image.packed_file or image.filepath == '':
-            print(f"Packing image {image.name}")
-            image.pack()
-        else:
-            print(f"Saving image {image.name}")
-            image.save()
-
-
-@persistent
-def refresh_image(scene: bpy.types.Scene):
-    ps_ctx = parse_context(bpy.context)
-    active_layer = ps_ctx.active_global_layer
-    if active_layer and active_layer.image:
-        active_layer.image.reload()
-
 _register, _unregister = register_classes_factory(classes)
 
 def register():
@@ -1715,13 +1693,9 @@ def register():
         description="Material Data for the Paint System"
     )
     bpy.types.Material.paint_system = PointerProperty(type=LegacyPaintSystemGroups)
-    bpy.app.handlers.save_pre.append(save_handler)
-    bpy.app.handlers.load_post.append(refresh_image)
     
 def unregister():
     """Unregister the Paint System data module."""
-    bpy.app.handlers.save_pre.remove(save_handler)
-    bpy.app.handlers.load_post.remove(refresh_image)
     del bpy.types.Material.paint_system
     del bpy.types.Material.ps_mat_data
     del bpy.types.Scene.ps_scene_data

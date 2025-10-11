@@ -6,34 +6,6 @@ from .common import PSContextMixin, get_unified_settings
 import numpy
 
 
-class MAT_MT_ImageMenu(PSContextMixin, Menu):
-    bl_label = "Image Menu"
-    bl_idname = "MAT_MT_ImageMenu"
-
-    @classmethod
-    def poll(cls, context):
-        ps_ctx = cls.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
-        return global_layer and global_layer.image
-
-    def draw(self, context):
-        layout = self.layout
-        ps_ctx = self.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
-        image_name = global_layer.image.name
-        layout.operator("paint_system.export_active_layer",
-                        text="Export Layer", icon='EXPORT')
-        layout.separator()
-        layout.operator("paint_system.fill_image", 
-                        text="Fill Image", icon='SNAP_FACE').image_name = image_name
-        layout.operator("paint_system.invert_colors",
-                        icon="MOD_MASK").image_name = image_name
-        layout.operator("paint_system.resize_image",
-                        icon="CON_SIZELIMIT").image_name = image_name
-        layout.operator("paint_system.clear_image",
-                        icon="X").image_name = image_name
-
-
 class PAINTSYSTEM_OT_InvertColors(Operator):
     bl_idname = "paint_system.invert_colors"
     bl_label = "Invert Colors"
@@ -71,21 +43,6 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
         layout.prop(self, "invert_g", text="Green")
         layout.prop(self, "invert_b", text="Blue")
         layout.prop(self, "invert_a", text="Alpha")
-
-
-class PAINTSYSTEM_OT_ExportActiveLayer(PSContextMixin, Operator):
-    bl_idname = "paint_system.export_active_layer"
-    bl_label = "Save Image"
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Save the active image"
-
-    def execute(self, context):
-        ps_ctx = self.parse_context(context)
-        active_global_layer = ps_ctx.active_global_layer
-        image = active_global_layer.image
-        with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
-            bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
-        return {'FINISHED'}
 
 
 class PAINTSYSTEM_OT_ResizeImage(Operator):
@@ -209,9 +166,7 @@ class PAINTSYSTEM_OT_FillImage(Operator):
 
 
 classes = (
-    MAT_MT_ImageMenu,
     PAINTSYSTEM_OT_InvertColors,
-    PAINTSYSTEM_OT_ExportActiveLayer,
     PAINTSYSTEM_OT_ResizeImage,
     PAINTSYSTEM_OT_ClearImage,
     PAINTSYSTEM_OT_FillImage,

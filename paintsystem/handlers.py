@@ -50,11 +50,50 @@ def load_post(scene):
             global_layer.update_node_tree(bpy.context)
     print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers)} layers in {round((time.time() - start_time) * 1000, 2)} ms")
 
+@bpy.app.handlers.persistent
+def save_handler(scene: bpy.types.Scene):
+    print("Saving Paint System data...")
+    images = set()
+    ps_ctx = parse_context(bpy.context)
+    for layer in ps_ctx.ps_scene_data.layers:
+        image = layer.image
+        if image and image.is_dirty:
+            images.add(image)
+    
+    for mat in bpy.data.materials:
+        if hasattr(mat, 'ps_mat_data'):
+            for group in mat.ps_mat_data.groups:
+                for channel in group.channels:
+                    image = channel.bake_image
+                    if image and image.is_dirty:
+                        images.add(image)
+            
+    for image in images:
+        if not image.is_dirty:
+            continue
+        if image.packed_file or image.filepath == '':
+            print(f"Packing image {image.name}")
+            image.pack()
+        else:
+            print(f"Saving image {image.name}")
+            image.save()
+
+
+@bpy.app.handlers.persistent
+def refresh_image(scene: bpy.types.Scene):
+    ps_ctx = parse_context(bpy.context)
+    active_layer = ps_ctx.active_global_layer
+    if active_layer and active_layer.image:
+        active_layer.image.reload()
+
 
 def register():
     bpy.app.handlers.frame_change_pre.append(frame_change_pre)
     bpy.app.handlers.load_post.append(load_post)
-
+    bpy.app.handlers.save_pre.append(save_handler)
+    bpy.app.handlers.load_post.append(refresh_image)
 def unregister():
     bpy.app.handlers.frame_change_pre.remove(frame_change_pre)
     bpy.app.handlers.load_post.remove(load_post)
+    bpy.app.handlers.save_pre.remove(save_handler)
+    bpy.app.handlers.load_post.remove(refresh_image)

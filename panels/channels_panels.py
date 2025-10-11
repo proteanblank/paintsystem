@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import UIList
+from bpy.types import UIList, Menu
 from bpy.utils import register_classes_factory
 from bpy.types import Panel
 from .common import (
@@ -9,18 +9,48 @@ from .common import (
     get_icon,
 )
 
+class MAT_MT_PaintSystemChannelsMergeAndExport(PSContextMixin, Menu):
+    bl_label = "Baked and Export"
+    bl_idname = "MAT_MT_PaintSystemChannelsMergeAndExport"
+    
+    def draw(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        active_channel = ps_ctx.active_channel
+        col = layout.column(align=True)
+        col.label(text="Bake")
+        col.operator("paint_system.bake_all_channels", text=f"Bake All Channels", icon_value=get_icon('channels'))
+        col.operator("paint_system.bake_channel", text=f"Bake Active Channel ({active_channel.name})", icon_value=get_icon_from_channel(active_channel))
+        # col.operator("paint_system.bake_all_channels", text="Bake all Channels")
+        col.separator()
+        col.label(text="Export")
+        col.operator("paint_system.export_all_images", text="Export All Images", icon='EXPORT')
+        if active_channel.bake_image:
+            col.operator("paint_system.export_image", text=f"Export Active Channel ({active_channel.name})", icon='EXPORT').image_name = active_channel.bake_image.name
+        else:
+            col.operator("paint_system.export_image", text=f"Export Active Channel ({active_channel.name})", icon='EXPORT')
+
 class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
     """UIList for displaying paint channels."""
 
     def draw_item(self, context, layout: bpy.types.UILayout, data, item, icon, active_data, active_propname, index):
         channel = item
         ps_ctx = self.parse_context(context)
+        if channel.use_bake_image:
+            row = layout.row()
+            icon_row = row.row(align=True)
+            icon_row.label(icon_value=get_icon_from_channel(channel))
+            icon_row.prop(channel, "name", text="", emboss=False)
+            
+            bake_row = row.row(align=True)
+            bake_row.label(text="Baked", icon="TEXTURE_DATA")
+            return
         split = layout.split(factor=0.6)
         group_node = ps_ctx.active_group.get_group_node(ps_ctx.active_material.node_tree)
         icon_row = split.row(align=True)
         icon_row.prop(channel, "type", text="", icon_only=True, emboss=False)
         icon_row.prop(channel, "name", text="", emboss=False)
-        if group_node and channel.type == "FLOAT":
+        if group_node and channel.type == "FLOAT" and channel.name in group_node.inputs:
             split.prop(group_node.inputs[channel.name], "default_value", text="")
 
     # def filter_items(self, context, data, propname):
@@ -91,6 +121,7 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
+        layout.menu("MAT_MT_PaintSystemChannelsMergeAndExport", icon="TEXTURE_DATA", text="Bake and Export")
         row = layout.row()
         row.template_list(
             "PAINTSYSTEM_UL_channels", 
@@ -124,11 +155,16 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
     
     def draw(self, context):
         layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
+        if active_channel.bake_image:
+            row = layout.row(align=True)
+            row.prop(active_channel, "use_bake_image", text="Use Baked Image", icon="TEXTURE_DATA")
+            row.operator("paint_system.delete_bake_image", text="", icon="TRASH")
         col = layout.column(align=True)
+        col.enabled = not active_channel.use_bake_image
+        col.use_property_split = True
+        col.use_property_decorate = False
         col.prop(active_channel, "type", text="Type")
         col.prop(active_channel, "use_alpha", text="Alpha Socket")
         if active_channel.type == "VECTOR":
@@ -141,6 +177,7 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
 
 
 classes = (
+    MAT_MT_PaintSystemChannelsMergeAndExport,
     PAINTSYSTEM_UL_channels,
     MAT_PT_ChannelsSelect,
     MAT_PT_ChannelsPanel,

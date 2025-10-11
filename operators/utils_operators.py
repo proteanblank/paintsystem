@@ -351,11 +351,11 @@ class PAINTSYSTEM_OT_AddCameraPlane(Operator):
 
 class PAINTSYSTEM_OT_HidePaintingTips(PSContextMixin, MultiMaterialOperator):
     """Hide the normal painting tips"""
-    bl_idname = "paint_system.hide_normal_painting_tips"
+    bl_idname = "paint_system.hide_painting_tips"
     bl_label = "Hide Normal Painting Tips"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     
-    tip_attribute_name: bpy.props.StringProperty(
+    attribute_name: bpy.props.StringProperty(
         name="Tip Attribute Name",
         description="The attribute name of the tip",
         default=""
@@ -368,8 +368,8 @@ class PAINTSYSTEM_OT_HidePaintingTips(PSContextMixin, MultiMaterialOperator):
     
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        if hasattr(ps_ctx.ps_scene_data, self.tip_attribute_name):
-            setattr(ps_ctx.ps_scene_data, self.tip_attribute_name, True)
+        if hasattr(ps_ctx.active_group, self.attribute_name):
+            setattr(ps_ctx.active_group, self.attribute_name, True)
         else:
             return {'CANCELLED'}
         redraw_panel(context)
