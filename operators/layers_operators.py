@@ -20,7 +20,14 @@ from ..paintsystem.data import (
     is_global_layer_linked,
 )
 from ..utils import get_next_unique_name
-from .common import PSContextMixin, scale_content, get_icon, MultiMaterialOperator, PSUVOptionsMixin
+from .common import (
+    PSContextMixin,
+    scale_content,
+    get_icon,
+    MultiMaterialOperator,
+    PSUVOptionsMixin,
+    PSImageCreateMixin
+    )
 from .operators_utils import redraw_panel, intern_enum_items
 
 def get_object_uv_maps(self, context: Context):
@@ -192,7 +199,7 @@ def get_icon_from_type(type: str) -> int:
 #         layer = add_global_layer_to_channel(channel, global_layer)
 #         return True
 
-class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOperator):
+class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixin, MultiMaterialOperator):
     """Create a new image layer"""
     bl_idname = "paint_system.new_image_layer"
     bl_label = "New Image Layer"
@@ -210,35 +217,12 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel is not None
     
-    layer_name: StringProperty(
+    image_name: StringProperty(
         name="Layer Name",
         description="Name of the new image layer",
         default="Image Layer"
     )
-    image_resolution: EnumProperty(
-        items=[
-            ('1024', "1024", "1024x1024"),
-            ('2048', "2048", "2048x2048"),
-            ('4096', "4096", "4096x4096"),
-            ('8192', "8192", "8192x8192"),
-            ('CUSTOM', "Custom", "Custom Resolution"),
-        ],
-        default='2048'
-    )
-    image_width: IntProperty(
-        name="Width",
-        default=1024,
-        min=1,
-        description="Width of the image in pixels",
-        subtype='PIXEL'
-    )
-    image_height: IntProperty(
-        name="Height",
-        default=1024,
-        min=1,
-        description="Height of the image in pixels",
-        subtype='PIXEL'
-    )
+    
     image_add_type: EnumProperty(
         name="Image Add Type",
         description="How to add the image layer",
@@ -269,18 +253,19 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         self.store_coord_type(context)
         ps_ctx = self.parse_context(context)
         if self.image_add_type == 'NEW':
-            img = bpy.data.images.new(
-                name=self.layer_name, width=self.image_width, height=self.image_height, alpha=True)
-            img.generated_color = (0, 0, 0, 0)
+            img = self.create_image()
         elif self.image_add_type == 'IMPORT':
             img = bpy.data.images.load(self.filepath, check_existing=True)
             if not img:
                 self.report({'ERROR'}, "Failed to load image")
                 return False
         elif self.image_add_type == 'EXISTING':
-            img = bpy.data.images.get(self.layer_name)
-            if not img:
+            if not self.image_name:
                 self.report({'ERROR'}, "No image selected")
+                return False
+            img = bpy.data.images.get(self.image_name)
+            if not img:
+                self.report({'ERROR'}, "Image not found")
                 return False
         img.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
         global_layer = add_global_layer("IMAGE")
@@ -290,7 +275,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         global_layer.attached_to_camera_plane = self.attach_to_camera_plane
         if self.attach_to_camera_plane and context.region_data.view_perspective != 'CAMERA':
             bpy.ops.view3d.view_camera('INVOKE_DEFAULT')
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.layer_name)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, self.image_name)
         world_matrix = context.scene.camera.matrix_world
         layer.camera_plane_position = world_matrix.translation
         layer.camera_plane_rotation = world_matrix.to_euler()
@@ -300,7 +285,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
     
     def invoke(self, context, event):
         self.get_coord_type(context)
-        self.layer_name = self.get_next_image_name(context)
+        self.image_name = self.get_next_image_name(context)
         if self.image_resolution != 'CUSTOM':
             self.image_width = int(self.image_resolution)
             self.image_height = int(self.image_resolution)
@@ -308,27 +293,16 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
             context.window_manager.fileselect_add(self)
             return {'RUNNING_MODAL'}
         if self.image_add_type == 'EXISTING':
-            self.layer_name = ""
+            self.image_name = ""
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
         self.multiple_objects_ui(layout, context)
         if self.image_add_type == 'NEW':
-            row = layout.row(align=True)
-            scale_content(context, row)
-            row.prop(self, "layer_name")
-            box = layout.box()
-            box.label(text="Image Resolution", icon='IMAGE_DATA')
-            row = box.row(align=True)
-            row.prop(self, "image_resolution", expand=True)
-            if self.image_resolution == 'CUSTOM':
-                col = box.column(align=True)
-                col.prop(self, "image_width", text="Width")
-                col.prop(self, "image_height", text="Height")
-            
+            self.image_create_ui(layout, context)
         elif self.image_add_type == 'EXISTING':
-            layout.prop_search(self, "layer_name", bpy.data,
+            layout.prop_search(self, "image_name", bpy.data,
                            "images", text="Image")
             
         box = layout.box()

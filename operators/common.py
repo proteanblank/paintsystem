@@ -1,4 +1,5 @@
 import bpy
+from bpy.props import IntProperty
 from ..paintsystem.data import PSContextMixin, get_global_layer, COORDINATE_TYPE_ENUM
 from ..custom_icons import get_icon
 from ..preferences import get_preferences
@@ -118,3 +119,56 @@ class PSUVOptionsMixin():
             row.prop_search(self, "uv_map_name", context.object.data, "uv_layers", text="")
             if not self.uv_map_name:
                 row.alert = True
+
+
+class PSImageCreateMixin():
+    image_name: StringProperty(
+        name="Image Name",
+        description="Name of the new image",
+        default="New Image",
+        options={'SKIP_SAVE'}
+    )
+    image_resolution: EnumProperty(
+        items=[
+            ('1024', "1024", "1024x1024"),
+            ('2048', "2048", "2048x2048"),
+            ('4096', "4096", "4096x4096"),
+            ('8192', "8192", "8192x8192"),
+            ('CUSTOM', "Custom", "Custom Resolution"),
+        ],
+        default='2048'
+    )
+    image_width: IntProperty(
+        name="Width",
+        default=1024,
+        min=1,
+        description="Width of the image in pixels",
+        subtype='PIXEL'
+    )
+    image_height: IntProperty(
+        name="Height",
+        default=1024,
+        min=1,
+        description="Height of the image in pixels",
+        subtype='PIXEL'
+    )
+    
+    def image_create_ui(self, layout, context, show_name=True):
+        row = layout.row(align=True)
+        scale_content(context, row)
+        if show_name:
+            row.prop(self, "image_name")
+        box = layout.box()
+        box.label(text="Image Resolution", icon='IMAGE_DATA')
+        row = box.row(align=True)
+        row.prop(self, "image_resolution", expand=True)
+        if self.image_resolution == 'CUSTOM':
+            col = box.column(align=True)
+            col.prop(self, "image_width", text="Width")
+            col.prop(self, "image_height", text="Height")
+            
+    def create_image(self):
+        img = bpy.data.images.new(
+            name=self.image_name, width=self.image_width, height=self.image_height, alpha=True)
+        img.generated_color = (0, 0, 0, 0)
+        return img
