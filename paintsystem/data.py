@@ -45,6 +45,7 @@ from .graph import (
     create_solid_graph,
     get_alpha_over_nodetree,
     create_texture_graph,
+    create_geometry_graph,
 )
 from .graph.common import get_library_object
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
@@ -67,6 +68,7 @@ LAYER_TYPE_ENUM = [
     ('GRADIENT', "Gradient", "Gradient layer"),
     ('RANDOM', "Random", "Random Color layer"),
     ('TEXTURE', "Texture", "Texture layer"),
+    ('GEOMETRY', "Geometry", "Geometry layer"),
 ]
 
 CHANNEL_TYPE_ENUM = [
@@ -121,6 +123,16 @@ ATTRIBUTE_TYPE_ENUM = [
     ('OBJECT', "Object", "Object"),
     ('INSTANCER', "Instancer", "Instancer"),
     ('VIEW_LAYER', "View Layer", "View Layer")
+]
+
+GEOMETRY_TYPE_ENUM = [
+    ('WORLD_NORMAL', "World Space Normal", "World Space Normal"),
+    ('WORLD_TRUE_NORMAL', "World Space True Normal", "World Space True Normal"),
+    ('POSITION', "World Space Position", "World Space Position"),
+    ('OBJECT_NORMAL', "Object Space Normal", "Object Space Normal"),
+    ('OBJECT_POSITION', "Object Space Position", "Object Space Position"),
+    ('BACKFACING', "Backfacing", "Backfacing"),
+    ('VECTOR_TRANSFORM', "Vector Transform", "Vector Transform"),
 ]
 
 ACTION_TYPE_ENUM = [
@@ -313,6 +325,8 @@ class GlobalLayer(PropertyGroup):
                 layer_graph = create_custom_graph(self)
             case "TEXTURE":
                 layer_graph = create_texture_graph(self)
+            case "GEOMETRY":
+                layer_graph = create_geometry_graph(self)
             case _:
                 raise ValueError(f"Invalid layer type: {self.type}")
         
@@ -503,6 +517,12 @@ class GlobalLayer(PropertyGroup):
         items=TEXTURE_TYPE_ENUM,
         name="Texture Type",
         description="Texture type",
+        update=update_node_tree
+    )
+    geometry_type: EnumProperty(
+        items=GEOMETRY_TYPE_ENUM,
+        name="Geometry Type",
+        description="Geometry type",
         update=update_node_tree
     )
     type: EnumProperty(
@@ -828,14 +848,18 @@ class Channel(BaseNestedListManager):
         surface_socket = material_output.inputs['Surface']
         from_socket = surface_socket.links[0].from_socket if surface_socket.links else None
         
-        temp_alpha_image = bake_image.copy()
-        temp_alpha_image.colorspace_settings.name = 'Non-Color'
-        
         # Bake as output of group ps if exists in the node tree
         bake_node = None
         to_be_deleted_nodes = []
         color_output = None
         alpha_output = None
+        
+        if not self.use_alpha:
+            # Use the value node set to 1 as alpha output
+            value_node = node_tree.nodes.new('ShaderNodeValue')
+            value_node.outputs['Value'].default_value = 1.0
+            alpha_output = value_node.outputs['Value']
+            to_be_deleted_nodes.append(value_node)
         
         if hasattr(mat, "ps_mat_data") and mat.ps_mat_data.groups and use_group_tree:
             for group in mat.ps_mat_data.groups:
@@ -859,29 +883,30 @@ class Channel(BaseNestedListManager):
         connect_sockets(surface_socket, color_output)
         bake_image = ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu)
         
-        if self.use_alpha:
-            connect_sockets(surface_socket, alpha_output)
-            temp_alpha_image = ps_bake(context, obj, mat, uv_layer, temp_alpha_image, use_gpu)
-    
-            if bake_image and temp_alpha_image:
-                # Get pixel data
-                image_pixels = bake_image.pixels[:]
-                alpha_pixels = temp_alpha_image.pixels[:]
-                
-                # Create a new pixel array
-                new_pixels = list(image_pixels)
-                
-                # Apply red channel of alpha image to alpha channel of main image
-                for i in range(0, len(image_pixels), 4):
-                    # Get the red channel value from alpha image (every 4 values)
-                    alpha_value = alpha_pixels[i]  # Red channel
-                    # Set the alpha channel of the main image (index + 3)
-                    new_pixels[i + 3] = alpha_value
-                
-                # Update the image with the new pixel data
-                bake_image.pixels = new_pixels
-                bake_image.update()
-            bpy.data.images.remove(temp_alpha_image)
+        temp_alpha_image = bake_image.copy()
+        temp_alpha_image.colorspace_settings.name = 'Non-Color'
+        connect_sockets(surface_socket, alpha_output)
+        temp_alpha_image = ps_bake(context, obj, mat, uv_layer, temp_alpha_image, use_gpu)
+
+        if bake_image and temp_alpha_image:
+            # Get pixel data
+            image_pixels = bake_image.pixels[:]
+            alpha_pixels = temp_alpha_image.pixels[:]
+            
+            # Create a new pixel array
+            new_pixels = list(image_pixels)
+            
+            # Apply red channel of alpha image to alpha channel of main image
+            for i in range(0, len(image_pixels), 4):
+                # Get the red channel value from alpha image (every 4 values)
+                alpha_value = alpha_pixels[i]  # Red channel
+                # Set the alpha channel of the main image (index + 3)
+                new_pixels[i + 3] = alpha_value
+            
+            # Update the image with the new pixel data
+            bake_image.pixels = new_pixels
+            bake_image.update()
+        # bpy.data.images.remove(temp_alpha_image)
 
         for node in to_be_deleted_nodes:
             node_tree.nodes.remove(node)

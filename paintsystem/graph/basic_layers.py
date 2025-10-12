@@ -16,6 +16,7 @@ GRADIENT_LAYER_VERSION = 1
 RANDOM_LAYER_VERSION = 2
 CUSTOM_LAYER_VERSION = 1
 TEXTURE_LAYER_VERSION = 1
+GEOMETRY_LAYER_VERSION = 1
 
 ALPHA_OVER_LAYER_VERSION = 1
 
@@ -39,6 +40,8 @@ def get_layer_version_for_type(type: str) -> int:
             return CUSTOM_LAYER_VERSION
         case "TEXTURE":
             return TEXTURE_LAYER_VERSION
+        case "GEOMETRY":
+            return GEOMETRY_LAYER_VERSION
         case _:
             raise ValueError(f"Invalid layer type: {type}")
 
@@ -209,6 +212,34 @@ def create_texture_graph(global_layer: "GlobalLayer"):
     create_mixing_graph(builder, "texture", "Color")
     builder.add_node("texture", texture_type)
     create_coord_graph(builder, coord_type, uv_map_name, 'texture', 'Vector')
+    return builder
+
+def create_geometry_graph(global_layer: "GlobalLayer"):
+    node_map = {
+        'WORLD_NORMAL': 'ShaderNodeNewGeometry',
+        'WORLD_TRUE_NORMAL': 'ShaderNodeNewGeometry',
+        'POSITION': 'ShaderNodeNewGeometry',
+        'BACKFACING': 'ShaderNodeNewGeometry',
+        'OBJECT_NORMAL': 'ShaderNodeTexCoord',
+        'OBJECT_POSITION': 'ShaderNodeTexCoord',
+        'VECTOR_TRANSFORM': 'ShaderNodeVectorTransform',
+    }
+    output_name_map = {
+        'WORLD_NORMAL': 'Normal',
+        'WORLD_TRUE_NORMAL': 'True Normal',
+        'POSITION': 'Position',
+        'BACKFACING': 'Backfacing',
+        'OBJECT_NORMAL': 'Normal',
+        'OBJECT_POSITION': 'Object',
+        'VECTOR_TRANSFORM': 'Vector',
+    }
+    node_tree = global_layer.node_tree
+    geometry_type = global_layer.geometry_type
+    builder = NodeTreeBuilder(node_tree, "Layer", version=GEOMETRY_LAYER_VERSION)
+    if geometry_type == 'VECTOR_TRANSFORM':
+        builder.link("group_input", "geometry", "Color", "Vector")
+    create_mixing_graph(builder, "geometry", output_name_map[geometry_type])
+    builder.add_node("geometry", node_map[geometry_type])
     return builder
 
 def get_alpha_over_nodetree():

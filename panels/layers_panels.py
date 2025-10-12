@@ -20,6 +20,7 @@ from ..paintsystem.data import (
     ADJUSTMENT_TYPE_ENUM, 
     GRADIENT_TYPE_ENUM, 
     TEXTURE_TYPE_ENUM,
+    GEOMETRY_TYPE_ENUM,
     is_global_layer_linked,
     sort_actions
 )
@@ -97,6 +98,8 @@ def draw_global_layer_icon(global_item: GlobalLayer, layout: bpy.types.UILayout)
             layout.label(icon='SEQ_HISTOGRAM')
         case 'TEXTURE':
             layout.label(icon='TEXTURE')
+        case 'GEOMETRY':
+            layout.label(icon='MESH_DATA')
         case _:
             layout.label(icon='BLANK1')
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
@@ -545,13 +548,13 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
             row.prop(global_layer.pre_mix_node.inputs['Opacity'], "default_value",
                     text="Opacity", slider=True)
             col = box.column()
+            col.enabled = not global_layer.lock_layer
             match global_layer.type:
                 case 'IMAGE':
                     pass
                 case 'ADJUSTMENT':
                     adjustment_node = global_layer.find_node("adjustment")
                     if adjustment_node:
-                        col.enabled = not global_layer.lock_layer
                         col.label(text="Adjustment Settings:", icon='SHADERFX')
                         col.template_node_inputs(adjustment_node)
                 case 'NODE_GROUP':
@@ -561,7 +564,6 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         'Color', 'Alpha')]
                     if not inputs:
                         return
-                    col.enabled = not global_layer.lock_layer
                     col.label(text="Node Group Settings:", icon='NODETREE')
                     for socket in inputs:
                         col.prop(socket, "default_value",
@@ -570,7 +572,6 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 case 'ATTRIBUTE':
                     attribute_node = global_layer.find_node("attribute")
                     if attribute_node:
-                        col.enabled = not global_layer.lock_layer
                         col.label(text="Attribute Settings:", icon='MESH_DATA')
                         col.template_node_inputs(attribute_node)
                 case 'GRADIENT':
@@ -579,7 +580,6 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     if gradient_node and map_range_node:
                         col.use_property_split = True
                         col.use_property_decorate = False
-                        col.enabled = not global_layer.lock_layer
                         if global_layer.gradient_type in ('LINEAR', 'RADIAL'):
                             if global_layer.empty_object and global_layer.empty_object.name in context.view_layer.objects:
                                 col.operator("paint_system.select_gradient_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
@@ -601,14 +601,12 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 case 'SOLID_COLOR':
                     rgb_node = global_layer.find_node("rgb")
                     if rgb_node:
-                        col.enabled = not global_layer.lock_layer
                         col.prop(rgb_node.outputs[0], "default_value", text="Color",
                                 icon='IMAGE_RGB_ALPHA')
 
                 case 'ADJUSTMENT':
                     adjustment_node = global_layer.find_node("adjustment")
                     if adjustment_node:
-                        col.enabled = not global_layer.lock_layer
                         col.label(text="Adjustment Settings:", icon='SHADERFX')
                         col.template_node_inputs(adjustment_node)
 
@@ -619,7 +617,6 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     value_math = global_layer.find_node("value_multiply_add")
                     hue_saturation_value = global_layer.find_node("hue_saturation_value")
                     if random_node and hue_math and saturation_math and value_math and hue_saturation_value:
-                        col.enabled = not global_layer.lock_layer
                         col.label(text="Random Settings:", icon='SHADERFX')
                         col.prop(
                             random_node.inputs[1], "default_value", text="Random Seed")
@@ -643,9 +640,20 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     col.use_property_split = False
                     texture_node = global_layer.find_node("texture")
                     if texture_node:
-                        col.enabled = not global_layer.lock_layer
                         col.label(text="Texture Settings:", icon='TEXTURE')
                         col.template_node_inputs(texture_node)
+                case 'GEOMETRY':
+                    if global_layer.geometry_type == 'VECTOR_TRANSFORM':
+                        geometry_node = global_layer.find_node("geometry")
+                        if geometry_node:
+                            col.label(text="Vector Transform:", icon='MESH_DATA')
+                            col.template_node_inputs(geometry_node)
+                    elif global_layer.geometry_type == 'BACKFACING':
+                        mat = ps_ctx.active_material
+                        box = col.box()
+                        col = box.column()
+                        col.label(text="Material Settings:", icon='MESH_DATA')
+                        col.prop(mat, "use_backface_culling", text="Backface Culling", icon='CHECKBOX_HLT' if mat.use_backface_culling else 'CHECKBOX_DEHLT')
                 case _:
                     pass
 
@@ -957,6 +965,17 @@ class MAT_MT_AddTextureLayerMenu(Menu):
             layout.operator("paint_system.new_texture_layer",
                 text=name, icon='TEXTURE' if idx == 0 else 'NONE').texture_type = node_type
 
+
+class MAT_MT_AddGeometryLayerMenu(Menu):
+    bl_label = "Add Geometry"
+    bl_idname = "MAT_MT_AddGeometryLayerMenu"
+    
+    def draw(self, context):
+        layout = self.layout
+        for idx, (node_type, name, description) in enumerate(GEOMETRY_TYPE_ENUM):
+            layout.operator("paint_system.new_geometry_layer",
+                text=name, icon='MESH_DATA' if idx == 0 else 'NONE').geometry_type = node_type
+
 class MAT_MT_AddLayerMenu(Menu):
     bl_label = "Add Layer"
     bl_idname = "MAT_MT_AddLayerMenu"
@@ -987,6 +1006,7 @@ class MAT_MT_AddLayerMenu(Menu):
         col.menu("MAT_MT_AddGradientLayerMenu", text="Gradient", icon='COLOR')
         col.menu("MAT_MT_AddTextureLayerMenu", text="Texture", icon='TEXTURE')
         col.menu("MAT_MT_AddAdjustmentLayerMenu", text="Adjustment", icon='SHADERFX')
+        col.menu("MAT_MT_AddGeometryLayerMenu", text="Geometry", icon='MESH_DATA')
         col.separator()
         # col.label(text="Advanced:")
         col.operator("paint_system.new_attribute_layer",
@@ -1100,6 +1120,7 @@ classes = (
     MAT_MT_AddGradientLayerMenu,
     MAT_MT_AddAdjustmentLayerMenu,
     MAT_MT_AddTextureLayerMenu,
+    MAT_MT_AddGeometryLayerMenu,
     MAT_MT_LayerMenu,
     MAT_MT_PaintSystemMergeAndExport,
     MAT_PT_Layers,

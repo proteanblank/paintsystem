@@ -16,6 +16,7 @@ from ..paintsystem.data import (
     ATTRIBUTE_TYPE_ENUM,
     TEXTURE_TYPE_ENUM,
     GRADIENT_TYPE_ENUM,
+    GEOMETRY_TYPE_ENUM,
     get_global_layer,
     is_global_layer_linked,
 )
@@ -248,8 +249,6 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMix
             return get_next_unique_name("Image Layer", [layer.name for layer in ps_ctx.active_channel.layers])
 
     def process_material(self, context):
-        self.image_width = int(self.image_resolution)
-        self.image_height = int(self.image_resolution)
         self.store_coord_type(context)
         ps_ctx = self.parse_context(context)
         if self.image_add_type == 'NEW':
@@ -481,6 +480,34 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_NewGeometry(PSContextMixin, MultiMaterialOperator):
+    """Create a new geometry layer"""
+    bl_idname = "paint_system.new_geometry_layer"
+    bl_label = "New Geometry Layer"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.active_channel is not None
+    
+    def process_material(self, context):
+        ps_ctx = self.parse_context(context)
+        global_layer = add_global_layer("GEOMETRY")
+        global_layer.geometry_type = self.geometry_type
+        layer_name = next(name for geometry_type, name, description in GEOMETRY_TYPE_ENUM if geometry_type == self.geometry_type)
+        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, layer_name)
+        layer.update_node_tree(context)
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+    
+    geometry_type: EnumProperty(
+        name="Geometry Type",
+        items=GEOMETRY_TYPE_ENUM,
+        default='WORLD_NORMAL'
+    )
 
 
 class PAINTSYSTEM_OT_FixMissingGradientEmpty(PSContextMixin, Operator):
@@ -1226,6 +1253,7 @@ classes = (
     PAINTSYSTEM_OT_NewAdjustment,
     PAINTSYSTEM_OT_NewShader,
     PAINTSYSTEM_OT_NewGradient,
+    PAINTSYSTEM_OT_NewGeometry,
     PAINTSYSTEM_OT_FixMissingGradientEmpty,
     PAINTSYSTEM_OT_SelectGradientEmpty,
     PAINTSYSTEM_OT_NewRandomColor,
