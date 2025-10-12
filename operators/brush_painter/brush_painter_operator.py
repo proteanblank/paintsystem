@@ -66,7 +66,7 @@ class BRUSH_OT_apply_brushes(Operator):
             # Handle result based on user preference
             if props.create_new_image:
                 # Create new image in Blender
-                bpy.data.images.append(result_image)
+                # bpy.data.images.append(result_image)
                 self.report({'INFO'}, f"Created new image: {result_image.name}")
             else:
                 # Replace original image data

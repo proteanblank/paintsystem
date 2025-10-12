@@ -153,7 +153,7 @@ class BRUSH_PT_painter_panel(Panel):
         
         # Brush parameters
         box = layout.box()
-        box.label(text="Brush Parameters", icon='BRUSH_SCULPT_DRAW')
+        box.label(text="Brush Parameters")
         
         col = box.column(align=True)
         col.prop(props, "brush_coverage_density", text="Coverage Density")
