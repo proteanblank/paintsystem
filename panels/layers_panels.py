@@ -65,13 +65,16 @@ def is_basic_setup(node_tree: NodeTree) -> bool:
 def draw_global_layer_icon(global_item: GlobalLayer, layout: bpy.types.UILayout):
     match global_item.type:
         case 'IMAGE':
-            if not global_item.image.preview:
-                global_item.image.asset_generate_preview()
-            if global_item.image.preview and is_image_painted(global_item.image.preview):
-                layout.label(
-                    icon_value=global_item.image.preview.icon_id)
-            else:
+            if not global_item.image:
                 layout.label(icon_value=get_icon('image'))
+                return
+            else:
+                if global_item.image.preview and is_image_painted(global_item.image.preview):
+                    layout.label(
+                        icon_value=global_item.image.preview.icon_id)
+                else:
+                    global_item.image.asset_generate_preview()
+                    layout.label(icon_value=get_icon('image'))
         case 'FOLDER':
             layout.prop(global_item, "is_expanded", text="", icon_only=True, icon_value=get_icon(
                 'folder_open') if global_item.is_expanded else get_icon('folder'), emboss=False)
@@ -343,7 +346,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
 
             if active_channel.use_bake_image:
                 image_node = find_node(active_channel.node_tree, {'bl_idname': 'ShaderNodeTexImage', 'image': active_channel.bake_image})
-                image_node_settings(box, image_node, text="Baked Image", icon="TEXTURE_DATA")
+                image_node_settings(box, image_node, active_channel, "bake_image", text="Baked Image", icon="TEXTURE_DATA")
                 return
 
             # if active_layer.mask_image:
@@ -885,7 +888,7 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         layout.enabled = not global_layer.lock_layer
 
         image_node = global_layer.find_node("image")
-        image_node_settings(layout, image_node)
+        image_node_settings(layout, image_node, global_layer, "image")
 
 class MAT_MT_LayerMenu(PSContextMixin, Menu):
     bl_label = "Layer Menu"

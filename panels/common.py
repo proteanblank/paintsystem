@@ -199,27 +199,28 @@ def check_group_multiuser(group_node_tree: bpy.types.NodeTree) -> bool:
     return user_count > 1
 
 
-def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, text="", icon="NONE", icon_value=None):
-    image = image_node.image
-    if image_node:
-        box = layout.box()
-        col = box.column()
-        if text or icon != "NONE" or icon_value:
-            col.label(text=text, icon=icon)
-            if icon_value:
-                col.label(text=text, icon_value=icon_value)
-            col.separator()
-        col.use_property_split = True
-        col.use_property_decorate = False
+def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, data, propname="image", text="", icon="NONE", icon_value=None):
+    box = layout.box()
+    col = box.column()
+    if text or icon != "NONE" or icon_value:
+        col.label(text=text, icon=icon)
+        if icon_value:
+            col.label(text=text, icon_value=icon_value)
+        col.separator()
+    col.use_property_split = True
+    col.use_property_decorate = False
+    if image_node.image:
         col.operator("paint_system.export_image", text="Save As...", icon="EXPORT").image_name = image_node.image.name
         col.separator()
-        col.template_ID(image_node, "image", text="")
-        col.prop(image_node, "interpolation",
-                    text="")
-        col.prop(image_node, "projection",
-                    text="")
-        col.prop(image_node, "extension",
-                    text="")
+    col.template_ID(data, propname, text="")
+    col.prop(image_node, "interpolation",
+                text="")
+    col.prop(image_node, "projection",
+                text="")
+    col.prop(image_node, "extension",
+                text="")
+    if image_node.image:
+        image = image_node.image
         col.prop(image, "source",
                     text="")
         # Color space settings
