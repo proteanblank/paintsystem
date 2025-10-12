@@ -319,7 +319,8 @@ class GlobalLayer(PropertyGroup):
         # Clean up
         if self.empty_object and self.type != "GRADIENT":
             collection = get_paint_system_collection(context)
-            collection.objects.unlink(self.empty_object)
+            if self.empty_object.name in collection.objects:
+                collection.objects.unlink(self.empty_object)
         
         if not self.enabled:
             layer_graph.link("group_input", "group_output", "Color", "Color")
