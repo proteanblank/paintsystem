@@ -906,7 +906,7 @@ class Channel(BaseNestedListManager):
             # Update the image with the new pixel data
             bake_image.pixels = new_pixels
             bake_image.update()
-        # bpy.data.images.remove(temp_alpha_image)
+        bpy.data.images.remove(temp_alpha_image)
 
         for node in to_be_deleted_nodes:
             node_tree.nodes.remove(node)
