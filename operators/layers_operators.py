@@ -263,6 +263,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMix
                 self.report({'ERROR'}, "No image selected")
                 return False
             img = bpy.data.images.get(self.image_name)
+            img.pack()
             if not img:
                 self.report({'ERROR'}, "Image not found")
                 return False
