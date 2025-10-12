@@ -1370,7 +1370,7 @@ def parse_context(context: bpy.types.Context) -> PSContext:
             case _:
                 obj = None
                 ps_object = None
-        if obj.name == "PS Camera Plane":
+        if obj and obj.name == "PS Camera Plane":
             obj = ps_scene_data.last_selected_ps_object
             ps_object = obj
 
