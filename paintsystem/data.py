@@ -1269,6 +1269,26 @@ def get_global_layer(layer: Layer) -> GlobalLayer | None:
     #         return global_layer
     return bpy.context.scene.ps_scene_data.layers.get(layer.ref_layer_id, None)
 
+def get_blend_type(global_layer: GlobalLayer) -> str:
+    """Get the blend mode of the global layer"""
+    node_tree = global_layer.node_tree
+    if not node_tree:
+        raise ValueError("Node tree is not found")
+    mix_node = find_node(node_tree, {'label': 'mix_rgb', 'bl_idname': 'ShaderNodeMix'})
+    if not mix_node:
+        raise ValueError("Mix node is not found")
+    return mix_node.blend_type
+
+def set_blend_type(global_layer: GlobalLayer, blend_type: str) -> None:
+    """Set the blend mode of the global layer"""
+    node_tree = global_layer.node_tree
+    if not node_tree:
+        raise ValueError("Node tree is not found")
+    mix_node = find_node(node_tree, {'label': 'mix_rgb', 'bl_idname': 'ShaderNodeMix'})
+    if not mix_node:
+        raise ValueError("Mix node is not found")
+    mix_node.blend_type = blend_type
+
 def is_global_layer_linked(global_layer: GlobalLayer) -> bool:
     """Check if the global layer is linked"""
     # Check all material in the scene and count the number of times the global layer is used

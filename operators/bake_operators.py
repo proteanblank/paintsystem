@@ -5,7 +5,7 @@ from bpy.props import StringProperty, BoolProperty
 
 from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin
 
-from ..paintsystem.data import get_global_layer
+from ..paintsystem.data import get_global_layer, set_blend_type, get_blend_type
 from ..panels.common import get_icon_from_channel
 
 
@@ -355,7 +355,11 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
             if global_layer.enabled and global_layer != active_global_layer:
                 to_be_enabled_layers.append(global_layer)
                 global_layer.enabled = False
+        
+        original_blend_mode = get_blend_type(active_global_layer)
+        set_blend_type(active_global_layer, 'MIX')
         active_channel.bake(context, ps_ctx.active_material, transferred_image, self.uv_map, use_group_tree=False)
+        set_blend_type(active_global_layer, original_blend_mode)
         active_global_layer.coord_type = 'UV'
         active_global_layer.uv_map_name = self.uv_map
         active_global_layer.image = transferred_image
@@ -413,7 +417,10 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
             if global_layer.enabled and global_layer != active_global_layer:
                 to_be_enabled_layers.append(global_layer)
                 global_layer.enabled = False
+        original_blend_mode = get_blend_type(active_global_layer)
+        set_blend_type(active_global_layer, 'MIX')
         active_channel.bake(context, ps_ctx.active_material, image, self.uv_map, use_group_tree=False)
+        set_blend_type(active_global_layer, original_blend_mode)
         active_global_layer.type = 'IMAGE'
         active_global_layer.coord_type = 'UV'
         active_global_layer.uv_map_name = self.uv_map
