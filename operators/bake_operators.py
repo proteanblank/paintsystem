@@ -62,6 +62,9 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         bake_image = active_channel.bake_image
         active_channel.bake_uv_map = self.uv_map
         
+        self.image_width = int(self.image_resolution)
+        self.image_height = int(self.image_resolution)
+        
         if not bake_image:
             self.image_name = f"{ps_ctx.active_group.name}_{ps_ctx.active_channel.name}"
             bake_image = self.create_image()
@@ -106,6 +109,9 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
         ps_ctx = self.parse_context(context)
         active_group = ps_ctx.active_group
         
+        self.image_width = int(self.image_resolution)
+        self.image_height = int(self.image_resolution)
+        
         for channel in active_group.channels:
             mat = ps_ctx.active_material
             bake_image = channel.bake_image
@@ -137,11 +143,6 @@ class PAINTSYSTEM_OT_ExportImage(PSContextMixin, Operator):
         name="Image Name",
         options={'SKIP_SAVE'}
     )
-    
-    @classmethod
-    def poll(cls, context):
-        ps_ctx = cls.parse_context(context)
-        return ps_ctx.active_channel and ps_ctx.active_channel.bake_image
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
