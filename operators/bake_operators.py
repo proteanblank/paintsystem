@@ -313,7 +313,7 @@ class PAINTSYSTEM_OT_DeleteBakedImage(PSContextMixin, Operator):
             text="Click OK to delete the baked image.")
 
 
-class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, Operator):
+class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Operator):
     bl_idname = "paint_system.transfer_image_layer_uv"
     bl_label = "Transfer Image Layer UV"
     bl_description = "Transfer the UV of the image layer"
@@ -383,6 +383,11 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
         return ps_ctx.active_layer and ps_ctx.active_layer.type != 'IMAGE'
     
     def invoke(self, context, event):
+        self.get_coord_type(context)
+        if self.coord_type == 'AUTO':
+            self.uv_map = "PS_UVMap"
+        else:
+            self.uv_map = self.uv_map_name
         return context.window_manager.invoke_props_dialog(self)
     
     def draw(self, context):
