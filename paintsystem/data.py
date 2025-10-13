@@ -919,7 +919,7 @@ class Channel(BaseNestedListManager):
             bake_image.pixels = new_pixels
             bake_image.update()
             bake_image.pack()
-        # bpy.data.images.remove(temp_alpha_image)
+        bpy.data.images.remove(temp_alpha_image)
 
         for node in to_be_deleted_nodes:
             node_tree.nodes.remove(node)
