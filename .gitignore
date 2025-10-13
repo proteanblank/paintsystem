@@ -170,3 +170,4 @@ bl_ext.vscode_development.paintsystem_updater/
 extension_build/
 
 *.blend1
+*.zip
