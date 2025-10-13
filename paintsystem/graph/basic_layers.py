@@ -233,12 +233,18 @@ def create_geometry_graph(global_layer: "GlobalLayer"):
         'OBJECT_POSITION': 'Object',
         'VECTOR_TRANSFORM': 'Vector',
     }
+    normalize_normals = global_layer.normalize_normal
     node_tree = global_layer.node_tree
     geometry_type = global_layer.geometry_type
     builder = NodeTreeBuilder(node_tree, "Layer", version=GEOMETRY_LAYER_VERSION)
     if geometry_type == 'VECTOR_TRANSFORM':
         builder.link("group_input", "geometry", "Color", "Vector")
-    create_mixing_graph(builder, "geometry", output_name_map[geometry_type])
+    if geometry_type in ['WORLD_NORMAL', 'WORLD_TRUE_NORMAL', 'OBJECT_NORMAL'] and normalize_normals:
+        builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD", "hide": True}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
+        builder.link("geometry", "normalize", output_name_map[geometry_type], "Vector")
+        create_mixing_graph(builder, "normalize", "Vector")
+    else:
+        create_mixing_graph(builder, "geometry", output_name_map[geometry_type])
     builder.add_node("geometry", node_map[geometry_type])
     return builder
 

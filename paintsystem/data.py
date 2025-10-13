@@ -531,6 +531,12 @@ class GlobalLayer(PropertyGroup):
         description="Geometry type",
         update=update_node_tree
     )
+    normalize_normal: BoolProperty(
+        name="Normalize Normal",
+        description="Normalize the normal",
+        default=False,
+        update=update_node_tree
+    )
     type: EnumProperty(
         items=LAYER_TYPE_ENUM,
         default='IMAGE'
@@ -912,6 +918,7 @@ class Channel(BaseNestedListManager):
             # Update the image with the new pixel data
             bake_image.pixels = new_pixels
             bake_image.update()
+            bake_image.pack()
         # bpy.data.images.remove(temp_alpha_image)
 
         for node in to_be_deleted_nodes:

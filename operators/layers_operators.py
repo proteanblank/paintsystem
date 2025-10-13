@@ -488,6 +488,18 @@ class PAINTSYSTEM_OT_NewGeometry(PSContextMixin, MultiMaterialOperator):
     bl_idname = "paint_system.new_geometry_layer"
     bl_label = "New Geometry Layer"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    
+    geometry_type: EnumProperty(
+        name="Geometry Type",
+        items=GEOMETRY_TYPE_ENUM,
+        default='WORLD_NORMAL'
+    )
+    normalize_normal: BoolProperty(
+        name="Normalize Normal",
+        description="Normalize the normal",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
 
     @classmethod
     def poll(cls, context):
@@ -498,17 +510,12 @@ class PAINTSYSTEM_OT_NewGeometry(PSContextMixin, MultiMaterialOperator):
         ps_ctx = self.parse_context(context)
         global_layer = add_global_layer("GEOMETRY")
         global_layer.geometry_type = self.geometry_type
+        global_layer.normalize_normal = self.normalize_normal
         layer_name = next(name for geometry_type, name, description in GEOMETRY_TYPE_ENUM if geometry_type == self.geometry_type)
         layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer, layer_name)
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
-    
-    geometry_type: EnumProperty(
-        name="Geometry Type",
-        items=GEOMETRY_TYPE_ENUM,
-        default='WORLD_NORMAL'
-    )
 
 
 class PAINTSYSTEM_OT_FixMissingGradientEmpty(PSContextMixin, Operator):
