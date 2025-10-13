@@ -182,13 +182,18 @@ class PSImageFilterMixin():
 
     image_name: StringProperty()
 
-    def get_image(self, context):
-        if not self.image_name:
-            self.report({'ERROR'}, "Layer Does not have an image")
-            return {'CANCELLED'}
-        image: bpy.types.Image = bpy.data.images.get(self.image_name)
-        if not image:
-            self.report({'ERROR'}, "Image not found")
-            return {'CANCELLED'}
+    def get_image(self, context) -> bpy.types.Image:
+        if self.image_name:
+            image = bpy.data.images.get(self.image_name)
+            if not image:
+                self.report({'ERROR'}, "Image not found")
+                return None
+        else:
+            ps_ctx = PSContextMixin.parse_context(context)
+            if ps_ctx.active_global_layer:
+                image = ps_ctx.active_global_layer.image
+            else:
+                self.report({'ERROR'}, "Layer Does not have an image")
+                return None
         return image
     
