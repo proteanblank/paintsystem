@@ -150,6 +150,12 @@ COLOR_SPACE_ENUM = [
     ('NONCOLOR', "Non-Color", "Non-Color"),
 ]
 
+FILTER_TYPE_ENUM = [
+    ('BLUR', "Blur", "Blur"),
+    ('EDGE_ENHANCE', "Edge Enhance", "Edge Enhance"),
+    ('SHARPEN', "Sharpen", "Sharpen"),
+]
+
 def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
     if context.mode != 'PAINT_TEXTURE':
         return
@@ -1283,6 +1289,25 @@ class CameraPlaneData(PropertyGroup):
         default=(0, 0, 0)
     )
     ref_layer_id: StringProperty()
+
+
+class Filter(PropertyGroup):
+    name: StringProperty()
+    type: EnumProperty(
+        items=FILTER_TYPE_ENUM,
+        name="Filter Type",
+        description="Filter type"
+    )
+    radius: FloatProperty(
+        name="Radius",
+        description="Radius of the filter",
+        default=1.0
+    )
+    iterations: IntProperty(
+        name="Iterations",
+        description="Iterations of the filter",
+        default=1
+    )
 
 
 def get_global_layer(layer: Layer) -> GlobalLayer | None:

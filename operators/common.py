@@ -176,3 +176,19 @@ class PSImageCreateMixin():
         img.generated_color = (0, 0, 0, 0)
         img.pack()
         return img
+
+
+class PSImageFilterMixin():
+
+    image_name: StringProperty()
+
+    def get_image(self, context):
+        if not self.image_name:
+            self.report({'ERROR'}, "Layer Does not have an image")
+            return {'CANCELLED'}
+        image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        if not image:
+            self.report({'ERROR'}, "Image not found")
+            return {'CANCELLED'}
+        return image
+    

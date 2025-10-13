@@ -424,6 +424,8 @@ class MAT_MT_ImageMenu(PSContextMixin, Menu):
                         icon="CON_SIZELIMIT").image_name = image_name
         layout.operator("paint_system.clear_image",
                         icon="X").image_name = image_name
+        layout.operator("paint_system.gaussian_blur",
+                        icon="FILTER").image_name = image_name
         
 class MAT_PT_LayerSettings(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_LayerSettings'

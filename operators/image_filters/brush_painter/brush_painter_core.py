@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image, ImageFilter
 import os
 import glob
+from ..common import blender_image_to_numpy, numpy_to_blender_image
 
 class BrushPainterCore:
     """Core functionality for applying brush strokes to Blender images."""
@@ -21,59 +22,6 @@ class BrushPainterCore:
         # Brush texture paths
         self.brush_texture_path = None
         self.brush_folder_path = None
-        
-    def blender_image_to_numpy(self, image):
-        """Convert Blender image to numpy array."""
-        if image is None:
-            return None
-            
-        # Get image dimensions
-        width, height = image.size
-        
-        # Create numpy array
-        pixels = np.array(image.pixels)
-        
-        # Reshape to (height, width, channels)
-        if image.channels == 4:  # RGBA
-            pixels = pixels.reshape((height, width, 4))
-        elif image.channels == 3:  # RGB
-            pixels = pixels.reshape((height, width, 3))
-        else:
-            raise ValueError(f"Unsupported image format with {image.channels} channels")
-        
-        # Flip vertically (Blender uses bottom-left origin, numpy uses top-left)
-        pixels = np.flipud(pixels)
-        
-        return pixels
-    
-    def numpy_to_blender_image(self, array, image_name="BrushPainted"):
-        """Convert numpy array back to Blender image."""
-        # Flip vertically back to Blender coordinate system
-        array = np.flipud(array)
-        
-        # Ensure array is in [0, 1] range
-        array = np.clip(array, 0, 1)
-        
-        # Get dimensions
-        height, width = array.shape[:2]
-        channels = array.shape[2] if len(array.shape) == 3 else 1
-        
-        # Flatten array
-        pixels = array.flatten()
-        
-        # Create new image in Blender
-        if channels == 4:
-            new_image = bpy.data.images.new(image_name, width=width, height=height, alpha=True)
-        else:
-            new_image = bpy.data.images.new(image_name, width=width, height=height, alpha=False)
-        
-        # Set pixels
-        new_image.pixels = pixels
-        
-        # Update image
-        new_image.update()
-        
-        return new_image
     
     def create_circular_brush(self, size):
         """Creates a soft circular brush mask as a NumPy array."""
@@ -333,7 +281,7 @@ class BrushPainterCore:
             return None
         
         # Convert Blender image to numpy
-        img_float = self.blender_image_to_numpy(image)
+        img_float = blender_image_to_numpy(image)
         if img_float is None:
             return None
         
@@ -393,6 +341,6 @@ class BrushPainterCore:
         final_canvas = canvas[offset_y:offset_y + H, offset_x:offset_x + W]
         
         # Convert back to Blender image
-        result_image = self.numpy_to_blender_image(final_canvas, f"{image.name}_brushed")
+        result_image = numpy_to_blender_image(final_canvas, f"{image.name}_brushed", create_new=True)
         
         return result_image

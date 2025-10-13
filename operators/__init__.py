@@ -11,7 +11,6 @@ submodules = [
     "quick_edit",
     "versioning_operators",
     "bake_operators",
-    "brush_painter",
 ]
 
 register, unregister = register_submodule_factory(__name__, submodules)

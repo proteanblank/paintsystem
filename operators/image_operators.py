@@ -1,12 +1,18 @@
 import bpy
 from bpy.types import Menu, Operator
-from bpy.props import StringProperty, IntProperty, EnumProperty, BoolProperty
+from bpy.props import StringProperty, IntProperty, EnumProperty, BoolProperty, FloatProperty
 from bpy.utils import register_classes_factory
-from .common import PSContextMixin, get_unified_settings
+from .common import PSImageFilterMixin, get_unified_settings
+from .image_filters import (
+    blender_image_to_numpy,
+    numpy_to_blender_image,
+    switch_image_content,
+    gaussian_blur,
+    )
 import numpy
 
 
-class PAINTSYSTEM_OT_InvertColors(Operator):
+class PAINTSYSTEM_OT_InvertColors(PSImageFilterMixin, Operator):
     bl_idname = "paint_system.invert_colors"
     bl_label = "Invert Colors"
     bl_options = {'REGISTER', 'UNDO'}
@@ -17,13 +23,8 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
     invert_b: BoolProperty(default=True)
     invert_a: BoolProperty(default=False)
 
-    image_name: StringProperty()
-
     def execute(self, context):
-        if not self.image_name:
-            self.report({'ERROR'}, "Layer Does not have an image")
-            return {'CANCELLED'}
-        image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        image: bpy.types.Image = self.get_image(context)
         with bpy.context.temp_override(**{'edit_image': bpy.data.images[image.name]}):
             bpy.ops.image.invert('INVOKE_DEFAULT', invert_r=self.invert_r,
                                  invert_g=self.invert_g, invert_b=self.invert_b, invert_a=self.invert_a)
@@ -34,18 +35,13 @@ class PAINTSYSTEM_OT_InvertColors(Operator):
 
     def draw(self, context):
         layout = self.layout
-        # Check if image have alpha channel
-        image: bpy.types.Image = bpy.data.images.get(self.image_name)
-        if not image:
-            self.report({'ERROR'}, "Layer Does not have an image")
-            return {'CANCELLED'}
         layout.prop(self, "invert_r", text="Red")
         layout.prop(self, "invert_g", text="Green")
         layout.prop(self, "invert_b", text="Blue")
         layout.prop(self, "invert_a", text="Alpha")
 
 
-class PAINTSYSTEM_OT_ResizeImage(Operator):
+class PAINTSYSTEM_OT_ResizeImage(PSImageFilterMixin, Operator):
     bl_idname = "paint_system.resize_image"
     bl_label = "Resize Image"
     bl_options = {'REGISTER', 'UNDO'}
@@ -59,8 +55,8 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
             self.width = int(scale * self.base_width)
             self.height = int(scale * self.base_height)
 
-    width: IntProperty(name="Width", default=1024)
-    height: IntProperty(name="Height", default=1024)
+    width: IntProperty(name="Width", default=1024, subtype='PIXEL')
+    height: IntProperty(name="Height", default=1024, subtype='PIXEL')
     relative_scale: EnumProperty(
         name="Relative Scale",
         description="Scale the image by a factor",
@@ -75,28 +71,17 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
         default='1.0',
         update=update_width_height,
     )
-    image_name: StringProperty()
     base_width: IntProperty()
     base_height: IntProperty()
-    image: bpy.types.Image
 
     def execute(self, context):
-        if not self.image_name:
-            self.report({'ERROR'}, "Layer Does not have an image")
-            return {'CANCELLED'}
-        image = bpy.data.images.get(self.image_name)
+        image = self.get_image(context)
         image.scale(self.width, self.height)
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        if not self.image_name:
-            self.report({'ERROR'}, "Layer Does not have an image")
-            return {'CANCELLED'}
-        self.image: bpy.types.Image = bpy.data.images.get(self.image_name)
-        if not self.image:
-            self.report({'ERROR'}, "Image not found")
-            return {'CANCELLED'}
-        self.base_width, self.base_height = self.image.size
+        image = self.get_image(context)
+        self.base_width, self.base_height = image.size
         self.relative_scale = '1.0'
         return context.window_manager.invoke_props_dialog(self)
 
@@ -114,19 +99,14 @@ class PAINTSYSTEM_OT_ResizeImage(Operator):
             box.label(text=f"{self.width} x {self.height}")
 
 
-class PAINTSYSTEM_OT_ClearImage(Operator):
+class PAINTSYSTEM_OT_ClearImage(PSImageFilterMixin, Operator):
     bl_idname = "paint_system.clear_image"
     bl_label = "Clear Image"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Clear the active image"
 
-    image_name: StringProperty()
-
     def execute(self, context):
-        if not self.image_name:
-            self.report({'ERROR'}, "Layer Does not have an image")
-            return {'CANCELLED'}
-        image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        image = self.get_image(context)
         # Replace every pixel with a transparent pixel
         pixels = numpy.empty(len(image.pixels), dtype=numpy.float32)
         pixels[::4] = 0.0
@@ -135,19 +115,14 @@ class PAINTSYSTEM_OT_ClearImage(Operator):
         image.update_tag()
         return {'FINISHED'}
     
-class PAINTSYSTEM_OT_FillImage(Operator):
+class PAINTSYSTEM_OT_FillImage(PSImageFilterMixin, Operator):
     bl_idname = "paint_system.fill_image"
     bl_label = "Fill Image"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Fill the active image with current color"
-
-    image_name: StringProperty()
-
+    
     def execute(self, context):
-        if not self.image_name:
-            self.report({'ERROR'}, "Layer Does not have an image")
-            return {'CANCELLED'}
-        image: bpy.types.Image = bpy.data.images.get(self.image_name)
+        image = self.get_image(context)
         # Replace every pixel with a transparent pixel
         pixels = numpy.empty(len(image.pixels), dtype=numpy.float32)
         prop_owner = get_unified_settings(context, "use_unified_color")
@@ -165,10 +140,35 @@ class PAINTSYSTEM_OT_FillImage(Operator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_GaussianBlur(PSImageFilterMixin, Operator):
+    bl_idname = "paint_system.gaussian_blur"
+    bl_label = "Gaussian Blur"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Apply a Gaussian blur to the active image"
+    
+    gaussian_sigma: FloatProperty(name="Gaussian Sigma", default=3.0, min=0.1, max=10.0, step=0.1)
+    
+    def execute(self, context):
+        image = self.get_image(context)
+        np_image = blender_image_to_numpy(image)
+        np_image = gaussian_blur(np_image, self.gaussian_sigma)
+        new_image = numpy_to_blender_image(np_image, image.name)
+        switch_image_content(image, new_image)
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "gaussian_sigma")
+
+
 classes = (
     PAINTSYSTEM_OT_InvertColors,
     PAINTSYSTEM_OT_ResizeImage,
     PAINTSYSTEM_OT_ClearImage,
     PAINTSYSTEM_OT_FillImage,
+    PAINTSYSTEM_OT_GaussianBlur,
 )
 register, unregister = register_classes_factory(classes)
