@@ -18,6 +18,9 @@ class BrushPainterCore:
         self.steps = 7
         self.gradient_threshold = 0.0
         self.gaussian_sigma = 3
+        self.hue_shift = 0.0 # 0.0 to 1.0
+        self.saturation_shift = 0.0 # 0.0 to 1.0
+        self.value_shift = 0.0 # 0.0 to 1.0
         
         # Brush texture paths
         self.brush_texture_path = None
@@ -217,17 +220,95 @@ class BrushPainterCore:
         
         return canvas, extended_H, extended_W, offset_y, offset_x
     
+    def apply_color_shift(self, pixel):
+        """Applies randomized HSV color shifts to a pixel based on shift parameters."""
+        if len(pixel) < 3:
+            return pixel
+        
+        # Convert RGB to HSV
+        r, g, b = pixel[:3]
+        
+        # Convert to HSV using standard RGB to HSV conversion
+        max_val = max(r, g, b)
+        min_val = min(r, g, b)
+        delta = max_val - min_val
+        
+        # Calculate Hue
+        if delta == 0:
+            h = 0
+        elif max_val == r:
+            h = 60 * ((g - b) / delta) % 360
+        elif max_val == g:
+            h = 60 * (2 + (b - r) / delta) % 360
+        else:  # max_val == b
+            h = 60 * (4 + (r - g) / delta) % 360
+        
+        # Calculate Saturation
+        s = 0 if max_val == 0 else delta / max_val
+        
+        # Calculate Value
+        v = max_val
+        
+        # Apply randomized shifts
+        # Hue: randomize within the shift range
+        if self.hue_shift > 0:
+            hue_range = self.hue_shift * 360
+            h_random = np.random.uniform(-hue_range/2, hue_range/2)
+            h = (h + h_random) % 360
+        
+        # Saturation: randomize within the shift range
+        if self.saturation_shift > 0:
+            s_range = self.saturation_shift
+            s_random = np.random.uniform(-s_range/2, s_range/2)
+            s = np.clip(s + s_random, 0, 1)
+        
+        # Value: randomize within the shift range
+        if self.value_shift > 0:
+            v_range = self.value_shift
+            v_random = np.random.uniform(-v_range/2, v_range/2)
+            v = np.clip(v + v_random, 0, 1)
+        
+        # Convert back to RGB
+        c = v * s
+        x = c * (1 - abs((h / 60) % 2 - 1))
+        m = v - c
+        
+        if 0 <= h < 60:
+            r_new, g_new, b_new = c, x, 0
+        elif 60 <= h < 120:
+            r_new, g_new, b_new = x, c, 0
+        elif 120 <= h < 180:
+            r_new, g_new, b_new = 0, c, x
+        elif 180 <= h < 240:
+            r_new, g_new, b_new = 0, x, c
+        elif 240 <= h < 300:
+            r_new, g_new, b_new = x, 0, c
+        else:  # 300 <= h < 360
+            r_new, g_new, b_new = c, 0, x
+        
+        # Add back the offset and ensure values are in [0, 1]
+        r_final = np.clip(r_new + m, 0, 1)
+        g_final = np.clip(g_new + m, 0, 1)
+        b_final = np.clip(b_new + m, 0, 1)
+        
+        # Return the modified pixel with original alpha if present
+        if len(pixel) == 4:
+            return np.array([r_final, g_final, b_final, pixel[3]])
+        else:
+            return np.array([r_final, g_final, b_final])
+
     def apply_brush_stroke(self, canvas, y, x, img_float, img_blurred, has_alpha, G_normalized, theta, opacity,
                           brush_list, canvas_y, canvas_x, extended_H, extended_W):
         """Applies a single brush stroke at the specified location."""
         sampled_pixel = img_blurred[y, x]
+        sampled_pixel = self.apply_color_shift(sampled_pixel)
         sampled_alpha = sampled_pixel[3] if has_alpha else 1.0
         
         if sampled_alpha < 1:
             return False
         
         magnitude = G_normalized[y, x]
-        if magnitude <= self.gradient_threshold:
+        if magnitude < self.gradient_threshold:
             return False
         
         angle_rad = theta[y, x]
@@ -275,7 +356,7 @@ class BrushPainterCore:
         
         return True
     
-    def apply_brush_painting(self, image, brush_folder_path=None, brush_texture_path=None):
+    def apply_brush_painting(self, image, brush_folder_path=None, brush_texture_path=None, hue_shift=0.0, saturation_shift=0.0, value_shift=0.0):
         """Main function to apply brush painting to a Blender image."""
         if image is None:
             return None

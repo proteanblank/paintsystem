@@ -398,9 +398,9 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                 return
 
 
-class MAT_MT_ImageMenu(PSContextMixin, Menu):
-    bl_label = "Image Menu"
-    bl_idname = "MAT_MT_ImageMenu"
+class MAT_MT_ImageFilterMenu(PSContextMixin, Menu):
+    bl_label = "Image Filter Menu"
+    bl_idname = "MAT_MT_ImageFilterMenu"
 
     @classmethod
     def poll(cls, context):
@@ -410,22 +410,20 @@ class MAT_MT_ImageMenu(PSContextMixin, Menu):
 
     def draw(self, context):
         layout = self.layout
+        
+        layout.operator_context = 'INVOKE_REGION_WIN'
+        
         ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
         image_name = global_layer.image.name
-        layout.operator("paint_system.export_image",
-                        text="Export Layer", icon='EXPORT').image_name = image_name
-        layout.separator()
-        layout.operator("paint_system.fill_image", 
-                        text="Fill Image", icon='SNAP_FACE').image_name = image_name
-        layout.operator("paint_system.invert_colors",
-                        icon="MOD_MASK").image_name = image_name
-        layout.operator("paint_system.resize_image",
-                        icon="CON_SIZELIMIT").image_name = image_name
-        layout.operator("paint_system.clear_image",
-                        icon="X").image_name = image_name
+        layout.operator("paint_system.brush_painter",
+                        icon="BRUSH_DATA")
         layout.operator("paint_system.gaussian_blur",
-                        icon="FILTER").image_name = image_name
+                        icon="FILTER")
+        layout.operator("paint_system.invert_colors",
+                        icon="MOD_MASK")
+        layout.operator("paint_system.fill_image", 
+                        text="Fill Image", icon='SNAP_FACE')
         
 class MAT_PT_LayerSettings(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_LayerSettings'
@@ -454,15 +452,12 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         layout = self.layout
         layout.label(icon="PREFERENCES")
         
-    # def draw_header_preset(self, context):
-    #     layout = self.layout
-    #     ps_ctx = self.parse_context(context)
-    #     global_layer = ps_ctx.active_global_layer
-    #     layout.popover(
-    #         panel="MAT_PT_Actions",
-    #         text=f"Actions ({len(global_layer.actions)})" if global_layer.actions else "Actions",
-    #         icon="KEYTYPE_KEYFRAME_VEC"
-    #     )
+    def draw_header_preset(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        global_layer = ps_ctx.active_global_layer
+        if global_layer.type == 'IMAGE':
+            layout.operator("wm.call_menu", text="Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
 
     def draw(self, context):
         layout = self.layout
@@ -511,15 +506,6 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 icon="KEYTYPE_KEYFRAME_VEC"
             )
             box = layout.box()
-            if global_layer.image:
-                row = box.row(align=True)
-                if not global_layer.external_image:
-                    row.operator("paint_system.quick_edit", text="Edit Externally")
-                else:
-                    row.operator("paint_system.project_apply",
-                                text="Apply")
-                row.menu("MAT_MT_ImageMenu",
-                        text="", icon='COLLAPSEMENU')
 
             # if ps.preferences.show_tooltips:
             #     row.menu("MAT_MT_LayersSettingsTooltips", text='', icon='QUESTION')
@@ -549,18 +535,19 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
             row.enabled = not global_layer.lock_layer
             row.prop(global_layer.pre_mix_node.inputs['Opacity'], "default_value",
                     text="Opacity", slider=True)
-            col = box.column()
-            col.enabled = not global_layer.lock_layer
             match global_layer.type:
                 case 'IMAGE':
                     pass
                 case 'ADJUSTMENT':
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     adjustment_node = global_layer.find_node("adjustment")
                     if adjustment_node:
                         col.label(text="Adjustment Settings:", icon='SHADERFX')
                         col.template_node_inputs(adjustment_node)
                 case 'NODE_GROUP':
-                    custom_node_tree = global_layer.custom_node_tree
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     node_group = global_layer.find_node('custom_node_tree')
                     inputs = [i for i in node_group.inputs if not i.is_linked and i.name not in (
                         'Color', 'Alpha')]
@@ -572,11 +559,15 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                                 text=socket.name)
 
                 case 'ATTRIBUTE':
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     attribute_node = global_layer.find_node("attribute")
                     if attribute_node:
                         col.label(text="Attribute Settings:", icon='MESH_DATA')
                         col.template_node_inputs(attribute_node)
                 case 'GRADIENT':
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     gradient_node = global_layer.find_node("gradient")
                     map_range_node = global_layer.find_node("map_range")
                     if gradient_node and map_range_node:
@@ -601,18 +592,24 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.prop(map_range_node.inputs[1], "default_value", text="Start Distance")
                         col.prop(map_range_node.inputs[2], "default_value", text="End Distance")
                 case 'SOLID_COLOR':
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     rgb_node = global_layer.find_node("rgb")
                     if rgb_node:
                         col.prop(rgb_node.outputs[0], "default_value", text="Color",
                                 icon='IMAGE_RGB_ALPHA')
 
                 case 'ADJUSTMENT':
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     adjustment_node = global_layer.find_node("adjustment")
                     if adjustment_node:
                         col.label(text="Adjustment Settings:", icon='SHADERFX')
                         col.template_node_inputs(adjustment_node)
 
                 case 'RANDOM':
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     random_node = global_layer.find_node("add_2")
                     hue_math = global_layer.find_node("hue_multiply_add")
                     saturation_math = global_layer.find_node("saturation_multiply_add")
@@ -634,6 +631,8 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.prop(
                             value_math.inputs[1], "default_value", text="Value")
                 case 'TEXTURE':
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
                     col.use_property_decorate = False
                     col.use_property_split = True
                     col.prop(global_layer, "texture_type", text="Texture Type")
@@ -645,17 +644,22 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.label(text="Texture Settings:", icon='TEXTURE')
                         col.template_node_inputs(texture_node)
                 case 'GEOMETRY':
-                    if global_layer.geometry_type == 'VECTOR_TRANSFORM':
+                    col = box.column()
+                    col.enabled = not global_layer.lock_layer
+                    geometry_type = global_layer.geometry_type
+                    if geometry_type == 'VECTOR_TRANSFORM':
                         geometry_node = global_layer.find_node("geometry")
                         if geometry_node:
                             col.label(text="Vector Transform:", icon='MESH_DATA')
                             col.template_node_inputs(geometry_node)
-                    elif global_layer.geometry_type == 'BACKFACING':
+                    elif geometry_type == 'BACKFACING':
                         mat = ps_ctx.active_material
                         box = col.box()
                         col = box.column()
                         col.label(text="Material Settings:", icon='MESH_DATA')
                         col.prop(mat, "use_backface_culling", text="Backface Culling", icon='CHECKBOX_HLT' if mat.use_backface_culling else 'CHECKBOX_DEHLT')
+                    elif geometry_type in ['WORLD_NORMAL', 'WORLD_TRUE_NORMAL', 'OBJECT_NORMAL']:
+                        col.prop(global_layer, "normalize_normal", text="Normalize Normal", icon='MESH_DATA')
                 case _:
                     pass
 
@@ -868,6 +872,27 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
             col.template_node_inputs(mapping_node)
 
 
+
+class MAT_MT_ImageMenu(PSContextMixin, Menu):
+    bl_label = "Image Menu"
+    bl_idname = "MAT_MT_ImageMenu"
+
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        global_layer = ps_ctx.active_global_layer
+        return global_layer and global_layer.image
+
+    def draw(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        global_layer = ps_ctx.active_global_layer
+        image_name = global_layer.image.name
+        layout.operator("paint_system.resize_image",
+                        icon="CON_SIZELIMIT")
+        layout.operator("paint_system.clear_image",
+                        icon="X")
+
 class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_ImageLayerSettings'
     bl_space_type = "VIEW_3D"
@@ -890,11 +915,16 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         layout.label(icon_value=get_icon('image'))
 
     def draw(self, context):
+        ps_ctx = self.parse_context(context)
+        global_layer = ps_ctx.active_global_layer
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
-        ps_ctx = self.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
+        if not global_layer.external_image:
+            layout.operator("paint_system.quick_edit", text="Edit Externally (View Capture)")
+        else:
+            layout.operator("paint_system.project_apply",
+                        text="Apply")
         layout.enabled = not global_layer.lock_layer
 
         image_node = global_layer.find_node("image")
@@ -1123,6 +1153,7 @@ classes = (
     MAT_MT_AddAdjustmentLayerMenu,
     MAT_MT_AddTextureLayerMenu,
     MAT_MT_AddGeometryLayerMenu,
+    MAT_MT_ImageFilterMenu,
     MAT_MT_LayerMenu,
     MAT_MT_PaintSystemMergeAndExport,
     MAT_PT_Layers,
