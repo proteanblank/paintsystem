@@ -175,11 +175,12 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
 
                 if self.pbr_add_color:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Color', channel_type='COLOR', use_alpha=True)
-                    if self.add_layers:
-                        bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
-                        bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
-                    transfer_connection(mat_node_tree, principled_node.inputs['Base Color'], node_group.inputs['Color'])
+                    color_connected = transfer_connection(mat_node_tree, principled_node.inputs['Base Color'], node_group.inputs['Color'])
                     transfer_connection(mat_node_tree, principled_node.inputs['Alpha'], node_group.inputs['Color Alpha'])
+                    if self.add_layers:
+                        if not color_connected:
+                            bpy.ops.paint_system.new_solid_color_layer('INVOKE_DEFAULT')
+                        bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
                     connect_sockets(node_group.outputs['Color'], principled_node.inputs['Base Color'])
                     connect_sockets(node_group.outputs['Color Alpha'], principled_node.inputs['Alpha'])
 
@@ -193,10 +194,11 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
                     connect_sockets(node_group.outputs['Roughness'], principled_node.inputs['Roughness'])
                 if self.pbr_add_normal:
                     bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, use_normalize=True)
-                    transfer_connection(mat_node_tree, principled_node.inputs['Normal'], node_group.inputs['Normal'])
+                    normal_connected =transfer_connection(mat_node_tree, principled_node.inputs['Normal'], node_group.inputs['Normal'])
                     connect_sockets(node_group.outputs['Normal'], principled_node.inputs['Normal'])
                     if self.add_layers:
-                        bpy.ops.paint_system.new_geometry_layer('EXEC_DEFAULT', geometry_type='OBJECT_NORMAL', normalize_normal=True)
+                        if not normal_connected:
+                            bpy.ops.paint_system.new_geometry_layer('EXEC_DEFAULT', geometry_type='OBJECT_NORMAL', normalize_normal=True)
                         bpy.ops.paint_system.new_image_layer('EXEC_DEFAULT', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
                     norm_map_node = mat_node_tree.nodes.new(type='ShaderNodeNormalMap')
                     norm_map_node.location = node_group.location + Vector((0, -300))
