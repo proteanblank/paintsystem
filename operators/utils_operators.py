@@ -353,7 +353,7 @@ class PAINTSYSTEM_OT_HidePaintingTips(PSContextMixin, MultiMaterialOperator):
     """Hide the normal painting tips"""
     bl_idname = "paint_system.hide_painting_tips"
     bl_label = "Hide Normal Painting Tips"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'INTERNAL'}
     
     attribute_name: bpy.props.StringProperty(
         name="Tip Attribute Name",
@@ -364,12 +364,12 @@ class PAINTSYSTEM_OT_HidePaintingTips(PSContextMixin, MultiMaterialOperator):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.active_group is not None
+        return ps_ctx.ps_settings is not None
     
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        if hasattr(ps_ctx.active_group, self.attribute_name):
-            setattr(ps_ctx.active_group, self.attribute_name, True)
+        if hasattr(ps_ctx.ps_settings, self.attribute_name):
+            setattr(ps_ctx.ps_settings, self.attribute_name, True)
         else:
             return {'CANCELLED'}
         redraw_panel(context)

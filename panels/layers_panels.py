@@ -326,7 +326,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                         text="", icon_value=get_icon('save'))
             # Baking and Exporting
             
-            if ps_ctx.ps_settings.show_tooltips and not active_group.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
+            if ps_ctx.ps_settings.show_tooltips and not ps_ctx.ps_settings.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
                 row = col.row(align=True)
                 row.scale_y = 1.5
                 row.scale_x = 1.5

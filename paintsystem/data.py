@@ -1204,16 +1204,6 @@ class Group(PropertyGroup):
         description="UV map",
         default="UVMap"
     )
-    hide_norm_paint_tips: BoolProperty(
-        name="Hide Normal Painting Tips",
-        description="Hide the normal painting tips",
-        default=False
-    )
-    hide_color_attr_tips: BoolProperty(
-        name="Hide Color Attribute Tips",
-        description="Hide the color attribute tips",
-        default=False
-    )
     
     def update_channel(self, context):
         ps_ctx = parse_context(context)
