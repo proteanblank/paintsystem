@@ -109,11 +109,11 @@ class PAINTSYSTEM_OT_NewMaterial(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_PreviewActiveChannel(PSContextMixin, Operator):
-    bl_idname = "paint_system.preview_active_channel"
-    bl_label = "Preview Active Channel"
+class PAINTSYSTEM_OT_IsolateChannel(PSContextMixin, Operator):
+    bl_idname = "paint_system.isolate_active_channel"
+    bl_label = "Isolate Channel"
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Preview the active channel"
+    bl_description = "Isolate the active channel"
     
     @classmethod
     def poll(cls, context):
@@ -410,7 +410,7 @@ classes = (
     PAINTSYSTEM_OT_AddPresetBrushes,
     PAINTSYSTEM_OT_SelectMaterialIndex,
     PAINTSYSTEM_OT_NewMaterial,
-    PAINTSYSTEM_OT_PreviewActiveChannel,
+    PAINTSYSTEM_OT_IsolateChannel,
     PAINTSYSTEM_OT_CreatePaintSystemUVMap,
     PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
     PAINTSYSTEM_OT_ColorSampler,

@@ -1209,9 +1209,9 @@ class Group(PropertyGroup):
         ps_ctx = parse_context(context)
         ps_mat_data = ps_ctx.ps_mat_data
         if ps_mat_data.preview_channel:
-            # Call paint_system.preview_active_channel twice to ensure it's updated
-            bpy.ops.paint_system.preview_active_channel('EXEC_DEFAULT')
-            bpy.ops.paint_system.preview_active_channel('EXEC_DEFAULT')
+            # Call paint_system.isolate_active_channel twice to ensure it's updated
+            bpy.ops.paint_system.isolate_active_channel('EXEC_DEFAULT')
+            bpy.ops.paint_system.isolate_active_channel('EXEC_DEFAULT')
         if ps_ctx.active_channel.use_bake_image:
             # Force to object mode
             bpy.ops.object.mode_set(mode="OBJECT")

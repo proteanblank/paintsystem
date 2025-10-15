@@ -320,7 +320,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             #                  text="Setup Material", icon="ERROR")
             #     row.alert = False
             if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
-                row.operator("paint_system.preview_active_channel",
+                row.operator("paint_system.isolate_active_channel",
                             text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
             row.operator("wm.save_mainfile",
                         text="", icon_value=get_icon('save'))
