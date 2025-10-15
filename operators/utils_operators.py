@@ -26,7 +26,7 @@ from bl_ui.properties_paint_common import (
 class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
     bl_idname = "paint_system.toggle_paint_mode"
     bl_label = "Toggle Paint Mode"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Toggle between texture paint and object mode"
     
     @classmethod
@@ -109,11 +109,11 @@ class PAINTSYSTEM_OT_NewMaterial(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_PreviewActiveChannel(PSContextMixin, Operator):
-    bl_idname = "paint_system.preview_active_channel"
-    bl_label = "Preview Active Channel"
+class PAINTSYSTEM_OT_IsolateChannel(PSContextMixin, Operator):
+    bl_idname = "paint_system.isolate_active_channel"
+    bl_label = "Isolate Channel"
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Preview the active channel"
+    bl_description = "Isolate the active channel"
     
     @classmethod
     def poll(cls, context):
@@ -353,7 +353,7 @@ class PAINTSYSTEM_OT_HidePaintingTips(PSContextMixin, MultiMaterialOperator):
     """Hide the normal painting tips"""
     bl_idname = "paint_system.hide_painting_tips"
     bl_label = "Hide Normal Painting Tips"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'INTERNAL'}
     
     attribute_name: bpy.props.StringProperty(
         name="Tip Attribute Name",
@@ -364,12 +364,12 @@ class PAINTSYSTEM_OT_HidePaintingTips(PSContextMixin, MultiMaterialOperator):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.active_group is not None
+        return ps_ctx.ps_settings is not None
     
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        if hasattr(ps_ctx.active_group, self.attribute_name):
-            setattr(ps_ctx.active_group, self.attribute_name, True)
+        if hasattr(ps_ctx.ps_settings, self.attribute_name):
+            setattr(ps_ctx.ps_settings, self.attribute_name, True)
         else:
             return {'CANCELLED'}
         redraw_panel(context)
@@ -410,7 +410,7 @@ classes = (
     PAINTSYSTEM_OT_AddPresetBrushes,
     PAINTSYSTEM_OT_SelectMaterialIndex,
     PAINTSYSTEM_OT_NewMaterial,
-    PAINTSYSTEM_OT_PreviewActiveChannel,
+    PAINTSYSTEM_OT_IsolateChannel,
     PAINTSYSTEM_OT_CreatePaintSystemUVMap,
     PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
     PAINTSYSTEM_OT_ColorSampler,

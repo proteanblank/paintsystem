@@ -320,13 +320,13 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             #                  text="Setup Material", icon="ERROR")
             #     row.alert = False
             if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
-                row.operator("paint_system.preview_active_channel",
+                row.operator("paint_system.isolate_active_channel",
                             text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
             row.operator("wm.save_mainfile",
                         text="", icon_value=get_icon('save'))
             # Baking and Exporting
             
-            if ps_ctx.ps_settings.show_tooltips and not active_group.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
+            if ps_ctx.ps_settings.show_tooltips and not ps_ctx.ps_settings.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
                 row = col.row(align=True)
                 row.scale_y = 1.5
                 row.scale_x = 1.5

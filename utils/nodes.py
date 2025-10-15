@@ -33,9 +33,11 @@ def transfer_connection(node_tree: NodeTree, source_socket: NodeSocket, target_s
     if source_socket.is_linked:
         original_socket = source_socket.links[0].from_socket
         node_tree.links.new(original_socket, target_socket)
+        return True
     else:
         # Copy the value from source socket to target socket
         target_socket.default_value = source_socket.default_value
+    return False
 
 def find_nodes(node_tree: NodeTree, properties: dict) -> list[Node]:
     node = get_material_output(node_tree)

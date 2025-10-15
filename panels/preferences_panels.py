@@ -28,6 +28,18 @@ class PaintSystemPreferences(AddonPreferences):
         min=0.5,
         max=3.0
     )
+    
+    # Tips
+    hide_norm_paint_tips: BoolProperty(
+        name="Hide Normal Painting Tips",
+        description="Hide the normal painting tips",
+        default=False
+    )
+    hide_color_attr_tips: BoolProperty(
+        name="Hide Color Attribute Tips",
+        description="Hide the color attribute tips",
+        default=False
+    )
 
     # name_layers_group: BoolProperty(
     #     name="Name Layers According to Group Name",
