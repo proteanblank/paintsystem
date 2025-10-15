@@ -204,7 +204,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMix
     """Create a new image layer"""
     bl_idname = "paint_system.new_image_layer"
     bl_label = "New Image Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     attach_to_camera_plane: BoolProperty(
         name="Attach to Camera Plane",
@@ -313,7 +313,7 @@ class PAINTSYSTEM_OT_NewFolder(PSContextMixin, MultiMaterialOperator):
     """Create a new folder layer"""
     bl_idname = "paint_system.new_folder_layer"
     bl_label = "New Folder"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -339,7 +339,7 @@ class PAINTSYSTEM_OT_NewSolidColor(PSContextMixin, MultiMaterialOperator):
     """Create a new solid color layer"""
     bl_idname = "paint_system.new_solid_color_layer"
     bl_label = "New Solid Color Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -365,7 +365,7 @@ class PAINTSYSTEM_OT_NewAttribute(PSContextMixin, MultiMaterialOperator):
     """Create a new attribute layer"""
     bl_idname = "paint_system.new_attribute_layer"
     bl_label = "New Attribute Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -401,7 +401,7 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
     """Create a new adjustment layer"""
     bl_idname = "paint_system.new_adjustment_layer"
     bl_label = "New Adjustment Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -428,7 +428,7 @@ class PAINTSYSTEM_OT_NewShader(PSContextMixin, MultiMaterialOperator):
     """Create a new shader layer"""
     bl_idname = "paint_system.new_shader_layer"
     bl_label = "New Shader Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -454,7 +454,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
     """Create a new gradient layer"""
     bl_idname = "paint_system.new_gradient_layer"
     bl_label = "New Gradient Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -487,7 +487,7 @@ class PAINTSYSTEM_OT_NewGeometry(PSContextMixin, MultiMaterialOperator):
     """Create a new geometry layer"""
     bl_idname = "paint_system.new_geometry_layer"
     bl_label = "New Geometry Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     geometry_type: EnumProperty(
         name="Geometry Type",
@@ -522,7 +522,7 @@ class PAINTSYSTEM_OT_FixMissingGradientEmpty(PSContextMixin, Operator):
     """Fix missing gradient empty"""
     bl_idname = "paint_system.fix_missing_gradient_empty"
     bl_label = "Fix Missing Gradient Empty"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -537,7 +537,7 @@ class PAINTSYSTEM_OT_SelectGradientEmpty(PSContextMixin, Operator):
     """Select the gradient empty"""
     bl_idname = "paint_system.select_gradient_empty"
     bl_label = "Select Gradient Empty"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -554,7 +554,7 @@ class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
     """Create a new random color layer"""
     bl_idname = "paint_system.new_random_color_layer"
     bl_label = "New Random Color Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     layer_name: StringProperty(
         name="Layer Name",
@@ -598,7 +598,7 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
     """Create a new custom node group layer"""
     bl_idname = "paint_system.new_custom_node_group_layer"
     bl_label = "New Custom Node Group Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     def get_node_groups(self, context: Context):
         node_groups = []
@@ -748,7 +748,7 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
     """Create a new texture layer"""
     bl_idname = "paint_system.new_texture_layer"
     bl_label = "New Texture Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     texture_type: EnumProperty(
         name="Texture Type",
@@ -788,7 +788,7 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
     """Remove the active item"""
     bl_idname = "paint_system.delete_item"
     bl_label = "Remove Item"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Remove the active item"
 
     @classmethod
@@ -854,7 +854,7 @@ class PAINTSYSTEM_OT_MoveUp(PSContextMixin, MultiMaterialOperator):
     """Move the active item up"""
     bl_idname = "paint_system.move_up"
     bl_label = "Move Item Up"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Move the active item up"
 
     action: EnumProperty(
@@ -938,7 +938,7 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, MultiMaterialOperator):
     """Move the active item down"""
     bl_idname = "paint_system.move_down"
     bl_label = "Move Item Down"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Move the active item down"
 
     action: EnumProperty(
@@ -1024,7 +1024,7 @@ class PAINTSYSTEM_OT_MoveUpCameraPlane(PSContextMixin, MultiMaterialOperator):
     """Move the active item up camera plane"""
     bl_idname = "paint_system.move_up_camera_plane"
     bl_label = "Move Item Up"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Move the active item up"
 
     @classmethod
@@ -1051,7 +1051,7 @@ class PAINTSYSTEM_OT_MoveDownCameraPlane(PSContextMixin, MultiMaterialOperator):
     """Move the active item down camera plane"""
     bl_idname = "paint_system.move_down_camera_plane"
     bl_label = "Move Item Down"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Move the active item down"
     
     @classmethod
@@ -1078,7 +1078,7 @@ class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
     """Copy the active layer"""
     bl_idname = "paint_system.copy_layer"
     bl_label = "Copy Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Copy the active layer"
     
     @classmethod
@@ -1105,7 +1105,7 @@ class PAINTSYSTEM_OT_CopyAllLayers(PSContextMixin, Operator):
     """Copy all layers"""
     bl_idname = "paint_system.copy_all_layers"
     bl_label = "Copy All Layers"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Copy all layers"
     
     @classmethod
@@ -1130,7 +1130,7 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
     """Paste the copied layer"""
     bl_idname = "paint_system.paste_layer"
     bl_label = "Paste Layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Paste the copied layer"
     
     linked: BoolProperty(
@@ -1170,7 +1170,7 @@ class PAINTSYSTEM_OT_AddAction(PSContextMixin, Operator):
     """Add an action to the active layer"""
     bl_idname = "paint_system.add_action"
     bl_label = "Add Action"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Add an action to the active layer"
     
     action_bind: EnumProperty(
@@ -1237,7 +1237,7 @@ class PAINTSYSTEM_OT_DeleteAction(PSContextMixin, Operator):
     """Delete the active action"""
     bl_idname = "paint_system.delete_action"
     bl_label = "Delete Action"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Delete the active action"
     
     @classmethod

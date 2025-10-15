@@ -65,7 +65,7 @@ def find_node_by_name(node_tree: NodeTree, name: str) -> Node:
 class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
     bl_idname = "paint_system.update_paint_system_data"
     bl_label = "Update Paint System Data"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         legacy_ps_ctx = LegacyPaintSystemContextParser(context)
