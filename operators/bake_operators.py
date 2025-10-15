@@ -11,7 +11,7 @@ from ..panels.common import get_icon_from_channel
 
 class BakeOperator(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixin, Operator):
     """Bake the active channel"""
-    bl_options = {'INTERNAL', 'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     uv_map: StringProperty(
         name= "UV Map",
@@ -35,7 +35,7 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
     bl_idname = "paint_system.bake_channel"
     bl_label = "Bake Channel"
     bl_description = "Bake the active channel"
-    bl_options = {'INTERNAL', 'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     uv_map: StringProperty(
         name= "UV Map",
@@ -85,7 +85,7 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
     bl_idname = "paint_system.bake_all_channels"
     bl_label = "Bake All Channels"
     bl_description = "Bake all channels"
-    bl_options = {'INTERNAL', 'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     uv_map: StringProperty(
         name= "UV Map",
@@ -137,7 +137,6 @@ class PAINTSYSTEM_OT_ExportImage(PSContextMixin, Operator):
     bl_idname = "paint_system.export_image"
     bl_label = "Export Baked Image"
     bl_description = "Export the baked image"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     
     image_name: StringProperty(
         name="Image Name",
@@ -164,7 +163,6 @@ class PAINTSYSTEM_OT_ExportAllImages(PSContextMixin, Operator):
     bl_idname = "paint_system.export_all_images"
     bl_label = "Export All Images"
     bl_description = "Export all images"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     
     directory: StringProperty(
         name="Directory",
@@ -285,7 +283,7 @@ class PAINTSYSTEM_OT_DeleteBakedImage(PSContextMixin, Operator):
     bl_idname = "paint_system.delete_bake_image"
     bl_label = "Delete Baked Image"
     bl_description = "Delete the baked image"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -318,7 +316,7 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
     bl_idname = "paint_system.transfer_image_layer_uv"
     bl_label = "Transfer Image Layer UV"
     bl_description = "Transfer the UV of the image layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     uv_map: StringProperty(
         name= "UV Map",
@@ -374,7 +372,7 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
     bl_idname = "paint_system.convert_to_image_layer"
     bl_label = "Transfer Image Layer UV"
     bl_description = "Transfer the UV of the image layer"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+    bl_options = {'REGISTER', 'UNDO'}
     
     uv_map: StringProperty(
         name= "UV Map",

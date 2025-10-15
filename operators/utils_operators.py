@@ -26,7 +26,6 @@ from bl_ui.properties_paint_common import (
 class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
     bl_idname = "paint_system.toggle_paint_mode"
     bl_label = "Toggle Paint Mode"
-    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     bl_description = "Toggle between texture paint and object mode"
     
     @classmethod
