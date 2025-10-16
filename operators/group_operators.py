@@ -193,7 +193,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
                     transfer_connection(mat_node_tree, principled_node.inputs['Roughness'], node_group.inputs['Roughness'])
                     connect_sockets(node_group.outputs['Roughness'], principled_node.inputs['Roughness'])
                 if self.pbr_add_normal:
-                    bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, use_normalize=True)
+                    bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, use_normalize=True, world_to_object_normal=True)
                     normal_connected =transfer_connection(mat_node_tree, principled_node.inputs['Normal'], node_group.inputs['Normal'])
                     connect_sockets(node_group.outputs['Normal'], principled_node.inputs['Normal'])
                     if self.add_layers:

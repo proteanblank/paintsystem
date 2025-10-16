@@ -48,6 +48,12 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         default=False,
         options={'SKIP_SAVE'}
     )
+    world_to_object_normal: bpy.props.BoolProperty(
+        name="World to Object Normal",
+        description="World to object normal",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
     use_max_min: bpy.props.BoolProperty(
         name="Use Max Min",
         description="Use max min for the channel",
@@ -80,6 +86,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         new_channel.use_normalize = self.use_normalize
         new_channel.color_space = self.color_space
         new_channel.use_max_min = self.use_max_min
+        new_channel.world_to_object_normal = self.world_to_object_normal
         if self.channel_type == "FLOAT" and new_channel.use_max_min:
             new_channel.factor_min = self.factor_min
             new_channel.factor_max = self.factor_max

@@ -126,7 +126,7 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
                 
             channel.use_bake_image = False
             channel.bake_uv_map = self.uv_map
-            channel.bake_channel(context, mat, bake_image, self.uv_map)
+            channel.bake(context, mat, bake_image, self.uv_map)
             channel.use_bake_image = True
         # Return to object mode
         bpy.ops.object.mode_set(mode="OBJECT")

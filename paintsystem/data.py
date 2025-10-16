@@ -719,6 +719,9 @@ class Channel(BaseNestedListManager):
         previous_dict: Dict[int, PreviousLayer] = {}
         if self.type == "VECTOR" and self.use_normalize:
             node_builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD", "hide": True}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
+        if self.type == "VECTOR" and self.world_to_object_normal:
+            node_builder.add_node("world_to_object_normal", "ShaderNodeVectorTransform")
+        
         node_builder.add_node("alpha_clamp_end", "ShaderNodeClamp", {"hide": True})
         node_builder.link("alpha_clamp_end", "group_output", "Result", "Alpha")
         previous_dict[-1] = PreviousLayer(color_name="group_output", color_socket="Color", alpha_name="alpha_clamp_end", alpha_socket="Value")
@@ -790,11 +793,15 @@ class Channel(BaseNestedListManager):
         prev_layer = previous_dict[-1]
         if self.type == "VECTOR" and self.use_normalize:
             node_builder.link("normalize", prev_layer.color_name, "Vector", prev_layer.color_socket)
-            node_builder.link("group_input", "normalize", "Color", "Vector")
-        else:
-            node_builder.link("group_input", prev_layer.color_name, "Color", "Color")
+            prev_layer.color_name = "normalize"
+            prev_layer.color_socket = "Vector"
+        if self.type == "VECTOR" and self.world_to_object_normal:
+            node_builder.link("world_to_object_normal", prev_layer.color_name, "Vector", prev_layer.color_socket)
+            prev_layer.color_name = "world_to_object_normal"
+            prev_layer.color_socket = "Vector"
+        node_builder.link("group_input", prev_layer.color_name, "Color", prev_layer.color_socket)
         node_builder.add_node("alpha_clamp_start", "ShaderNodeClamp", {"hide": True})
-        node_builder.link("alpha_clamp_start", prev_layer.color_name, "Result", "Alpha")
+        node_builder.link("alpha_clamp_start", prev_layer.alpha_name, "Result", prev_layer.alpha_socket)
         node_builder.link("group_input", "alpha_clamp_start", "Alpha", "Value")
         node_builder.compile()
     
@@ -1002,6 +1009,12 @@ class Channel(BaseNestedListManager):
     use_normalize: BoolProperty(
         name="Normalize",
         description="Normalize the channel",
+        default=False,
+        update=update_node_tree
+    )
+    world_to_object_normal: BoolProperty(
+        name="World to Object Normal",
+        description="World to object normal",
         default=False,
         update=update_node_tree
     )

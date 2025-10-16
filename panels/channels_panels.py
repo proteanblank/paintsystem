@@ -168,8 +168,17 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
         col.prop(active_channel, "type", text="Type")
         col.prop(active_channel, "use_alpha", text="Alpha Socket")
         if active_channel.type == "VECTOR":
+            vec_box = col.box()
+            col = vec_box.column()
+            col.label(text="Vector Input Settings:", icon="SETTINGS")
+            col.use_property_split = False
+            col.prop(active_channel, "world_to_object_normal", text="World to Object Normal")
             col.prop(active_channel, "use_normalize", text="Normalize Input")
         if active_channel.type == "FLOAT":
+            float_box = col.box()
+            col = float_box.column()
+            col.label(text="Float Input Settings:", icon="SETTINGS")
+            col.use_property_split = False
             col.prop(active_channel, "use_max_min")
             if active_channel.use_max_min:
                 col.prop(active_channel, "factor_min")

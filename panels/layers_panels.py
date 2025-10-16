@@ -230,7 +230,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                 icon_value=get_icon_from_channel(ps_ctx.active_channel)
             )
         else:
-            if ps_ctx.active_channel.bake_image:
+            if ps_ctx.ps_object.type == 'MESH' and ps_ctx.active_channel.bake_image:
                 layout.prop(ps_ctx.active_channel, "use_bake_image",
                         text="Use Baked", icon="TEXTURE_DATA")
 
@@ -261,9 +261,8 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         row.scale_x = 1.7
         # if contains_mat_setup:
         paint_row = row.row(align=True)
-        paint_row.enabled = not ps_ctx.active_channel.use_bake_image
         paint_row.operator("paint_system.toggle_paint_mode",
-            text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon_from_channel(ps_ctx.active_channel))
+            text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_object.type == 'MESH' else get_icon('paintbrush'))
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             grease_pencil = context.grease_pencil
             layers = grease_pencil.layers
@@ -296,6 +295,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             sub.operator("grease_pencil.layer_move", icon='TRIA_UP', text="").direction = 'UP'
             sub.operator("grease_pencil.layer_move", icon='TRIA_DOWN', text="").direction = 'DOWN'
         elif ps_ctx.ps_object.type == 'MESH':
+            paint_row.enabled = not ps_ctx.active_channel.use_bake_image
             active_group = ps_ctx.active_group
             active_channel = ps_ctx.active_channel
             active_layer = ps_ctx.active_global_layer
@@ -321,7 +321,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             #     row.alert = False
             if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
                 row.operator("paint_system.isolate_active_channel",
-                            text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon('channel'))
+                            text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon("channel"))
             row.operator("wm.save_mainfile",
                         text="", icon_value=get_icon('save'))
             # Baking and Exporting
@@ -436,9 +436,9 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        if ps_ctx.active_channel.use_bake_image:
-            return False
         if ps_ctx.ps_object.type == 'MESH':
+            if ps_ctx.active_channel.use_bake_image:
+                return False
             active_layer = ps_ctx.active_layer
             return active_layer is not None
         elif ps_ctx.ps_object.type == 'GREASEPENCIL':
@@ -456,7 +456,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         layout = self.layout
         ps_ctx = self.parse_context(context)
         global_layer = ps_ctx.active_global_layer
-        if global_layer.type == 'IMAGE':
+        if ps_ctx.ps_object.type == 'MESH' and global_layer.type == 'IMAGE':
             layout.operator("wm.call_menu", text="Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
 
     def draw(self, context):
@@ -725,7 +725,7 @@ class MAT_PT_LayerCameraPlaneSettings(PSContextMixin, Panel):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        if ps_ctx.active_channel.use_bake_image:
+        if ps_ctx.ps_object.type != 'MESH' or ps_ctx.active_channel.use_bake_image:
             return False
         return ps_ctx.ps_object.type == 'MESH' and ps_ctx.active_global_layer.attached_to_camera_plane
     
@@ -834,7 +834,7 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
-        if ps_ctx.active_channel.use_bake_image:
+        if ps_ctx.ps_object.type != 'MESH' or ps_ctx.ps_object.type != 'MESH':
             return False
         return global_layer and global_layer.type in ('IMAGE', 'TEXTURE')
     
@@ -906,7 +906,7 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
         global_layer = ps_ctx.active_global_layer
-        if ps_ctx.active_channel.use_bake_image:
+        if ps_ctx.ps_object.type != 'MESH' or ps_ctx.active_channel.use_bake_image:
             return False
         return global_layer and global_layer.type == 'IMAGE'
     
