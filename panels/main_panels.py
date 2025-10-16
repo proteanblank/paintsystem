@@ -13,7 +13,8 @@ from ..paintsystem.data import LegacyPaintSystemContextParser
 creators = [
     ("Tawan Sunflower", "https://x.com/himawari_hito"),
     ("@blastframe", "https://github.com/blastframe"),
-    ("Pink.Ninjaa", "https://pinkninjaa.net/")
+    ("Pink.Ninjaa", "https://pinkninjaa.net/"),
+    ("Zoomy Toons", "https://www.youtube.com/channel/UCNCKsXWIBFoWH6cMzeHmkhA")
 ]
 
 class MAT_PT_Support(PSContextMixin, Panel):
