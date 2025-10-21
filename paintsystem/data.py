@@ -1258,6 +1258,14 @@ class PaintSystemGlobalData(PropertyGroup):
         name="Last Selected Object",
         type=Object
     )
+    last_selected_object: PointerProperty(
+        name="Last Selected Object",
+        type=Object
+    )
+    last_selected_material: PointerProperty(
+        name="Last Selected Material",
+        type=Material
+    )
 
 class MaterialData(PropertyGroup):
     """Custom data for channels in the Paint System"""

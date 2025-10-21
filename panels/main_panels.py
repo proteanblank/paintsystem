@@ -133,24 +133,9 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             col = layout.column(align=True)
             row = col.row(align=True)
             scale_content(context, row, 1.5, 1.2)
-            # if not ps.preferences.use_compact_design:
-            #     row.scale_x = 1.5
-            #     row.scale_y = 1.2
-            # row.prop_enum(ob, "material_slot_selector", "Material", text="")
-            # row.template_list("MATERIAL_UL_PaintSystemMatSlots", "", ob, "material_slots", ob, "active_material_index", rows=2)
-            # row.template_ID(ob, "material_slots", text="Material Slots")
             row.menu("MAT_MT_PaintSystemMaterialSelectMenu", text="" if ob.active_material else "Empty Material", icon="MATERIAL" if ob.active_material else "MESH_CIRCLE")
             if mat:
                 row.prop(mat, "name", text="")
-            # row.template_ID(ob, "active_material", text="")
-            # row.prop_search(ob, "active_material", ob, "material_slots", text="")
-            # row.panel_prop(ob, "material_slots")
-            # box = row.box()
-            # col = box.column(align=True)
-            # for idx, material_slot in enumerate(ob.material_slots):
-            #     is_selected = ob.active_material_index == idx
-            #     op = col.operator("paint_system.select_material_index", text=material_slot.material.name if material_slot.material else " ", icon="MATERIAL", depress=is_selected, emboss=is_selected)
-            #     op.index = idx
             
             # row.operator("object.material_slot_add", icon='ADD', text="")
             ops_row = row.row(align=True)
@@ -162,8 +147,8 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
                 row.operator("object.material_slot_assign", text="Assign")
                 row.operator("object.material_slot_select", text="Select")
                 row.operator("object.material_slot_deselect", text="Deselect")
-            
-            layout.prop(mat, "surface_render_method", text="Render Method", icon="RENDER_RESULT")
+            if mat:
+                layout.prop(mat, "surface_render_method", text="Render Method", icon="RENDER_RESULT")
         
         if len(groups) > 1:
             row = col.row(align=True)

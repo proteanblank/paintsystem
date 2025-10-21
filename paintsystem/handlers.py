@@ -87,13 +87,59 @@ def refresh_image(scene: bpy.types.Scene):
         active_layer.image.reload()
 
 
+@bpy.app.handlers.persistent
+def paint_system_object_update(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph = None):
+    """Handle object changes and update paint canvas - based on UcuPaint's ypaint_last_object_update"""
+    
+    try: 
+        obj = bpy.context.object
+        mat = obj.active_material if obj else None
+    except: 
+        return
+    
+    if not obj or not hasattr(scene, 'ps_scene_data'):
+        return
+    
+    ps_scene_data = scene.ps_scene_data
+    
+    if not hasattr(ps_scene_data, 'last_selected_object'):
+        ps_scene_data.last_selected_object = None
+    if not hasattr(ps_scene_data, 'last_selected_material'):
+        ps_scene_data.last_selected_material = None
+        
+    current_obj = obj
+    current_mat = mat
+    
+    if (ps_scene_data.last_selected_object != current_obj or 
+        ps_scene_data.last_selected_material != current_mat):
+        
+        # Update tracking variables
+        ps_scene_data.last_selected_object = current_obj
+        ps_scene_data.last_selected_material = current_mat
+        
+        if obj and obj.type == 'MESH' and mat and hasattr(mat, 'ps_mat_data'):
+            from .data import update_active_image
+            try:
+                update_active_image(None, bpy.context) 
+            except Exception as e:
+                pass
+
+
 def register():
     bpy.app.handlers.frame_change_pre.append(frame_change_pre)
     bpy.app.handlers.load_post.append(load_post)
     bpy.app.handlers.save_pre.append(save_handler)
     bpy.app.handlers.load_post.append(refresh_image)
+    if hasattr(bpy.app.handlers, 'scene_update_pre'):
+        bpy.app.handlers.scene_update_pre.append(paint_system_object_update)
+    else:
+        bpy.app.handlers.depsgraph_update_post.append(paint_system_object_update)
 def unregister():
     bpy.app.handlers.frame_change_pre.remove(frame_change_pre)
     bpy.app.handlers.load_post.remove(load_post)
     bpy.app.handlers.save_pre.remove(save_handler)
     bpy.app.handlers.load_post.remove(refresh_image)
+    if hasattr(bpy.app.handlers, 'scene_update_pre'):
+        bpy.app.handlers.scene_update_pre.remove(paint_system_object_update)
+    else:
+        bpy.app.handlers.depsgraph_update_post.remove(paint_system_object_update)
