@@ -141,11 +141,19 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
         legacy_material_settings = legacy_ps_ctx.get_material_settings()
         if legacy_material_settings and legacy_material_settings.groups:
             box = layout.box()
-            box.alert = True
-            scale_content(context, box, 1.5, 1.5)
             col = box.column()
+            warning_box = col.box()
+            col = warning_box.column()
+            col.alert = True
             col.label(text="Legacy Paint System Detected", icon="ERROR")
-            col.operator("paint_system.update_paint_system_data", text="Update Paint System Data")
+            col.label(text="Please save as before updating")
+            row = warning_box.row()
+            scale_content(context, row)
+            row.operator("wm.save_as_mainfile", text="Save As")
+            row = warning_box.row()
+            row.alert = True
+            scale_content(context, row)
+            row.operator("paint_system.update_paint_system_data", text="Update Paint System Data", icon="FILE_REFRESH")
             
             return
         ps_ctx = self.parse_context(context)

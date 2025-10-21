@@ -60,7 +60,7 @@ def load_post(scene):
             name = global_layer.name
             # Transfer layer name to global_layer layer_name
             global_layer.layer_name = layers[name].name
-            print(f"Copying layer name {layers[name].name} to {global_layer.name}")
+            print(f"Copying layer name '{layers[name].name}' to '{global_layer.name}'")
             
     print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers)} layers in {round((time.time() - start_time) * 1000, 2)} ms")
 
@@ -139,6 +139,11 @@ def paint_system_object_update(scene: bpy.types.Scene, depsgraph: bpy.types.Deps
                 pass
 
 
+# --- On Addon Enable ---
+def on_addon_enable():
+    load_post(bpy.context.scene)
+
+
 def register():
     bpy.app.handlers.frame_change_pre.append(frame_change_pre)
     bpy.app.handlers.load_post.append(load_post)
@@ -148,6 +153,7 @@ def register():
         bpy.app.handlers.scene_update_pre.append(paint_system_object_update)
     else:
         bpy.app.handlers.depsgraph_update_post.append(paint_system_object_update)
+    bpy.app.timers.register(on_addon_enable, first_interval=0.1)
 def unregister():
     bpy.app.handlers.frame_change_pre.remove(frame_change_pre)
     bpy.app.handlers.load_post.remove(load_post)

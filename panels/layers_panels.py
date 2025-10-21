@@ -262,7 +262,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         # if contains_mat_setup:
         paint_row = row.row(align=True)
         paint_row.operator("paint_system.toggle_paint_mode",
-            text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_object.type == 'MESH' else get_icon('paintbrush'))
+            text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon('paintbrush'))
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             grease_pencil = context.grease_pencil
             layers = grease_pencil.layers
@@ -345,7 +345,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             row.scale_x = 1.2
             
             row.menu("MAT_MT_PaintSystemMergeAndExport",
-                        text="Bake and Export", icon_value=get_icon('merge'))
+                        text="Bake and Export")
 
             if active_channel.use_bake_image:
                 image_node = find_node(active_channel.node_tree, {'bl_idname': 'ShaderNodeTexImage', 'image': active_channel.bake_image})

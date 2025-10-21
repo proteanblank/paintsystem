@@ -40,7 +40,7 @@ def get_layer_adjustment_type(legacy_layer: LegacyPaintSystemLayer) -> str:
     adjustment_type = None
     for node in legacy_layer.node_tree.nodes:
         if node.label == "Adjustment":
-            adjustment_type = node.bl_idname
+            adjustment_type = node.type
             break
     return adjustment_type
 
@@ -121,7 +121,7 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                     new_global_layer.pre_mix_node.inputs['Opacity'].default_value = opacity_node.inputs[0].default_value
                     
                 ps_ctx = self.parse_context(context)
-                ps_ctx.active_channel.add_global_layer_to_channel(new_global_layer, legacy_layer.name)
+                ps_ctx.active_channel.add_global_layer_to_channel(new_global_layer)
                 # refresh paintsystem context
             ps_ctx.active_channel.update_node_tree(context)
             ps_ctx.active_group.update_node_tree(context)

@@ -388,7 +388,7 @@ class GlobalLayer(PropertyGroup):
             cam_channel = camera_plane.material_slots[0].material.ps_mat_data.groups[0].channels[0]
             # Always add to the end of the list
             cam_channel.active_index = len(cam_channel.layers) - 1
-            cam_channel.add_global_layer_to_channel(self, "Camera Plane")
+            cam_channel.add_global_layer_to_channel(self)
         else:
             # Remove the layer from the camera plane
             cam_channel = ps_ctx.camera_plane_channel
@@ -607,6 +607,8 @@ class Layer(BaseNestedListItem):
             global_layer.update_node_tree(context)
     
     ref_layer_id: StringProperty()
+    
+    # Name is deprecated, use GlobalLayer.layer_name instead
     name: StringProperty(
         name="Name",
         description="Layer name",
