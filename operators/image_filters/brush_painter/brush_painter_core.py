@@ -21,6 +21,7 @@ class BrushPainterCore:
         self.hue_shift = 0.0 # 0.0 to 1.0
         self.saturation_shift = 0.0 # 0.0 to 1.0
         self.value_shift = 0.0 # 0.0 to 1.0
+        self.brush_rotation_offset = 0.0 # 0 to 360 degrees
         
         # Brush texture paths
         self.brush_texture_path = None
@@ -313,7 +314,7 @@ class BrushPainterCore:
         
         angle_rad = theta[y, x]
         angle_deg = np.rad2deg(angle_rad)
-        brush_angle = angle_deg + 90
+        brush_angle = angle_deg + self.brush_rotation_offset
         
         selected_brush = brush_list[np.random.randint(0, len(brush_list))]
         brush_H, brush_W = selected_brush.shape
