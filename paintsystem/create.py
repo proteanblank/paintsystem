@@ -21,6 +21,7 @@ def add_global_layer(layer_type: str, layer_name: str = "New Layer") -> GlobalLa
         node_tree.interface.new_socket("Over Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
     global_layer = bpy.context.scene.ps_scene_data.layers.add()
     global_layer.name = str(uuid4())
+    global_layer.layer_name = layer_name
     global_layer.type = layer_type
     global_layer.node_tree = node_tree
     return global_layer

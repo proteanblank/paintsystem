@@ -12,6 +12,7 @@ from ..utils.nodes import (
     transfer_connection,
     traverse_connected_nodes,
 )
+from ..utils import get_next_unique_name
 from .common import (
     MultiMaterialOperator,
     PSContextMixin,
@@ -121,7 +122,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         ps_ctx = self.parse_context(context)
         # See if there is any material slot on the active object
         if not ps_ctx.active_material:
-            mat = bpy.data.materials.new(name="New Material")
+            mat = bpy.data.materials.new(name=f"{self.group_name} Material")
             ps_ctx.ps_object.active_material = mat
         ps_ctx = self.parse_context(context)
         mat = ps_ctx.active_material
@@ -135,11 +136,11 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         if self.set_view_transform:
             context.scene.view_settings.view_transform = 'Standard'
         
-        node_tree = bpy.data.node_groups.new(name=self.group_name, type='ShaderNodeTree')
+        node_tree = bpy.data.node_groups.new(name=f"Temp Group Name", type='ShaderNodeTree')
         ps_mat_data = ps_ctx.ps_mat_data
         lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
         new_group = lm.add_item()
-        # new_group.name = self.group_name
+        new_group.name = self.group_name
         new_group.node_tree = node_tree
         new_group.update_node_tree(context)
         new_group.template = self.template
@@ -273,6 +274,11 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         return {'FINISHED'}
     
     def invoke(self, context, event):
+        ps_ctx = self.parse_context(context)
+        if ps_ctx.ps_mat_data and ps_ctx.ps_mat_data.groups:
+            self.group_name = get_next_unique_name(self.group_name, [group.name for group in ps_ctx.ps_mat_data.groups])
+        else:
+            self.group_name = "New Group"
         self.get_coord_type(context)
         return context.window_manager.invoke_props_dialog(self, width=300)
     

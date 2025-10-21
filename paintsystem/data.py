@@ -292,7 +292,10 @@ class MarkerAction(PropertyGroup):
 class GlobalLayer(PropertyGroup):
             
     def update_node_tree(self, context):
-        self.node_tree.name = f".PS_Layer ({self.name})"
+        if not self.node_tree:
+            return
+        if self.layer_name:
+            self.node_tree.name = f".PS_Layer ({self.layer_name})"
         
         match self.type:
             case "IMAGE":
@@ -350,18 +353,12 @@ class GlobalLayer(PropertyGroup):
             
     def update_layer_name(self, context):
         """Update the layer name to ensure uniqueness."""
-        if self.updating_name_flag:
-            return
-        self.updating_name_flag = True
-        try:
-            new_name = get_next_unique_name(self.name, [layer.name for layer in context.scene.ps_scene_data.layers if layer != self])
-            if new_name != self.name:
-                self.name = new_name
-
-        finally:
-            # Always unset the flag when done, even if errors occur
-            self.update_node_tree(context)
-            self.updating_name_flag = False
+        new_name = get_next_unique_name(self.layer_name, [layer.layer_name for layer in context.scene.ps_scene_data.layers if layer != self])
+        if new_name != self.layer_name:
+            self.layer_name = new_name
+        if self.image:
+            print(f"Updating image name to {self.layer_name}")
+            self.image.name = self.layer_name
     
     def update_camera_plane(self, context):
         ps_ctx = parse_context(context)
@@ -435,12 +432,11 @@ class GlobalLayer(PropertyGroup):
     
     name: StringProperty()
     
-    # name: StringProperty(
-    #     name="Name",
-    #     description="Layer name",
-    #     default="Layer",
-    #     update=update_layer_name
-    # )
+    layer_name: StringProperty(
+        name="Name",
+        description="Layer name",
+        update=update_layer_name
+    )
     updating_name_flag: bpy.props.BoolProperty(
         default=False, 
         options={'SKIP_SAVE'} # Don't save this flag in the .blend file
@@ -821,7 +817,7 @@ class Channel(BaseNestedListManager):
         self.updating_name_flag = False
         update_active_group(self, context)
     
-    def add_global_layer_to_channel(self, global_layer: GlobalLayer, layer_name: str) -> Layer:
+    def add_global_layer_to_channel(self, global_layer: GlobalLayer) -> Layer:
         parent_id, insert_order = self.get_insertion_data()
         # Adjust existing items' order
         self.adjust_sibling_orders(parent_id, insert_order)
@@ -832,7 +828,6 @@ class Channel(BaseNestedListManager):
                 order=insert_order
             )
         layer.ref_layer_id = global_layer.name
-        layer.name = layer_name
         # Update active index
         new_id = layer.id
         if new_id != -1:
@@ -1078,6 +1073,18 @@ class Group(PropertyGroup):
         if not self.node_tree:
             return
         node_tree = self.node_tree
+        mat = None
+        # Get the material that contains this group
+        for material in bpy.data.materials:
+            if material.ps_mat_data and material.ps_mat_data.groups:
+                for group in material.ps_mat_data.groups:
+                    if group.node_tree == node_tree:
+                        mat = material
+                        break
+        if mat:
+            node_tree.name = f"{self.name} ({mat.name})"
+        else:
+            node_tree.name = f"{self.name} (None)"
         # node_tree.name = f"Paint System ({self.name})"
         if not isinstance(node_tree, bpy.types.NodeTree):
             return
@@ -1191,11 +1198,12 @@ class Group(PropertyGroup):
                 node_builder.link(channel_name, "group_output", "Alpha", c_alpha_name)
         node_builder.compile()
     
-    # name: StringProperty(
-    #     name="Name",
-    #     description="Group name",
-    #     default="Paint System (Group)"
-    # )
+    name: StringProperty(
+        name="Name",
+        description="Group name",
+        default="New Group",
+        update=update_node_tree
+    )
     channels: CollectionProperty(
         type=Channel,
         name="Channels",

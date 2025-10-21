@@ -124,7 +124,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             draw_global_layer_icon(global_item, row)
 
             row = main_row.row(align=True)
-            row.prop(item, "name", text="", emboss=False)
+            row.prop(global_item, "layer_name", text="", emboss=False)
             # if global_item.mask_image:
             #     row.prop(global_item, "enable_mask",
             #              icon='MOD_MASK' if global_item.enable_mask else 'MATPLANE', text="", emboss=False)

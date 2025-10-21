@@ -42,12 +42,26 @@ def load_post(scene):
     ps_ctx = parse_context(bpy.context)
     if not ps_ctx.ps_scene_data:
         return
+    layers = {}
     # Layer Versioning
     for global_layer in ps_ctx.ps_scene_data.layers:
         target_version = get_layer_version_for_type(global_layer.type)
         if get_nodetree_version(global_layer.node_tree) != target_version:
             print(f"Updating layer {global_layer.name} to version {target_version}")
             global_layer.update_node_tree(bpy.context)
+        if global_layer.name and not global_layer.layer_name:
+            if not layers:
+                for mat in bpy.data.materials:
+                    if hasattr(mat, 'ps_mat_data'):
+                        for group in mat.ps_mat_data.groups:
+                            for channel in group.channels:
+                                for layer in channel.layers:
+                                    layers[layer.ref_layer_id] = layer
+            name = global_layer.name
+            # Transfer layer name to global_layer layer_name
+            global_layer.layer_name = layers[name].name
+            print(f"Copying layer name {layers[name].name} to {global_layer.name}")
+            
     print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers)} layers in {round((time.time() - start_time) * 1000, 2)} ms")
 
 @bpy.app.handlers.persistent
