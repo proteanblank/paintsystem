@@ -690,18 +690,19 @@ class Channel(BaseNestedListManager):
             self.node_tree.interface.new_socket("Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
             self.node_tree.interface.new_socket("Color", in_out="INPUT", socket_type="NodeSocketColor")
             self.node_tree.interface.new_socket("Alpha", in_out="INPUT", socket_type="NodeSocketFloat")
-        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200, clear=True)
+        node_builder = NodeTreeBuilder(self.node_tree, frame_name="Channel Graph", node_width=200)
         node_builder.add_node("group_input", "NodeGroupInput")
         node_builder.add_node("group_output", "NodeGroupOutput")
         
-        if self.use_bake_image:
+        if self.bake_image:
             node_builder.add_node("uv_map", "ShaderNodeUVMap", {"uv_map": self.bake_uv_map})
             node_builder.add_node("bake_image", "ShaderNodeTexImage", {"image": self.bake_image})
             node_builder.link("uv_map", "bake_image", "UV", "Vector")
-            node_builder.link("bake_image", "group_output", "Color", "Color")
-            node_builder.link("bake_image", "group_output", "Alpha", "Alpha")
-            node_builder.compile()
-            return
+            if self.use_bake_image:
+                node_builder.link("bake_image", "group_output", "Color", "Color")
+                node_builder.link("bake_image", "group_output", "Alpha", "Alpha")
+                node_builder.compile()
+                return
         
         flattened_layers = self.flatten_hierarchy()
         @dataclass
@@ -737,7 +738,7 @@ class Channel(BaseNestedListManager):
                     # print("Skipping layer: ", layer.name, " because it is attached to camera plane and the channel is not a camera plane channel")
                     continue
                 layer_identifier = global_layer.name
-                node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree}, {"Clip": global_layer.is_clip})
+                node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": global_layer.node_tree}, {"Clip": global_layer.is_clip}, force_default_values=True)
                 # match global_layer.type:
                 #     case "IMAGE":
                 #         layer_name = layer.name
