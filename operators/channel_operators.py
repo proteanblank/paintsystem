@@ -76,7 +76,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         channels = ps_ctx.active_group.channels
-        node_tree = bpy.data.node_groups.new(name=f"PS_Channel ({self.channel_name})", type='ShaderNodeTree')
+        node_tree = bpy.data.node_groups.new(name=f"Temp Channel Name", type='ShaderNodeTree')
         new_channel = channels.add()
         ps_ctx.active_group.active_index = len(channels) - 1
         unique_name = self.get_unique_channel_name(context)

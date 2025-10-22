@@ -763,6 +763,7 @@ class Channel(BaseNestedListManager):
     def update_node_tree(self, context):
         if not self.node_tree:
             return
+        self.node_tree.name = f"PS {self.name}"
         if len(self.node_tree.interface.items_tree) == 0:
             self.node_tree.interface.new_socket("Color", in_out="OUTPUT", socket_type="NodeSocketColor")
             self.node_tree.interface.new_socket("Alpha", in_out="OUTPUT", socket_type="NodeSocketFloat")
@@ -1155,9 +1156,9 @@ class Group(PropertyGroup):
                         mat = material
                         break
         if mat:
-            node_tree.name = f"{self.name} ({mat.name})"
+            node_tree.name = f"PS {self.name} ({mat.name})"
         else:
-            node_tree.name = f"{self.name} (None)"
+            node_tree.name = f"PS {self.name} (None)"
         # node_tree.name = f"Paint System ({self.name})"
         if not isinstance(node_tree, bpy.types.NodeTree):
             return

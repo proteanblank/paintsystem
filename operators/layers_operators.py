@@ -449,7 +449,7 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
     def get_node_groups(self, context: Context):
         node_groups = []
         for node_group in bpy.data.node_groups:
-            if node_group.bl_idname == 'ShaderNodeTree' and not node_group.name.startswith(".PS") and not node_group.name.startswith("Paint System") and not node_group.name.startswith("PS_"):
+            if node_group.bl_idname == 'ShaderNodeTree' and not node_group.name.startswith(".PS") and not node_group.name.startswith("Paint System") and not node_group.name.startswith("PS "):
                 node_groups.append((node_group.name, node_group.name, ""))
         return node_groups
     
