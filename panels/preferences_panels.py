@@ -14,6 +14,11 @@ class PaintSystemPreferences(AddonPreferences):
         description="Show tooltips in the UI",
         default=True
     )
+    show_hex_color: BoolProperty(
+        name="Show Hex Color",
+        description="Show hex color in the color picker settings",
+        default=False
+    )
 
     use_compact_design: BoolProperty(
         name="Use Compact Design",

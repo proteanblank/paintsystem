@@ -155,6 +155,7 @@ class MAT_PT_BrushColorSettings(PSContextMixin, Panel):
         ps_ctx = self.parse_context(context)
         layout.prop(context.preferences.view, "color_picker_type", text="")
         layout.prop(ps_ctx.ps_settings, "color_picker_scale", text="Color Picker Scale", slider=True)
+        layout.prop(ps_ctx.ps_settings, "show_hex_color", text="Show Hex Color")
 
 class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
     bl_idname = 'MAT_PT_BrushColor'
@@ -231,8 +232,9 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
                 col.prop(ps_ctx.ps_scene_data, "hue", text="Hue")
             col.prop(ps_ctx.ps_scene_data, "saturation", text="Saturation")
             col.prop(ps_ctx.ps_scene_data, "value", text="Value")
-            row = col.row()
-            row.prop(ps_ctx.ps_scene_data, "hex_color", text="Hex")
+            if ps_ctx.ps_settings.show_hex_color:
+                row = col.row()
+                row.prop(ps_ctx.ps_scene_data, "hex_color", text="Hex")
             if is_newer_than(4,5):
                 from bl_ui.properties_paint_common import color_jitter_panel
                 color_jitter_panel(col, context, brush)
