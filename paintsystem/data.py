@@ -375,6 +375,8 @@ class GlobalLayer(PropertyGroup):
         
         match self.type:
             case "IMAGE":
+                if self.image:
+                    self.image.name = self.layer_name
                 layer_graph = create_image_graph(self)
             case "FOLDER":
                 layer_graph = create_folder_graph(self)
@@ -426,15 +428,14 @@ class GlobalLayer(PropertyGroup):
             layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
         layer_graph.compile()
         update_active_image(self, context)
-            
+    
+    # Not used anymore
     def update_layer_name(self, context):
         """Update the layer name to ensure uniqueness."""
         new_name = get_next_unique_name(self.layer_name, [layer.layer_name for layer in context.scene.ps_scene_data.layers if layer != self])
         if new_name != self.layer_name:
             self.layer_name = new_name
-        if self.image:
-            print(f"Updating image name to {self.layer_name}")
-            self.image.name = self.layer_name
+        self.update_node_tree(context)
     
     def update_camera_plane(self, context):
         ps_ctx = parse_context(context)
@@ -511,7 +512,7 @@ class GlobalLayer(PropertyGroup):
     layer_name: StringProperty(
         name="Name",
         description="Layer name",
-        update=update_layer_name
+        update=update_node_tree
     )
     updating_name_flag: bpy.props.BoolProperty(
         default=False, 
