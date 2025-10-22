@@ -103,15 +103,15 @@ class MAT_PT_PaintSystemMaterialSettings(PSContextMixin, Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         layout.prop(mat, "surface_render_method", text="Render Method")
-        if mat:
-            if ps_ctx.ps_mat_data and ps_ctx.ps_mat_data.groups:
-                box = layout.box()
-                box.label(text=f"Paint System Groups:", icon_value=get_icon("sunflower"))
-                row = box.row(align=True)
-                scale_content(context, row, 1.2, 1.2)
-                row.popover("MAT_PT_PaintSystemGroups", text=ps_ctx.active_group.name, icon="NODETREE")
-                row.operator("paint_system.new_group", icon='ADD', text="")
-                row.operator("paint_system.delete_group", icon='REMOVE', text="")
+        layout.prop(mat, "use_backface_culling", text="Backface Culling")
+        if ps_ctx.ps_mat_data and ps_ctx.ps_mat_data.groups:
+            box = layout.box()
+            box.label(text=f"Paint System Groups:", icon_value=get_icon("sunflower"))
+            row = box.row(align=True)
+            scale_content(context, row, 1.2, 1.2)
+            row.popover("MAT_PT_PaintSystemGroups", text=ps_ctx.active_group.name, icon="NODETREE")
+            row.operator("paint_system.new_group", icon='ADD', text="")
+            row.operator("paint_system.delete_group", icon='REMOVE', text="")
 
 class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_PaintSystemMainPanel'
