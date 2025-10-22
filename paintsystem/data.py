@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, List
+import re
 
 import bpy
 from bpy.app.handlers import persistent
@@ -25,6 +26,7 @@ from bpy.types import (
 from bpy.utils import register_classes_factory
 from bpy_extras.node_utils import connect_sockets
 from typing import Optional
+from mathutils import Color
 
 # ---
 from ..custom_icons import get_icon
@@ -261,6 +263,79 @@ def get_paint_system_collection(context: bpy.types.Context) -> bpy.types.Collect
     else:
         collection = view_layer.layer_collection.collection.children["Paint System Collection"]
     return collection
+
+def blender_color_to_srgb_hex(color: Color):
+    """
+    Converts a Blender Color property (Linear R, G, B floats 0.0-1.0) 
+    to the corresponding sRGB color, and then to an 8-character hex string (#RRGGBB).
+    """
+    
+    # 3. Convert the sRGB floats to 0-255 integers
+    r = int(color.r * 255)
+    g = int(color.g * 255)
+    b = int(color.b * 255)
+    
+    # 4. Format and return
+    return "#{:02x}{:02x}{:02x}".format(r, g, b).upper()
+
+
+HEX_PATTERN = re.compile(r'^[0-9a-fA-F]{6}$')
+
+def _is_valid_hex_code(hex_str_6char):
+    """
+    Checks if a cleaned 6-character string is a valid hex code using regex.
+    """
+    return HEX_PATTERN.match(hex_str_6char) is not None
+
+
+def hex_string_to_blender_color(hex_string):
+    """
+    Converts a hex string (e.g., #A3F5B4 or A3F5B4) into a Blender 
+    (R, G, B) float tuple (linear color space).
+
+    If the string is invalid, returns White (1.0, 1.0, 1.0).
+
+    Args:
+        hex_string (str): The input string to check.
+
+    Returns:
+        tuple: (R, G, B) float values in linear color space.
+    """
+    
+    # Define the default return color (White)
+    WHITE_COLOR = (1.0, 1.0, 1.0)
+    
+    # 1. Cleanup the input string (remove optional hash prefix)
+    cleaned_hex = hex_string.lstrip('#')
+    
+    # 2. Validation Check
+    if not _is_valid_hex_code(cleaned_hex):
+        print(f"Warning: Invalid hex code received: {hex_string}. Returning white.")
+        return WHITE_COLOR
+        
+    # --- If Valid, proceed to conversion ---
+    
+    try:
+        # 3. Parse components (convert RR, GG, BB from base 16 to base 10)
+        r = int(cleaned_hex[0:2], 16)
+        g = int(cleaned_hex[2:4], 16)
+        b = int(cleaned_hex[4:6], 16)
+
+        # 4. Normalize to 0.0 - 1.0 float values (treating input as sRGB)
+        r_norm = r / 255.0
+        g_norm = g / 255.0
+        b_norm = b / 255.0
+
+        # 5. Convert from sRGB (the standard hex space) to Linear (Blender space)
+        # We must use mathutils.Color for accurate color space conversion
+        linear_color = Color((r_norm, g_norm, b_norm))
+        
+        # 6. Return as a standard tuple
+        return (linear_color.r, linear_color.g, linear_color.b)
+
+    except ValueError:
+        # Failsafe for any unexpected parsing error during int() conversion
+        return WHITE_COLOR
 
 class MarkerAction(PropertyGroup):
     action_bind: EnumProperty(
@@ -1249,6 +1324,32 @@ class Group(PropertyGroup):
 
 class PaintSystemGlobalData(PropertyGroup):
     """Custom data for the Paint System"""
+    
+    def get_brush_color(self, context):
+        settings = context.tool_settings.image_paint
+        brush = settings.brush
+        if hasattr(context.tool_settings, "unified_paint_settings"):
+            ups = context.tool_settings.unified_paint_settings
+        else:
+            ups = settings.unified_paint_settings
+        prop_owner = ups if ups.use_unified_color else brush
+        return prop_owner.color
+    
+    def update_unified_color(self, context):
+        brush_color = self.get_brush_color(context)
+        if brush_color.hsv != (self.hue, self.saturation, self.value):
+            brush_color.hsv = (self.hue, self.saturation, self.value)
+    
+    def update_hex_color(self, context):
+        brush_color = self.get_brush_color(context)
+        brush_color_hex = blender_color_to_srgb_hex(brush_color)
+        if brush_color_hex != self.hex_color:
+            color = hex_string_to_blender_color(self.hex_color)
+            brush_color.r = color[0]
+            brush_color.g = color[1]
+            brush_color.b = color[2]
+    
+    
     clipboard_layers: CollectionProperty(
         type=Layer,
         name="Clipboard Layers",
@@ -1276,6 +1377,39 @@ class PaintSystemGlobalData(PropertyGroup):
     last_selected_material: PointerProperty(
         name="Last Selected Material",
         type=Material
+    )
+    hue: FloatProperty(
+        name="Hue",
+        description="Hue of the brush",
+        default=0.0,
+        update=update_unified_color,
+        min=0.0,
+        max=1.0,
+        subtype='FACTOR'
+    )
+    saturation: FloatProperty(
+        name="Saturation",
+        description="Saturation of the brush",
+        default=0.0,
+        update=update_unified_color,
+        min=0.0,
+        max=1.0,
+        subtype='FACTOR'
+    )
+    value: FloatProperty(
+        name="Value",
+        description="Value of the brush",
+        default=0.0,
+        update=update_unified_color,
+        min=0.0,
+        max=1.0,
+        subtype='FACTOR'
+    )
+    hex_color: StringProperty(
+        name="Hex Color",
+        description="Hex color of the brush",
+        default="#000000",
+        update=update_hex_color,
     )
 
 class MaterialData(PropertyGroup):

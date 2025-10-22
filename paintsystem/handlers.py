@@ -144,6 +144,31 @@ def on_addon_enable():
     load_post(bpy.context.scene)
 
 
+owner = object()
+
+def brush_color_callback(*args):
+    context = bpy.context
+    settings = context.tool_settings.image_paint
+    brush = settings.brush
+    if hasattr(context.tool_settings, "unified_paint_settings"):
+        ups = context.tool_settings.unified_paint_settings
+    else:
+        ups = settings.unified_paint_settings
+    prop_owner = ups if ups.use_unified_color else brush
+    # Store color to context.ps_scene_data.hsv_color
+    hsv = prop_owner.color.hsv
+    if hsv != (context.scene.ps_scene_data.hue, context.scene.ps_scene_data.saturation, context.scene.ps_scene_data.value):
+        context.scene.ps_scene_data.hue = hsv[0]
+        context.scene.ps_scene_data.saturation = hsv[1]
+        context.scene.ps_scene_data.value = hsv[2]
+        color = prop_owner.color
+        r = int(color[0] * 255)
+        g = int(color[1] * 255)
+        b = int(color[2] * 255)
+        hex_color = "#{:02x}{:02x}{:02x}".format(r, g, b).upper()
+        context.scene.ps_scene_data.hex_color = hex_color
+
+
 def register():
     bpy.app.handlers.frame_change_pre.append(frame_change_pre)
     bpy.app.handlers.load_post.append(load_post)
@@ -154,7 +179,21 @@ def register():
     else:
         bpy.app.handlers.depsgraph_update_post.append(paint_system_object_update)
     bpy.app.timers.register(on_addon_enable, first_interval=0.1)
+    bpy.msgbus.subscribe_rna(
+        key=(bpy.types.UnifiedPaintSettings, "color"),
+        owner=owner,
+        args=(None,),
+        notify=brush_color_callback,
+    )
+    bpy.msgbus.subscribe_rna(
+        key=(bpy.types.Brush, "color"),
+        owner=owner,
+        args=(None,),
+        notify=brush_color_callback,
+    )
+
 def unregister():
+    bpy.msgbus.clear_by_owner(owner)
     bpy.app.handlers.frame_change_pre.remove(frame_change_pre)
     bpy.app.handlers.load_post.remove(load_post)
     bpy.app.handlers.save_pre.remove(save_handler)

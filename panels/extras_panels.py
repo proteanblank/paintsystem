@@ -227,6 +227,12 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
             row = col.row()
             row.scale_y = ps_ctx.ps_settings.color_picker_scale
             self.prop_unified_color_picker(row, context, brush, "color", value_slider=True)
+            if not context.preferences.view.color_picker_type == "SQUARE_SV":
+                col.prop(ps_ctx.ps_scene_data, "hue", text="Hue")
+            col.prop(ps_ctx.ps_scene_data, "saturation", text="Saturation")
+            col.prop(ps_ctx.ps_scene_data, "value", text="Value")
+            row = col.row()
+            row.prop(ps_ctx.ps_scene_data, "hex_color", text="Hex")
             if is_newer_than(4,5):
                 from bl_ui.properties_paint_common import color_jitter_panel
                 color_jitter_panel(col, context, brush)
