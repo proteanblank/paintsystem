@@ -616,7 +616,7 @@ class GlobalLayer(PropertyGroup):
         name="Lock Layer",
         description="Lock the layer",
         default=False,
-        # update=update_active_image
+        update=update_active_image
     )
     node_tree: PointerProperty(
         name="Node Tree",
