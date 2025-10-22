@@ -689,9 +689,9 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
     def draw(self, context):
         ps_ctx = self.parse_context(context)
         layout = self.layout
-        active_layer = ps_ctx.active_layer
+        global_layer = ps_ctx.active_global_layer
         layout.label(
-            text=f"Delete '{active_layer.name}' ?", icon='ERROR')
+            text=f"Delete '{global_layer.layer_name}' ?", icon='ERROR')
         layout.label(
             text="Click OK to delete, or cancel to keep the layer")
 

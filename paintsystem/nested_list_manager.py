@@ -93,6 +93,23 @@ class BaseNestedListManager(PropertyGroup):
         self.next_id += 1
         self.normalize_orders()
         return new_item
+    
+    def get_children(self, parent_id):
+        children = []
+        for item in getattr(self, self.collection_name):
+            if item.parent_id == parent_id:
+                children.append(item)
+                if item.type == 'FOLDER':
+                    children.extend(self.get_children(item.id))
+        return children
+    
+    def remove_children(self, item_id):
+        item = self.get_item_by_id(item_id)
+        if item:
+            children = self.get_children(item_id)
+            collection = getattr(self, self.collection_name)
+            for child in sorted(children, key=lambda x: collection.find(x.name), reverse=True):
+                collection.remove(collection.find(child.name))
 
     def remove_item_and_children(self, item_id, on_delete=None):
         """Remove an item and all its children"""
@@ -238,18 +255,18 @@ class BaseNestedListManager(PropertyGroup):
                 # Special case: If the above item is the parent folder
                 if above_item.id == item.parent_id:
                     options.append(
-                        ('MOVE_OUT', f"Move out of '{above_item.name}'"))
+                        ('MOVE_OUT', f"Move out of '{self.get_item_name(above_item)}'"))
                     return options  # Only show this option in this case
 
                 # Normal cases
                 if above_item.type == 'FOLDER':
                     options.append(
-                        ('MOVE_INTO', f"Move into '{above_item.name}'"))
+                        ('MOVE_INTO', f"Move into '{self.get_item_name(above_item)}'"))
                 if above_item.parent_id != item.parent_id:
                     parent = self.get_item_by_id(above_item.parent_id)
                     parent_name = parent.name if parent else "root"
                     options.append(
-                        ('MOVE_ADJACENT', f"Move into '{parent_name}'"))
+                        ('MOVE_ADJACENT', f"Move into '{self.get_item_name(parent)}'"))
                 options.append(('SKIP', "Skip over"))
 
             # Check if at top of current parent
@@ -259,7 +276,7 @@ class BaseNestedListManager(PropertyGroup):
                 parent = self.get_item_by_id(item.parent_id)
                 if parent:
                     options.append(
-                        ('MOVE_OUT', f"Move out of '{parent.name}'"))
+                        ('MOVE_OUT', f"Move out of '{self.get_item_name(parent)}'"))
 
         else:  # DOWN
             # Get next sibling item (skipping folder contents if necessary)
@@ -271,19 +288,22 @@ class BaseNestedListManager(PropertyGroup):
                     parent = self.get_item_by_id(item.parent_id)
                     if parent:
                         options.append(
-                            ('MOVE_OUT_BOTTOM', f"Move out of '{parent.name}'"))
+                            ('MOVE_OUT_BOTTOM', f"Move out of '{self.get_item_name(parent)}'"))
             else:
                 if next_item.type == 'FOLDER':
                     options.append(
-                        ('MOVE_INTO_TOP', f"Move into '{next_item.name}'"))
+                        ('MOVE_INTO_TOP', f"Move into '{self.get_item_name(next_item)}'"))
                 if next_item.parent_id != item.parent_id:
                     parent = self.get_item_by_id(next_item.parent_id)
                     parent_name = parent.name if parent else "root"
                     options.append(
-                        ('MOVE_ADJACENT', f"Move into '{parent_name}'"))
+                        ('MOVE_ADJACENT', f"Move into '{self.get_item_name(parent)}'"))
                 options.append(('SKIP', "Skip over"))
 
         return options
+    
+    def get_item_name(self, item):
+        return item.name if item else "root"
 
     def get_movement_menu_items(self, item_id, direction):
         """

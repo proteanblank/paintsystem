@@ -403,17 +403,20 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
     def execute(self, context):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
+        active_layer = ps_ctx.active_layer
         active_global_layer = ps_ctx.active_global_layer
         if not active_channel:
             return {'CANCELLED'}
         
         image = self.create_image()
         
+        children = active_channel.get_children(active_layer.id)
+        
         to_be_enabled_layers = []
         # Ensure all layers are disabled except the active layer
         for layer in active_channel.layers:
             global_layer = get_global_layer(layer)
-            if global_layer.enabled and global_layer != active_global_layer:
+            if global_layer.type != "FOLDER" and global_layer.enabled and global_layer != active_global_layer and layer not in children:
                 to_be_enabled_layers.append(global_layer)
                 global_layer.enabled = False
         original_blend_mode = get_blend_type(active_global_layer)
@@ -426,6 +429,7 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
         active_global_layer.image = image
         for layer in to_be_enabled_layers:
             layer.enabled = True
+        active_channel.remove_children(active_layer.id)
         return {'FINISHED'}
 
 

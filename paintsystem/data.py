@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, List
 import re
+import numpy as np
 
 import bpy
 from bpy.app.handlers import persistent
@@ -755,6 +756,9 @@ def ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu=True):
 class Channel(BaseNestedListManager):
     """Custom data for material layers in the Paint System"""
     
+    def get_item_name(self, item):
+        return get_global_layer(item).layer_name if item else "root"
+    
     def update_node_tree(self, context):
         if not self.node_tree:
             return
@@ -981,22 +985,12 @@ class Channel(BaseNestedListManager):
         temp_alpha_image = ps_bake(context, obj, mat, uv_layer, temp_alpha_image, use_gpu)
 
         if bake_image and temp_alpha_image:
-            # Get pixel data
-            image_pixels = bake_image.pixels[:]
-            alpha_pixels = temp_alpha_image.pixels[:]
-            
-            # Create a new pixel array
-            new_pixels = list(image_pixels)
-            
-            # Apply red channel of alpha image to alpha channel of main image
-            for i in range(0, len(image_pixels), 4):
-                # Get the red channel value from alpha image (every 4 values)
-                alpha_value = alpha_pixels[i]  # Red channel
-                # Set the alpha channel of the main image (index + 3)
-                new_pixels[i + 3] = alpha_value
-            
-            # Update the image with the new pixel data
-            bake_image.pixels = new_pixels
+            pixels_bake = np.empty(len(bake_image.pixels), dtype=np.float32)
+            pixels_temp_alpha = np.empty(len(temp_alpha_image.pixels), dtype=np.float32)
+            bake_image.pixels.foreach_get(pixels_bake)
+            temp_alpha_image.pixels.foreach_get(pixels_temp_alpha)
+            pixels_bake[3::4] = pixels_temp_alpha[1::4]
+            bake_image.pixels.foreach_set(pixels_bake)
             bake_image.update()
             bake_image.pack()
         bpy.data.images.remove(temp_alpha_image)
