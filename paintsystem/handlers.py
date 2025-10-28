@@ -148,6 +148,8 @@ owner = object()
 
 def brush_color_callback(*args):
     context = bpy.context
+    if context.mode != 'PAINT_TEXTURE':
+        return
     settings = context.tool_settings.image_paint
     brush = settings.brush
     if hasattr(context.tool_settings, "unified_paint_settings"):
@@ -187,6 +189,12 @@ def register():
     )
     bpy.msgbus.subscribe_rna(
         key=(bpy.types.Brush, "color"),
+        owner=owner,
+        args=(None,),
+        notify=brush_color_callback,
+    )
+    bpy.msgbus.subscribe_rna(
+        key=(bpy.types.Object, "mode"),
         owner=owner,
         args=(None,),
         notify=brush_color_callback,
