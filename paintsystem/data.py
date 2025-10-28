@@ -50,7 +50,7 @@ from .graph import (
     create_texture_graph,
     create_geometry_graph,
 )
-from .graph.common import get_library_object
+from .graph.common import get_library_object, DEFAULT_PS_UV_MAP_NAME
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 
 TEMPLATE_ENUM = [
@@ -198,8 +198,8 @@ def update_active_image(self=None, context: bpy.types.Context = None):
     if global_layer.coord_type == 'UV' or global_layer.attached_to_camera_plane:
         if global_layer.uv_map_name and obj.data.uv_layers.get(global_layer.uv_map_name):
             obj.data.uv_layers[global_layer.uv_map_name].active = True
-    elif global_layer.coord_type == 'AUTO' and obj.data.uv_layers.get("PS_UVMap"):
-        obj.data.uv_layers["PS_UVMap"].active = True
+    elif global_layer.coord_type == 'AUTO' and obj.data.uv_layers.get(DEFAULT_PS_UV_MAP_NAME):
+        obj.data.uv_layers[DEFAULT_PS_UV_MAP_NAME].active = True
 
     if not global_layer.attached_to_camera_plane:
         context.view_layer.objects.active = obj
@@ -566,7 +566,7 @@ class GlobalLayer(PropertyGroup):
         items=COORDINATE_TYPE_ENUM,
         name="Coordinate Type",
         description="Coordinate type",
-        default='AUTO',
+        default='UV',
         update=update_node_tree
     )
     uv_map_name: StringProperty(
@@ -1292,7 +1292,7 @@ class Group(PropertyGroup):
         items=COORDINATE_TYPE_ENUM,
         name="Coordinate Type",
         description="Coordinate type",
-        default='AUTO'
+        default='UV'
     )
     uv_map_name: StringProperty(
         name="UV Map",

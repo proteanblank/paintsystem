@@ -16,7 +16,7 @@ from ..utils.nodes import find_node, get_material_output
 from ..utils.version import is_newer_than
 from ..utils.unified_brushes import get_unified_settings
 from .brushes import get_brushes_from_library
-from .common import MultiMaterialOperator, PSContextMixin
+from .common import MultiMaterialOperator, PSContextMixin, DEFAULT_PS_UV_MAP_NAME
 from .operators_utils import redraw_panel
 
 from bl_ui.properties_paint_common import (
@@ -165,7 +165,7 @@ class PAINTSYSTEM_OT_CreatePaintSystemUVMap(PSContextMixin, Operator):
         # Get the active object
         ps_object = self.parse_context(context).ps_object
         
-        if ps_object.data.uv_layers.get("PS_UVMap"):
+        if ps_object.data.uv_layers.get(DEFAULT_PS_UV_MAP_NAME):
             return {'FINISHED'}
 
         # Deselect all objects
@@ -180,7 +180,7 @@ class PAINTSYSTEM_OT_CreatePaintSystemUVMap(PSContextMixin, Operator):
         bpy.ops.mesh.select_all(action='SELECT')
         # Apply to only the active object
         uv_layers = ps_object.data.uv_layers
-        uvmap = uv_layers.new(name="PS_UVMap")
+        uvmap = uv_layers.new(name=DEFAULT_PS_UV_MAP_NAME)
         ps_object.data.uv_layers.active = uvmap
         bpy.ops.uv.smart_project(angle_limit=30/180*math.pi, island_margin=0.005)
         bpy.ops.object.mode_set(mode=original_mode)

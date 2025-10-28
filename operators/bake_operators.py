@@ -3,7 +3,7 @@ from bpy.types import Operator
 from bpy.utils import register_classes_factory
 from bpy.props import StringProperty, BoolProperty
 
-from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin
+from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin, DEFAULT_PS_UV_MAP_NAME
 
 from ..paintsystem.data import get_global_layer, set_blend_type, get_blend_type
 from ..panels.common import get_icon_from_channel
@@ -23,8 +23,8 @@ class BakeOperator(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixin, Operato
         """Invoke the operator to create a new channel."""
         ps_ctx = self.parse_context(context)
         self.get_coord_type(context)
-        if self.coord_type == 'AUTO':
-            self.uv_map = "PS_UVMap"
+        if self.use_paint_system_uv:
+            self.uv_map = DEFAULT_PS_UV_MAP_NAME
         else:
             self.uv_map = self.uv_map_name
         self.image_name = f"{ps_ctx.active_group.name}_{ps_ctx.active_channel.name}"
@@ -387,8 +387,8 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
     
     def invoke(self, context, event):
         self.get_coord_type(context)
-        if self.coord_type == 'AUTO':
-            self.uv_map = "PS_UVMap"
+        if self.use_paint_system_uv:
+            self.uv_map = DEFAULT_PS_UV_MAP_NAME
         else:
             self.uv_map = self.uv_map_name
         return context.window_manager.invoke_props_dialog(self)
@@ -471,8 +471,8 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         self.get_coord_type(context)
         below_layer = self.get_below_layer(context)
         below_global_layer = get_global_layer(below_layer)
-        if below_global_layer.coord_type == 'AUTO':
-            self.uv_map = "PS_UVMap"
+        if below_global_layer.use_paint_system_uv:
+            self.uv_map = DEFAULT_PS_UV_MAP_NAME
         else:
             self.uv_map = below_global_layer.uv_map_name
         if below_global_layer.type == "IMAGE":

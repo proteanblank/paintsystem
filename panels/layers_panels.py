@@ -349,7 +349,12 @@ class MAT_PT_Layers(PSContextMixin, Panel):
 
             if active_channel.use_bake_image:
                 image_node = find_node(active_channel.node_tree, {'bl_idname': 'ShaderNodeTexImage', 'image': active_channel.bake_image})
-                image_node_settings(box, image_node, active_channel, "bake_image", text="Baked Image", icon="TEXTURE_DATA")
+                bake_box = box.box()
+                col = bake_box.column()
+                col.label(text="Baked Image", icon="TEXTURE_DATA")
+                col.operator("wm.call_menu", text="Apply Image Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
+                col.operator("paint_system.delete_bake_image", text="Delete", icon="TRASH")
+                image_node_settings(box, image_node, active_channel, "bake_image")
                 return
 
             # if active_layer.mask_image:

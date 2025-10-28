@@ -7,6 +7,7 @@ from .nodetree_builder import NodeTreeBuilder
 import bpy
 
 LIBRARY_FILENAME = "library2.blend"
+DEFAULT_PS_UV_MAP_NAME = "PS_UVMap"
 
 
 def _resolve_library_path(filename: str = LIBRARY_FILENAME) -> Path:
@@ -112,7 +113,7 @@ def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str = None, c
 def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: str, node_name: str, socket_name: str) -> NodeTreeBuilder:
     builder.add_node("mapping", "ShaderNodeMapping")
     if coord_type == "AUTO":
-        builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": "PS_UVMap"}, force_properties=True)
+        builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": DEFAULT_PS_UV_MAP_NAME}, force_properties=True)
         builder.link("uvmap", "mapping", "UV", "Vector")
         builder.link("mapping", node_name, "Vector", socket_name)
     elif coord_type == "UV":

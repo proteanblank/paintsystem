@@ -297,7 +297,10 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
                 self.report({'WARNING'}, f"Brush texture not found: {self.brush_texture_path}")
         
         new_image = painter.apply_brush_painting(image, brush_folder_path=brush_folder_path, brush_texture_path=brush_texture_path)
-        ps_ctx.active_global_layer.image = new_image
+        if ps_ctx.active_channel.use_bake_image:
+            ps_ctx.active_channel.bake_image = new_image
+        else:
+            ps_ctx.active_global_layer.image = new_image
         return {'FINISHED'}
     
     def invoke(self, context, event):

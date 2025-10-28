@@ -7,6 +7,8 @@ from ..utils.unified_brushes import get_unified_settings
 from bpy.types import Operator, Context
 from bpy.props import BoolProperty, EnumProperty, StringProperty
 
+from ..paintsystem.graph.common import DEFAULT_PS_UV_MAP_NAME
+
 icons = bpy.types.UILayout.bl_rna.functions["prop"].parameters["icon"].enum_items.keys()
 
 def icon_parser(icon: str, default="NONE") -> str:
@@ -80,10 +82,28 @@ class MultiMaterialOperator(Operator):
 
 
 class PSUVOptionsMixin():
+    
+    def update_use_paint_system_uv(self, context):
+        if self.use_paint_system_uv and self.coord_type != 'AUTO':
+            self.coord_type = 'AUTO'
+        elif not self.use_paint_system_uv and self.coord_type == 'AUTO':
+            self.coord_type = 'UV'
+    
+    use_paint_system_uv: BoolProperty(
+        name="Use Paint System UV",
+        description="Use the Paint System UV",
+        default=True,
+        update=update_use_paint_system_uv
+    )
+    def update_coord_type(self, context):
+        if self.coord_type == 'AUTO' and not self.use_paint_system_uv:
+            self.use_paint_system_uv = True
+    
     coord_type: EnumProperty(
         name="Coordinate Type",
         items=COORDINATE_TYPE_ENUM,
-        default='AUTO'
+        default='UV',
+        update=update_coord_type
     )
     uv_map_name: StringProperty(
         name="UV Map",
@@ -94,6 +114,8 @@ class PSUVOptionsMixin():
     def store_coord_type(self, context):
         """Store the coord_type from the operator to the active channel"""
         ps_ctx = PSContextMixin.parse_context(context)
+        if self.use_paint_system_uv:
+            self.coord_type = 'AUTO'
         if ps_ctx.active_group:
             ps_ctx.active_group.coord_type = self.coord_type
             ps_ctx.active_group.uv_map_name = self.uv_map_name
@@ -102,19 +124,32 @@ class PSUVOptionsMixin():
         """Get the coord_type from the active channel and set it on the operator"""
         ps_ctx = PSContextMixin.parse_context(context)
         if ps_ctx.active_channel:
-            self.coord_type = ps_ctx.active_group.coord_type
+            past_coord_type = ps_ctx.active_group.coord_type
+            if past_coord_type == 'AUTO':
+                self.use_paint_system_uv = True
+            else:
+                self.use_paint_system_uv = False
+                self.coord_type = past_coord_type
             self.uv_map_name = ps_ctx.active_group.uv_map_name
             
     def select_coord_type_ui(self, layout, context):
-        layout.label(text="Coordinate Type", icon='UV')
+        row = layout.row(align=True)
+        row.label(text="Coordinate Type", icon='UV')
+        row.prop(self, "use_paint_system_uv", text="Use AUTO UV?", toggle =1)
+        if self.use_paint_system_uv:
+            info_box = layout.box()
+            if not context.object.data.uv_layers.get(DEFAULT_PS_UV_MAP_NAME):
+                info_box.label(text="Will create UV Map: " + DEFAULT_PS_UV_MAP_NAME, icon='ERROR')
+            else:
+                info_box.label(text="Using UV Map: " + DEFAULT_PS_UV_MAP_NAME, icon='INFO')
+            return
         layout.prop(self, "coord_type", text="")
-        if self.coord_type not in ['AUTO', 'UV']:
+        if self.coord_type != 'UV':
             # Warning that painting may not work as expected
             box = layout.box()
             box.alert = True
             box.label(text="Painting may not work in this mode", icon='ERROR')
-        
-        if self.coord_type == 'UV':
+        else:
             row = layout.row(align=True)
             row.prop_search(self, "uv_map_name", context.object.data, "uv_layers", text="")
             if not self.uv_map_name:
@@ -190,10 +225,11 @@ class PSImageFilterMixin():
                 return None
         else:
             ps_ctx = PSContextMixin.parse_context(context)
-            if ps_ctx.active_global_layer:
+            if ps_ctx.active_channel.use_bake_image:
+                image = ps_ctx.active_channel.bake_image
+            elif ps_ctx.active_global_layer:
                 image = ps_ctx.active_global_layer.image
-            else:
+            if not image:
                 self.report({'ERROR'}, "Layer Does not have an image")
                 return None
         return image
-    
