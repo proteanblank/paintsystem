@@ -395,7 +395,7 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
     
     def draw(self, context):
         layout = self.layout
-        self.image_create_ui(layout, context)
+        self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
         box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
@@ -433,6 +433,119 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixin, Operator):
+    bl_idname = "paint_system.merge_down"
+    bl_label = "Merge Down"
+    bl_description = "Merge the down layers"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    uv_map: StringProperty(
+        name= "UV Map",
+        default="UVMap",
+        options={'SKIP_SAVE'},
+    )
+    
+    def get_below_layer(self, context):
+        ps_ctx = self.parse_context(context)
+        active_channel = ps_ctx.active_channel
+        active_layer = ps_ctx.active_layer
+        flattened_layers = [v[0] for v in active_channel.flatten_hierarchy()]
+        if active_layer and flattened_layers.index(active_layer) < len(flattened_layers) - 1:
+            return flattened_layers[flattened_layers.index(active_layer) + 1]
+        return None
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        active_global_layer = ps_ctx.active_global_layer
+        below_layer = cls.get_below_layer(cls, context)
+        if not below_layer:
+            return False
+        below_global_layer = get_global_layer(below_layer)
+        return (active_global_layer and 
+                below_global_layer and 
+                active_global_layer.type != "FOLDER" and 
+                below_global_layer.type != "FOLDER")
+    
+    def invoke(self, context, event):
+        self.get_coord_type(context)
+        below_layer = self.get_below_layer(context)
+        below_global_layer = get_global_layer(below_layer)
+        if below_global_layer.coord_type == 'AUTO':
+            self.uv_map = "PS_UVMap"
+        else:
+            self.uv_map = below_global_layer.uv_map_name
+        if below_global_layer.type == "IMAGE":
+            self.image_width = below_global_layer.image.size[0]
+            self.image_height = below_global_layer.image.size[1]
+            return self.execute(context)
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def draw(self, context):
+        layout = self.layout
+        self.image_create_ui(layout, context, show_name=False)
+        box = layout.box()
+        box.label(text="UV Map", icon='UV')
+        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        active_channel = ps_ctx.active_channel
+        active_layer = ps_ctx.active_layer
+        active_global_layer = ps_ctx.active_global_layer
+        below_layer = self.get_below_layer(context)
+        below_global_layer = get_global_layer(below_layer)
+        
+        if not active_channel:
+            return {'CANCELLED'}
+        
+        image = self.create_image()
+        
+        to_be_enabled_layers = []
+        # Enable both active layer and below layer, disable all others
+        for layer in active_channel.layers:
+            global_layer = get_global_layer(layer)
+            if global_layer.type != "FOLDER" and global_layer.enabled and global_layer != active_global_layer and global_layer != below_global_layer:
+                to_be_enabled_layers.append(global_layer)
+                global_layer.enabled = False
+        
+        # Enable the below layer if it's not already enabled
+        if not below_global_layer.enabled:
+            below_global_layer.enabled = True
+        
+        # Store original blend modes
+        original_active_blend_mode = get_blend_type(active_global_layer)
+        original_below_blend_mode = get_blend_type(below_global_layer)
+        
+        # Set both layers to MIX for proper blending
+        set_blend_type(active_global_layer, 'MIX')
+        set_blend_type(below_global_layer, 'MIX')
+        
+        # Bake both layers into the new image
+        active_channel.bake(context, ps_ctx.active_material, image, self.uv_map, use_group_tree=False)
+        
+        # Restore original blend modes
+        set_blend_type(active_global_layer, original_active_blend_mode)
+        set_blend_type(below_global_layer, original_below_blend_mode)
+        
+        # Replace the below layer with the merged result
+        below_global_layer.type = 'IMAGE'
+        below_global_layer.coord_type = 'UV'
+        below_global_layer.uv_map_name = self.uv_map
+        below_global_layer.image = image
+        
+        # Restore other layers
+        for layer in to_be_enabled_layers:
+            layer.enabled = True
+        
+        # Remove the current layer since it's been merged
+        bpy.ops.paint_system.delete_item('EXEC_DEFAULT')
+        
+        return {'FINISHED'}
+
+
+
+
 classes = (
     PAINTSYSTEM_OT_BakeChannel,
     PAINTSYSTEM_OT_BakeAllChannels,
@@ -441,6 +554,7 @@ classes = (
     PAINTSYSTEM_OT_ExportAllImages,
     PAINTSYSTEM_OT_DeleteBakedImage,
     PAINTSYSTEM_OT_ConvertToImageLayer,
+    PAINTSYSTEM_OT_MergeDown,
 )
 
 register, unregister = register_classes_factory(classes)

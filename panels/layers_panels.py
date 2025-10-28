@@ -370,7 +370,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             scale_content(context, row, scale_x=1, scale_y=1.5)
             row.template_list(
                 "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
-                rows=max(5, len(layers))
+                rows=min(max(5, len(layers)), 7)
             )
 
             col = row.column(align=True)
@@ -937,7 +937,7 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
     def draw(self, context):
         ps_ctx = self.parse_context(context)
         layout = self.layout
-        if ps_ctx.active_global_layer.type != 'IMAGE':
+        if ps_ctx.active_global_layer and ps_ctx.active_global_layer.type != 'IMAGE':
             layout.operator("paint_system.convert_to_image_layer", text="Convert to Image Layer", icon_value=get_icon('image'))
             layout.separator()
         layout.operator("paint_system.copy_layer",
@@ -948,6 +948,9 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
                         text="Paste Layer(s)", icon="PASTEDOWN").linked = False
         layout.operator("paint_system.paste_layer",
                         text="Paste Linked Layer(s)", icon="LINKED").linked = True
+        # layout.operator("paint_system.merge_layer", text="Merge Up", icon="TRIA_UP_BAR").merge_direction = 'UP'
+        layout.separator()
+        layout.operator("paint_system.merge_down", text="Merge Down", icon="TRIA_DOWN_BAR")
 
 
 class MAT_MT_AddImageLayerMenu(Menu):
