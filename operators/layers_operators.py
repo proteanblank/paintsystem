@@ -993,7 +993,7 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
         ps_ctx = self.parse_context(context)
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         for layer in clipboard_layers:
-            global_layer = get_global_layer(layer, layer.name)
+            global_layer = get_global_layer(layer)
             if self.linked:
                 ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
             else:
