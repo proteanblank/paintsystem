@@ -226,18 +226,19 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
                     link = node_links[0]
                     from_node = link.from_node
                     socket_type = find_base_socket_type(link.from_socket)
+                    node_group, mix_shader = create_basic_setup(mat_node_tree, node_tree, from_node.location + Vector((from_node.width + 50, 0)))
                     if socket_type == 'NodeSocketShader':
-                        node_group, mix_shader = create_basic_setup(mat_node_tree, node_tree, from_node.location + Vector((from_node.width + 50, 0)))
                         shader_to_rgb = mat_node_tree.nodes.new(type='ShaderNodeShaderToRGB')
                         shader_to_rgb.location = from_node.location + Vector((from_node.width + 50, 0))
                         connect_sockets(shader_to_rgb.inputs[0], link.from_socket)
                         connect_sockets(node_group.inputs['Color'], shader_to_rgb.outputs[0])
                         connect_sockets(node_group.inputs['Color Alpha'], shader_to_rgb.outputs[1])
-                        mat_output.location = mix_shader.location + Vector((200, 0))
-                        mat_output.is_active_output = True
-                        connect_sockets(mix_shader.outputs[0], mat_output.inputs[0])
                     else:
-                        print("No shader node found")
+                        connect_sockets(node_group.inputs['Color'], from_node.outputs[0])
+                        node_group.inputs['Color Alpha'].default_value = 1.0
+                    mat_output.location = mix_shader.location + Vector((200, 0))
+                    mat_output.is_active_output = True
+                    connect_sockets(mix_shader.outputs[0], mat_output.inputs[0])
                         
             case 'NORMAL':
                 bpy.ops.paint_system.add_channel('EXEC_DEFAULT', channel_name='Normal', channel_type='VECTOR', use_alpha=False, use_normalize=True)
