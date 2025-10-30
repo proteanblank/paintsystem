@@ -8,7 +8,6 @@ from ..paintsystem.data import (
     LegacyPaintSystemLayer,
     LAYER_TYPE_ENUM,
 )
-from ..paintsystem.create import add_global_layer
 from ..paintsystem.graph.nodetree_builder import capture_node_state, apply_node_state
 from ..utils.nodes import find_nodes
 from bpy_extras.node_utils import connect_sockets
@@ -79,7 +78,7 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                     print(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
                     warning_messages.append(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
                     continue
-                new_global_layer = add_global_layer(legacy_layer.type, legacy_layer.name)
+                new_layer = ps_ctx.active_channel.create_layer(legacy_layer.name, legacy_layer.type)
                 
                 # Apply legacy layer properties
                 for prop in legacy_layer.bl_rna.properties:
@@ -88,40 +87,37 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                         continue
                     if pid in {"name", "node_tree", "type"} or pid not in pid_mapping:
                         continue
-                    setattr(new_global_layer, pid_mapping[pid], getattr(legacy_layer, pid))
+                    setattr(new_layer, pid_mapping[pid], getattr(legacy_layer, pid))
                 if legacy_layer.type == "ADJUSTMENT":
-                    new_global_layer.adjustment_type = get_layer_adjustment_type(legacy_layer)
+                    new_layer.adjustment_type = get_layer_adjustment_type(legacy_layer)
                 if legacy_layer.type == "GRADIENT":
-                    new_global_layer.gradient_type = get_layer_gradient_type(legacy_layer)
-                    new_global_layer.empty_object = get_layer_empty_object(legacy_layer)
+                    new_layer.gradient_type = get_layer_gradient_type(legacy_layer)
+                    new_layer.empty_object = get_layer_empty_object(legacy_layer)
                 if legacy_layer.type == "IMAGE":
                     uv_map_node = legacy_ps_ctx.find_node(legacy_layer.node_tree, {'bl_idname': 'ShaderNodeUVMap'})
                     if uv_map_node:
                         uv_map_name = uv_map_node.uv_map
-                        new_global_layer.coord_type = "UV"
-                        new_global_layer.uv_map_name = uv_map_name
+                        new_layer.coord_type = "UV"
+                        new_layer.uv_map_name = uv_map_name
                     
-                new_global_layer.update_node_tree(context)
+                new_layer.update_node_tree(context)
                 # Apply node values
                 # Copy rgb node value
                 if legacy_layer.type == "SOLID_COLOR":
                     rgb_node = find_node_by_name(legacy_layer.node_tree, 'RGB')
                     if rgb_node:
-                        new_global_layer.find_node('rgb').outputs[0].default_value = rgb_node.outputs[0].default_value
+                        new_layer.find_node('rgb').outputs[0].default_value = rgb_node.outputs[0].default_value
                 if legacy_layer.type == "ADJUSTMENT":
                     state = capture_node_state(legacy_ps_ctx.find_node(legacy_layer.node_tree, {'label': 'Adjustment'}))
-                    apply_node_state(new_global_layer.find_node('adjustment'), state)
+                    apply_node_state(new_layer.find_node('adjustment'), state)
                 if legacy_layer.type == "GRADIENT":
                     state = capture_node_state(legacy_ps_ctx.find_node(legacy_layer.node_tree, {'label': 'Gradient Color Ramp'}))
-                    apply_node_state(new_global_layer.find_node('gradient'), state)
+                    apply_node_state(new_layer.find_node('gradient'), state)
                 
                 # Copy opacity node value
                 opacity_node = find_node_by_name(legacy_layer.node_tree, 'Opacity')
                 if opacity_node:
-                    new_global_layer.pre_mix_node.inputs['Opacity'].default_value = opacity_node.inputs[0].default_value
-                    
-                ps_ctx = self.parse_context(context)
-                ps_ctx.active_channel.add_global_layer_to_channel(new_global_layer)
+                    new_layer.pre_mix_node.inputs['Opacity'].default_value = opacity_node.inputs[0].default_value
                 # refresh paintsystem context
             ps_ctx.active_channel.update_node_tree(context)
             ps_ctx.active_group.update_node_tree(context)

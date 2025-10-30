@@ -1,6 +1,6 @@
 import bpy
 from bpy.props import IntProperty
-from ..paintsystem.data import PSContextMixin, get_global_layer, COORDINATE_TYPE_ENUM
+from ..paintsystem.data import PSContextMixin, COORDINATE_TYPE_ENUM
 from ..custom_icons import get_icon
 from ..preferences import get_preferences
 from ..utils.unified_brushes import get_unified_settings
@@ -227,8 +227,8 @@ class PSImageFilterMixin():
             ps_ctx = PSContextMixin.parse_context(context)
             if ps_ctx.active_channel.use_bake_image:
                 image = ps_ctx.active_channel.bake_image
-            elif ps_ctx.active_global_layer:
-                image = ps_ctx.active_global_layer.image
+            elif ps_ctx.active_layer:
+                image = ps_ctx.active_layer.image
             if not image:
                 self.report({'ERROR'}, "Layer Does not have an image")
                 return None

@@ -171,7 +171,7 @@ class PAINTSYSTEM_OT_GaussianBlur(PSContextMixin, PSImageFilterMixin, Operator):
         np_image = blender_image_to_numpy(image)
         np_image = gaussian_blur(np_image, self.gaussian_sigma)
         new_image = numpy_to_blender_image(np_image, f"{image.name}_blurred")
-        ps_ctx.active_global_layer.image = new_image
+        ps_ctx.active_layer.image = new_image
         return {'FINISHED'}
     
     def invoke(self, context, event):
@@ -198,7 +198,7 @@ class PAINTSYSTEM_OT_SharpenImage(PSContextMixin, PSImageFilterMixin, Operator):
         np_image = blender_image_to_numpy(image)
         np_image = sharpen_image(np_image, self.sharpen_amount)
         new_image = numpy_to_blender_image(np_image, f"{image.name}_sharpened")
-        ps_ctx.active_global_layer.image = new_image
+        ps_ctx.active_layer.image = new_image
         return {'FINISHED'}
     
     def invoke(self, context, event):
@@ -300,7 +300,7 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
         if ps_ctx.active_channel.use_bake_image:
             ps_ctx.active_channel.bake_image = new_image
         else:
-            ps_ctx.active_global_layer.image = new_image
+            ps_ctx.active_layer.image = new_image
         return {'FINISHED'}
     
     def invoke(self, context, event):

@@ -1,5 +1,5 @@
 import bpy
-from .data import sort_actions, parse_context
+from .data import get_global_layer, sort_actions, parse_context, get_all_layers
 from .graph.basic_layers import get_layer_version_for_type
 import time
 from .graph.nodetree_builder import get_nodetree_version
@@ -9,31 +9,30 @@ def frame_change_pre(scene):
     if not hasattr(scene, 'ps_scene_data'):
         return
     update_task = {}
-    for global_layer in scene.ps_scene_data.layers:
-        sorted_actions = sort_actions(bpy.context, global_layer)
+    for layer in get_all_layers():
+        sorted_actions = sort_actions(bpy.context, layer)
         for action in sorted_actions:
             match action.action_bind:
                 case 'FRAME':
                     if action.frame <= scene.frame_current:
                         # print(f"Frame {action.frame} found at frame {scene.frame_current}")
-                        if action.action_type == 'ENABLE' and update_task.get(global_layer, global_layer.enabled) == False:
-                            update_task[global_layer] = True
-                        elif action.action_type == 'DISABLE' and update_task.get(global_layer, global_layer.enabled) == True:
-                            update_task[global_layer] = False
+                        if action.action_type == 'ENABLE' and update_task.get(layer, layer.enabled) == False:
+                            update_task[layer] = True
+                        elif action.action_type == 'DISABLE' and update_task.get(layer, layer.enabled) == True:
+                            update_task[layer] = False
                 case 'MARKER':
                     marker = scene.timeline_markers.get(action.marker_name)
                     if marker and marker.frame <= scene.frame_current:
                         # print(f"Marker {marker.frame} found at frame {scene.frame_current}")
-                        if action.action_type == 'ENABLE' and update_task.get(global_layer, global_layer.enabled) == False:
-                            update_task[global_layer] = True
-                        elif action.action_type == 'DISABLE' and update_task.get(global_layer, global_layer.enabled) == True:
-                            update_task[global_layer] = False
+                        if action.action_type == 'ENABLE' and update_task.get(layer, layer.enabled) == False:
+                            update_task[layer] = True
+                        elif action.action_type == 'DISABLE' and update_task.get(layer, layer.enabled) == True:
+                            update_task[layer] = False
                 case _:
                     pass
-    for global_layer, enabled in update_task.items():
-        if global_layer.enabled != enabled:
-            # print(f"Updating layer {global_layer.name} to {enabled}")
-            global_layer.enabled = enabled
+    for layer, enabled in update_task.items():
+        if layer.enabled != enabled:
+            layer.enabled = enabled
 
 
 @bpy.app.handlers.persistent
@@ -42,25 +41,48 @@ def load_post(scene):
     ps_ctx = parse_context(bpy.context)
     if not ps_ctx.ps_scene_data:
         return
-    layers = {}
-    # Layer Versioning
+    
+    # Global Layer Versioning. Will be removed in the future.
     for global_layer in ps_ctx.ps_scene_data.layers:
         target_version = get_layer_version_for_type(global_layer.type)
         if get_nodetree_version(global_layer.node_tree) != target_version:
             print(f"Updating layer {global_layer.name} to version {target_version}")
             global_layer.update_node_tree(bpy.context)
-        if global_layer.name and not global_layer.layer_name:
-            if not layers:
-                for mat in bpy.data.materials:
-                    if hasattr(mat, 'ps_mat_data'):
-                        for group in mat.ps_mat_data.groups:
-                            for channel in group.channels:
-                                for layer in channel.layers:
-                                    layers[layer.ref_layer_id] = layer
-            name = global_layer.name
-            # Transfer layer name to global_layer layer_name
-            global_layer.layer_name = layers[name].name
-            print(f"Copying layer name '{layers[name].name}' to '{global_layer.name}'")
+    
+    seen_global_layers_map = {}
+    # Layer Versioning
+    for mat in bpy.data.materials:
+        if hasattr(mat, 'ps_mat_data'):
+            for group in mat.ps_mat_data.groups:
+                for channel in group.channels:
+                    has_migrated_global_layer = False
+                    for layer in channel.layers:
+                        if layer.name and not layer.layer_name: # data from global layer is not copied to layer
+                            global_layer = get_global_layer(layer)
+                            if global_layer:
+                                print(f"Migrating global layer data ({global_layer.name}) to layer data ({layer.name}) ({layer.layer_name})")
+                                has_migrated_global_layer = True
+                                layer.layer_name = layer.name
+                                if global_layer.name not in seen_global_layers_map:
+                                    seen_global_layers_map[global_layer.name] = [mat, global_layer]
+                                    for prop in global_layer.bl_rna.properties:
+                                        pid = getattr(prop, 'identifier', '')
+                                        if not pid or getattr(prop, 'is_readonly', False):
+                                            continue
+                                        if pid in {"layer_name"}:
+                                            continue
+                                        if pid == "name":
+                                            uid = getattr(global_layer, pid)
+                                            layer.uid = uid
+                                        setattr(layer, pid, getattr(global_layer, pid))
+                                else:
+                                    # as linked layer, properties will not be copied
+                                    print(f"Layer {layer.name} is linked to {global_layer.name}")
+                                    mat, global_layer = seen_global_layers_map[global_layer.name]
+                                    layer.linked_layer_uid = global_layer.name
+                                    layer.linked_material = mat
+                    if has_migrated_global_layer:
+                        channel.update_node_tree(bpy.context)
             
     print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers)} layers in {round((time.time() - start_time) * 1000, 2)} ms")
 
@@ -96,7 +118,7 @@ def save_handler(scene: bpy.types.Scene):
 @bpy.app.handlers.persistent
 def refresh_image(scene: bpy.types.Scene):
     ps_ctx = parse_context(bpy.context)
-    active_layer = ps_ctx.active_global_layer
+    active_layer = ps_ctx.active_layer
     if active_layer and active_layer.image:
         active_layer.image.reload()
 

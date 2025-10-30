@@ -6,9 +6,6 @@ from bpy.props import (
 from bpy.types import Operator, Context, NodeTree
 from bpy.utils import register_classes_factory
 
-from ..paintsystem.create import (
-    add_global_layer,
-)
 from ..paintsystem.data import (
     ACTION_BIND_ENUM,
     ACTION_TYPE_ENUM,
@@ -17,8 +14,8 @@ from ..paintsystem.data import (
     TEXTURE_TYPE_ENUM,
     GRADIENT_TYPE_ENUM,
     GEOMETRY_TYPE_ENUM,
-    get_global_layer,
-    is_global_layer_linked,
+    get_all_layers,
+    is_layer_linked,
 )
 from ..utils import get_next_unique_name
 from .common import (
@@ -50,13 +47,6 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMix
     bl_idname = "paint_system.new_image_layer"
     bl_label = "New Image Layer"
     bl_options = {'REGISTER', 'UNDO'}
-    
-    attach_to_camera_plane: BoolProperty(
-        name="Attach to Camera Plane",
-        description="Attach the image layer to the camera plane",
-        default=False,
-        options={'SKIP_SAVE'}
-    )
 
     @classmethod
     def poll(cls, context):
@@ -114,17 +104,10 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMix
                 self.report({'ERROR'}, "Image not found")
                 return False
         img.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
-        global_layer = add_global_layer("IMAGE", self.image_name)
-        global_layer.image = img
-        global_layer.coord_type = self.coord_type
-        global_layer.uv_map_name = self.uv_map_name
-        global_layer.attached_to_camera_plane = self.attach_to_camera_plane
-        if self.attach_to_camera_plane and context.region_data.view_perspective != 'CAMERA':
-            bpy.ops.view3d.view_camera('INVOKE_DEFAULT')
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
-        world_matrix = context.scene.camera.matrix_world
-        layer.camera_plane_position = world_matrix.translation
-        layer.camera_plane_rotation = world_matrix.to_euler()
+        layer = ps_ctx.active_channel.create_layer(self.image_name, "IMAGE")
+        layer.image = img
+        layer.coord_type = self.coord_type
+        layer.uv_map_name = self.uv_map_name
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -174,8 +157,7 @@ class PAINTSYSTEM_OT_NewFolder(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = add_global_layer("FOLDER", self.layer_name)
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(self.layer_name, "FOLDER")
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -200,8 +182,7 @@ class PAINTSYSTEM_OT_NewSolidColor(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = add_global_layer("SOLID_COLOR", self.layer_name)
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(self.layer_name, "SOLID_COLOR")
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -236,8 +217,7 @@ class PAINTSYSTEM_OT_NewAttribute(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = add_global_layer("ATTRIBUTE", self.layer_name)
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(self.layer_name, "ATTRIBUTE")
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -262,9 +242,8 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         layer_name = next(name for adjustment_type, name, description in ADJUSTMENT_TYPE_ENUM if adjustment_type == self.adjustment_type)
-        global_layer = add_global_layer("ADJUSTMENT", layer_name)
-        global_layer.adjustment_type = self.adjustment_type
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(layer_name, "ADJUSTMENT")
+        layer.adjustment_type = self.adjustment_type
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -289,8 +268,7 @@ class PAINTSYSTEM_OT_NewShader(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = add_global_layer("SHADER", self.layer_name)
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(self.layer_name, "SHADER")
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -321,9 +299,8 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = add_global_layer("GRADIENT", self.gradient_type.title())
-        global_layer.gradient_type = self.gradient_type
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(self.gradient_type.title(), "GRADIENT")
+        layer.gradient_type = self.gradient_type
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -355,10 +332,9 @@ class PAINTSYSTEM_OT_NewGeometry(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         layer_name = next(name for geometry_type, name, description in GEOMETRY_TYPE_ENUM if geometry_type == self.geometry_type)
-        global_layer = add_global_layer("GEOMETRY", layer_name)
-        global_layer.geometry_type = self.geometry_type
-        global_layer.normalize_normal = self.normalize_normal
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(layer_name, "GEOMETRY")
+        layer.geometry_type = self.geometry_type
+        layer.normalize_normal = self.normalize_normal
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -375,7 +351,7 @@ class PAINTSYSTEM_OT_FixMissingGradientEmpty(PSContextMixin, Operator):
         for layer in ps_ctx.active_channel.layers:
             if layer.type == 'GRADIENT':
                 layer.update_node_tree(context)
-        ps_ctx.active_global_layer.update_node_tree(context)
+        ps_ctx.active_layer.update_node_tree(context)
         return {'FINISHED'}
 
 
@@ -387,7 +363,7 @@ class PAINTSYSTEM_OT_SelectGradientEmpty(PSContextMixin, Operator):
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
-        empty_object = ps_ctx.active_global_layer.empty_object
+        empty_object = ps_ctx.active_layer.empty_object
         if empty_object:
             bpy.ops.object.mode_set(mode='OBJECT')
             bpy.ops.object.select_all(action='DESELECT')
@@ -415,8 +391,7 @@ class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
     
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = add_global_layer("RANDOM", self.layer_name)
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(self.layer_name, "RANDOM")
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -538,13 +513,12 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
             return {'CANCELLED'}
         ps_ctx = self.parse_context(context)
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        global_layer = add_global_layer("NODE_GROUP", self.node_tree_name)
-        global_layer.custom_node_tree = custom_node_tree
-        global_layer.custom_color_input = int(self.custom_color_input)
-        global_layer.custom_alpha_input = int(self.custom_alpha_input if self.custom_alpha_input != "" else "-1")
-        global_layer.custom_color_output = int(self.custom_color_output)
-        global_layer.custom_alpha_output = int(self.custom_alpha_output if self.custom_alpha_output != "" else "-1")
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer = ps_ctx.active_channel.create_layer(self.node_tree_name, "NODE_GROUP")
+        layer.custom_node_tree = custom_node_tree
+        layer.custom_color_input = int(self.custom_color_input)
+        layer.custom_alpha_input = int(self.custom_alpha_input if self.custom_alpha_input != "" else "-1")
+        layer.custom_color_output = int(self.custom_color_output)
+        layer.custom_alpha_output = int(self.custom_alpha_output if self.custom_alpha_output != "" else "-1")
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -620,12 +594,11 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         layer_name = next(name for texture_type, name, description in TEXTURE_TYPE_ENUM if texture_type == self.texture_type)
-        global_layer = add_global_layer("TEXTURE", layer_name)
+        layer = ps_ctx.active_channel.create_layer(layer_name, "TEXTURE")
         self.store_coord_type(context)
-        global_layer.texture_type = self.texture_type
-        global_layer.coord_type = self.coord_type
-        global_layer.uv_map_name = self.uv_map_name
-        layer = ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+        layer.texture_type = self.texture_type
+        layer.coord_type = self.coord_type
+        layer.uv_map_name = self.uv_map_name
         layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         return {'FINISHED'}
@@ -646,27 +619,34 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
-        global_layer = ps_ctx.active_global_layer
         item_id = active_layer.id
         order = int(active_layer.order)
         parent_id = int(active_layer.parent_id)
         
-        if not is_global_layer_linked(global_layer):
-            # Check if global layer is used in the camera plane channel
-            global_layer.attached_to_camera_plane = False
-            # Delete the global layer
-            if global_layer.empty_object:
-                bpy.data.objects.remove(global_layer.empty_object, do_unlink=True)
+        if is_layer_linked(active_layer):
+            if not active_layer.is_linked:
+                linked_layer_uid_map = {}
+                for material in bpy.data.materials:
+                    if hasattr(material, 'ps_mat_data'):
+                        for group in material.ps_mat_data.groups:
+                            for channel in group.channels:
+                                for layer in channel.layers:
+                                    if layer.is_linked and layer.linked_layer_uid == active_layer.uid:
+                                        linked_layer_uid_map[layer.uid] = [layer, material]
+                # Migrate layer data to one of the linked layers
+                linked_layers = [layer for layer, _ in linked_layer_uid_map.values() if layer.is_linked and layer.linked_layer_uid == active_layer.uid]
+                new_main_layer, new_material = list(linked_layer_uid_map.values())[0]
+                new_main_layer.copy_layer_data(active_layer)
+                
+                for linked_layer in linked_layers[1:]:
+                    linked_layer.linked_material = new_material
+        else:
+            print(f"Deleting layer data for {active_layer.name}")
+            if active_layer.empty_object:
+                bpy.data.objects.remove(active_layer.empty_object, do_unlink=True)
             # TODO: The following causes some issue when undoing
-            # if global_layer.image:
-            #     bpy.data.images.remove(global_layer.image)
-            if global_layer.node_tree:
-                bpy.data.node_groups.remove(global_layer.node_tree)
-            global_layers = context.scene.ps_scene_data.layers
-            for i, layer in enumerate(global_layers):
-                if layer == global_layer:
-                    global_layers.remove(i)
-                    break
+            if active_layer.node_tree:
+                bpy.data.node_groups.remove(active_layer.node_tree)
                 
         if item_id != -1 and active_channel.remove_item_and_children(item_id):
             # Update active_index
@@ -689,9 +669,9 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
     def draw(self, context):
         ps_ctx = self.parse_context(context)
         layout = self.layout
-        global_layer = ps_ctx.active_global_layer
+        active_layer = ps_ctx.active_layer
         layout.label(
-            text=f"Delete '{global_layer.layer_name}' ?", icon='ERROR')
+            text=f"Delete '{active_layer.layer_name}' ?", icon='ERROR')
         layout.label(
             text="Click OK to delete, or cancel to keep the layer")
 
@@ -866,60 +846,6 @@ class PAINTSYSTEM_OT_MoveDown(PSContextMixin, MultiMaterialOperator):
         return {'CANCELLED'}
 
 
-class PAINTSYSTEM_OT_MoveUpCameraPlane(PSContextMixin, MultiMaterialOperator):
-    """Move the active item up camera plane"""
-    bl_idname = "paint_system.move_up_camera_plane"
-    bl_label = "Move Item Up"
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Move the active item up"
-
-    @classmethod
-    def poll(cls, context):
-        ps_ctx = cls.parse_context(context)
-        active_channel = ps_ctx.camera_plane_channel
-        if not active_channel:
-            return False
-        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
-        options = active_channel.get_movement_options(item_id, 'UP')
-        return bool(options)
-    
-    def execute(self, context):
-        ps_ctx = self.parse_context(context)
-        active_channel = ps_ctx.camera_plane_channel
-        if not active_channel:
-            return {'CANCELLED'}
-        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
-        active_channel.execute_movement(item_id, 'UP', 'SKIP')
-        return {'FINISHED'}
-
-
-class PAINTSYSTEM_OT_MoveDownCameraPlane(PSContextMixin, MultiMaterialOperator):
-    """Move the active item down camera plane"""
-    bl_idname = "paint_system.move_down_camera_plane"
-    bl_label = "Move Item Down"
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Move the active item down"
-    
-    @classmethod
-    def poll(cls, context):
-        ps_ctx = cls.parse_context(context)
-        active_channel = ps_ctx.camera_plane_channel
-        if not active_channel:
-            return False
-        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
-        options = active_channel.get_movement_options(item_id, 'DOWN')
-        return bool(options)
-    
-    def execute(self, context):
-        ps_ctx = self.parse_context(context)
-        active_channel = ps_ctx.camera_plane_channel
-        if not active_channel:
-            return {'CANCELLED'}
-        item_id = active_channel.get_id_from_flattened_index(active_channel.active_index)
-        active_channel.execute_movement(item_id, 'DOWN', 'SKIP')
-        return {'FINISHED'}
-
-
 class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
     """Copy the active layer"""
     bl_idname = "paint_system.copy_layer"
@@ -939,6 +865,7 @@ class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
         if not ps_scene_data:
             return {'CANCELLED'}
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
+        bpy.context.scene.ps_scene_data.clipboard_material = ps_ctx.active_material
         clipboard_layers.clear()
         clipboard_layer = clipboard_layers.add()
         clipboard_layer.name = active_layer.name
@@ -963,6 +890,7 @@ class PAINTSYSTEM_OT_CopyAllLayers(PSContextMixin, Operator):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
+        bpy.context.scene.ps_scene_data.clipboard_material = ps_ctx.active_material
         clipboard_layers.clear()
         for layer in active_channel.layers:
             clipboard_layer = clipboard_layers.add()
@@ -992,21 +920,20 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
     def execute(self, context):
         ps_ctx = self.parse_context(context)
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
+        clipboard_material = bpy.context.scene.ps_scene_data.clipboard_material
         for layer in clipboard_layers:
-            global_layer = get_global_layer(layer)
             if self.linked:
-                ps_ctx.active_channel.add_global_layer_to_channel(global_layer)
+                ps_ctx.active_channel.create_linked_layer(layer, clipboard_material)
             else:
                 # Create a new global layer and copy everything except the uid
-                new_global_layer = add_global_layer(global_layer.type, layer.name)
-                for prop in global_layer.bl_rna.properties:
+                new_layer = ps_ctx.active_channel.create_layer(layer.name, layer.type)
+                for prop in layer.bl_rna.properties:
                     pid = getattr(prop, 'identifier', '')
                     if not pid or getattr(prop, 'is_readonly', False):
                         continue
                     if pid in {"name", "node_tree", "type"}:
                         continue
-                    setattr(new_global_layer, pid, getattr(global_layer, pid))
-                layer = ps_ctx.active_channel.add_global_layer_to_channel(new_global_layer)
+                    setattr(new_layer, pid, getattr(layer, pid))
         ps_ctx.active_channel.update_node_tree(context)
         
         return {'FINISHED'}
@@ -1042,8 +969,8 @@ class PAINTSYSTEM_OT_AddAction(PSContextMixin, Operator):
     
     def get_next_action_name(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
-        return get_next_unique_name("Action", [action.name for action in global_layer.actions])
+        active_layer = ps_ctx.active_layer
+        return get_next_unique_name("Action", [action.name for action in active_layer.actions])
     
     @classmethod
     def poll(cls, context):
@@ -1062,8 +989,8 @@ class PAINTSYSTEM_OT_AddAction(PSContextMixin, Operator):
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
-        action = global_layer.actions.add()
+        active_layer = ps_ctx.active_layer
+        action = active_layer.actions.add()
         action.name = self.name
         action.action_bind = self.action_bind
         action.action_type = self.action_type
@@ -1093,9 +1020,9 @@ class PAINTSYSTEM_OT_DeleteAction(PSContextMixin, Operator):
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
-        global_layer.actions.remove(global_layer.active_action_index)
-        global_layer.active_action_index = min(global_layer.active_action_index, len(global_layer.actions) - 1)
+        active_layer = ps_ctx.active_layer
+        active_layer.actions.remove(active_layer.active_action_index)
+        active_layer.active_action_index = min(active_layer.active_action_index, len(active_layer.actions) - 1)
         return {'FINISHED'}
 
 
@@ -1116,8 +1043,6 @@ classes = (
     PAINTSYSTEM_OT_DeleteItem,
     PAINTSYSTEM_OT_MoveUp,
     PAINTSYSTEM_OT_MoveDown,
-    PAINTSYSTEM_OT_MoveUpCameraPlane,
-    PAINTSYSTEM_OT_MoveDownCameraPlane,
     PAINTSYSTEM_OT_CopyLayer,
     PAINTSYSTEM_OT_CopyAllLayers,
     PAINTSYSTEM_OT_PasteLayer,

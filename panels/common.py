@@ -1,7 +1,7 @@
 import bpy
 
 # --
-from ..paintsystem.data import PSContextMixin, get_global_layer, Channel
+from ..paintsystem.data import PSContextMixin, Channel
 from ..custom_icons import get_icon
 from ..preferences import get_preferences
 from ..utils.nodes import find_node

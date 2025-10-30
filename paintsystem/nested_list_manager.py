@@ -74,7 +74,7 @@ class BaseNestedListManager(PropertyGroup):
 
     def add_item(self, name, item_type='ITEM', parent_id=-1, **kwargs) -> item_type:
         """Add a new item to the list"""
-        if item_type == 'ITEM' and parent_id != -1:
+        if item_type != 'FOLDER' and parent_id != -1:
             parent = self.get_item_by_id(parent_id)
             if parent and parent.type != 'FOLDER':
                 return -1

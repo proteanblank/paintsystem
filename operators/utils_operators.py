@@ -53,11 +53,6 @@ class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
         
         update_active_image(self, context)
 
-            # if ps.preferences.unified_brush_color:
-            #     bpy.context.scene.tool_settings.unified_paint_settings.use_unified_color = True
-            # if ps.preferences.unified_brush_size:
-            #     bpy.context.scene.tool_settings.unified_paint_settings.use_unified_size = True
-
         return {'FINISHED'}
 
 

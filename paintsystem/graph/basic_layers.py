@@ -5,7 +5,7 @@ import bpy
 from .common import create_mixing_graph, NodeTreeBuilder, create_coord_graph
 
 if TYPE_CHECKING:
-    from ..data import GlobalLayer
+    from ..data import Layer
 
 IMAGE_LAYER_VERSION = 2
 FOLDER_LAYER_VERSION = 1
@@ -70,40 +70,40 @@ def get_adjustment_identifier(adjustment_type: str) -> str:
     }
     return identifier_mapping.get(adjustment_type, "")
 
-def create_image_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
-    img = global_layer.image
-    coord_type = global_layer.coord_type
-    uv_map_name = global_layer.uv_map_name
+def create_image_graph(layer: "Layer"):
+    node_tree = layer.node_tree
+    img = layer.image
+    coord_type = layer.coord_type
+    uv_map_name = layer.uv_map_name
     builder = NodeTreeBuilder(node_tree, "Layer", version=IMAGE_LAYER_VERSION)
     create_mixing_graph(builder, "image", "Color", "image", "Alpha")
     builder.add_node("image", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest"})
     create_coord_graph(builder, coord_type, uv_map_name, 'image', 'Vector')
     return builder
 
-def create_folder_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
+def create_folder_graph(layer: "Layer"):
+    node_tree = layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer", version=FOLDER_LAYER_VERSION)
     create_mixing_graph(builder, "group_input", "Over Color", "group_input", "Over Alpha")
     return builder
 
-def create_solid_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
+def create_solid_graph(layer: "Layer"):
+    node_tree = layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer", version=SOLID_COLOR_LAYER_VERSION)
     create_mixing_graph(builder, "rgb", "Color")
     builder.add_node("rgb", "ShaderNodeRGB", default_outputs={0: (1, 1, 1, 1)})
     return builder
 
-def create_attribute_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
+def create_attribute_graph(layer: "Layer"):
+    node_tree = layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer", version=ATTRIBUTE_LAYER_VERSION)
     create_mixing_graph(builder, "attribute", "Color")
     builder.add_node("attribute", "ShaderNodeAttribute")
     return builder
 
-def create_adjustment_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
-    adjustment_type = get_adjustment_identifier(global_layer.adjustment_type)
+def create_adjustment_graph(layer: "Layer"):
+    node_tree = layer.node_tree
+    adjustment_type = get_adjustment_identifier(layer.adjustment_type)
     builder = NodeTreeBuilder(node_tree, "Layer", version=ADJUSTMENT_LAYER_VERSION)
     input_socket_name = "Color"
     output_socket_name = "Color"
@@ -123,10 +123,10 @@ def create_adjustment_graph(global_layer: "GlobalLayer"):
     builder.link("group_input", "adjustment", "Color", input_socket_name)
     return builder
 
-def create_gradient_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
-    gradient_type = global_layer.gradient_type
-    empty_object = global_layer.empty_object
+def create_gradient_graph(layer: "Layer"):
+    node_tree = layer.node_tree
+    gradient_type = layer.gradient_type
+    empty_object = layer.empty_object
     builder = NodeTreeBuilder(node_tree, "Layer", version=GRADIENT_LAYER_VERSION)
     create_mixing_graph(builder, "gradient", "Color", "gradient", "Alpha")
     builder.add_node("gradient", "ShaderNodeValToRGB")
@@ -155,8 +155,8 @@ def create_gradient_graph(global_layer: "GlobalLayer"):
     builder.link("map_range", "gradient", "Result", "Fac")
     return builder
 
-def create_random_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
+def create_random_graph(layer: "Layer"):
+    node_tree = layer.node_tree
     builder = NodeTreeBuilder(node_tree, "Layer", version=RANDOM_LAYER_VERSION)
     create_mixing_graph(builder, "hue_saturation_value", "Color")
     builder.add_node("object_info", "ShaderNodeObjectInfo")
@@ -183,13 +183,13 @@ def create_random_graph(global_layer: "GlobalLayer"):
     builder.link("value_multiply_add", "hue_saturation_value", "Value", "Value")
     return builder
 
-def create_custom_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
-    custom_node_tree = global_layer.custom_node_tree
-    color_input = global_layer.custom_color_input
-    alpha_input = global_layer.custom_alpha_input
-    color_output = global_layer.custom_color_output
-    alpha_output = global_layer.custom_alpha_output
+def create_custom_graph(layer: "Layer"):
+    node_tree = layer.node_tree
+    custom_node_tree = layer.custom_node_tree
+    color_input = layer.custom_color_input
+    alpha_input = layer.custom_alpha_input
+    color_output = layer.custom_color_output
+    alpha_output = layer.custom_alpha_output
     builder = NodeTreeBuilder(node_tree, "Layer", version=CUSTOM_LAYER_VERSION)
     if alpha_output != -1:
         create_mixing_graph(builder, "custom_node_tree", color_output, "custom_node_tree", alpha_output)
@@ -203,18 +203,18 @@ def create_custom_graph(global_layer: "GlobalLayer"):
         builder.link("group_input", "custom_node_tree", "Alpha", alpha_input)
     return builder
 
-def create_texture_graph(global_layer: "GlobalLayer"):
-    node_tree = global_layer.node_tree
-    texture_type = get_texture_identifier(global_layer.texture_type)
-    coord_type = global_layer.coord_type
-    uv_map_name = global_layer.uv_map_name
+def create_texture_graph(layer: "Layer"):
+    node_tree = layer.node_tree
+    texture_type = get_texture_identifier(layer.texture_type)
+    coord_type = layer.coord_type
+    uv_map_name = layer.uv_map_name
     builder = NodeTreeBuilder(node_tree, "Layer", version=TEXTURE_LAYER_VERSION)
     create_mixing_graph(builder, "texture", "Color")
     builder.add_node("texture", texture_type)
     create_coord_graph(builder, coord_type, uv_map_name, 'texture', 'Vector')
     return builder
 
-def create_geometry_graph(global_layer: "GlobalLayer"):
+def create_geometry_graph(layer: "Layer"):
     node_map = {
         'WORLD_NORMAL': 'ShaderNodeNewGeometry',
         'WORLD_TRUE_NORMAL': 'ShaderNodeNewGeometry',
@@ -233,9 +233,9 @@ def create_geometry_graph(global_layer: "GlobalLayer"):
         'OBJECT_POSITION': 'Object',
         'VECTOR_TRANSFORM': 'Vector',
     }
-    normalize_normals = global_layer.normalize_normal
-    node_tree = global_layer.node_tree
-    geometry_type = global_layer.geometry_type
+    normalize_normals = layer.normalize_normal
+    node_tree = layer.node_tree
+    geometry_type = layer.geometry_type
     builder = NodeTreeBuilder(node_tree, "Layer", version=GEOMETRY_LAYER_VERSION)
     if geometry_type == 'VECTOR_TRANSFORM':
         builder.link("group_input", "geometry", "Color", "Vector")

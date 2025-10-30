@@ -181,6 +181,8 @@ def apply_node_state(node: bpy.types.Node, state: dict) -> None:
 
 
 def get_nodetree_version(node_tree: bpy.types.NodeTree) -> int:
+    if not node_tree:
+        return 0
     version_frame = node_tree.nodes.get("versioning")
     if version_frame:
         return int(version_frame.label)

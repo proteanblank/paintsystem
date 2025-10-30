@@ -16,8 +16,8 @@ class PAINTSYSTEM_OT_ProjectEdit(PSContextMixin, Operator):
         import os
 
         ps_ctx = self.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
-        if not global_layer.image:
+        active_layer = ps_ctx.active_layer
+        if not active_layer.image:
             self.report({'ERROR'}, "Layer Does not have an image")
             return {'CANCELLED'}
 
@@ -66,7 +66,7 @@ class PAINTSYSTEM_OT_ProjectEdit(PSContextMixin, Operator):
             i += 1
 
         image_new.name = bpy.path.basename(filepath_final)
-        global_layer.external_image = image_new
+        active_layer.external_image = image_new
 
         image_new.filepath_raw = filepath_final  # TODO, filepath raw is crummy
         image_new.file_format = 'PNG'
@@ -178,18 +178,18 @@ class PAINTSYSTEM_OT_ProjectApply(PSContextMixin, Operator):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
-        return global_layer and global_layer.external_image
+        active_layer = ps_ctx.active_layer
+        return active_layer and active_layer.external_image
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
-        global_layer = ps_ctx.active_global_layer
+        active_layer = ps_ctx.active_layer
 
         current_image_editor = context.preferences.filepaths.image_editor
         editor_path = pathlib.Path(current_image_editor)
         app_name = editor_path.name
-        external_image = global_layer.external_image
-        external_image_name = str(global_layer.external_image.name)
+        external_image = active_layer.external_image
+        external_image_name = str(active_layer.external_image.name)
 
         # external_image_name = str(external_image.name)
         # print(external_image_name)
@@ -207,7 +207,7 @@ class PAINTSYSTEM_OT_ProjectApply(PSContextMixin, Operator):
         with bpy.context.temp_override(**{'mode': 'IMAGE_PAINT'}):
             bpy.ops.paint.project_image(image=external_image_name)
 
-        global_layer.external_image = None
+        active_layer.external_image = None
 
         return {'FINISHED'}
 

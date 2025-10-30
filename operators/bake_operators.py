@@ -5,7 +5,7 @@ from bpy.props import StringProperty, BoolProperty
 
 from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin, DEFAULT_PS_UV_MAP_NAME
 
-from ..paintsystem.data import get_global_layer, set_blend_type, get_blend_type
+from ..paintsystem.data import set_layer_blend_type, get_layer_blend_type
 from ..panels.common import get_icon_from_channel
 
 
@@ -327,7 +327,7 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.active_channel and ps_ctx.active_global_layer.type == 'IMAGE' and ps_ctx.active_global_layer.image
+        return ps_ctx.active_channel and ps_ctx.active_layer.type == 'IMAGE' and ps_ctx.active_layer.image
     
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
@@ -341,27 +341,26 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
     def execute(self, context):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
-        active_global_layer = ps_ctx.active_global_layer
+        active_layer = ps_ctx.active_layer
         if not active_channel:
             return {'CANCELLED'}
         
-        transferred_image = bpy.data.images.new(name=f"{active_global_layer.image.name}_Transferred", width=active_global_layer.image.size[0], height=active_global_layer.image.size[1], alpha=True)
+        transferred_image = bpy.data.images.new(name=f"{active_layer.image.name}_Transferred", width=active_layer.image.size[0], height=active_layer.image.size[1], alpha=True)
         
         to_be_enabled_layers = []
         # Ensure all layers are disabled except the active layer
         for layer in active_channel.layers:
-            global_layer = get_global_layer(layer)
-            if global_layer.enabled and global_layer != active_global_layer:
-                to_be_enabled_layers.append(global_layer)
-                global_layer.enabled = False
+            if layer.enabled and layer != active_layer:
+                to_be_enabled_layers.append(layer)
+                layer.enabled = False
         
-        original_blend_mode = get_blend_type(active_global_layer)
-        set_blend_type(active_global_layer, 'MIX')
+        original_blend_mode = get_layer_blend_type(active_layer)
+        set_layer_blend_type(active_layer, 'MIX')
         active_channel.bake(context, ps_ctx.active_material, transferred_image, self.uv_map, use_group_tree=False)
-        set_blend_type(active_global_layer, original_blend_mode)
-        active_global_layer.coord_type = 'UV'
-        active_global_layer.uv_map_name = self.uv_map
-        active_global_layer.image = transferred_image
+        set_layer_blend_type(active_layer, original_blend_mode)
+        active_layer.coord_type = 'UV'
+        active_layer.uv_map_name = self.uv_map
+        active_layer.image = transferred_image
         # Restore the layers
         for layer in to_be_enabled_layers:
             layer.enabled = True
@@ -404,7 +403,6 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
-        active_global_layer = ps_ctx.active_global_layer
         if not active_channel:
             return {'CANCELLED'}
         
@@ -415,18 +413,17 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
         to_be_enabled_layers = []
         # Ensure all layers are disabled except the active layer
         for layer in active_channel.layers:
-            global_layer = get_global_layer(layer)
-            if global_layer.type != "FOLDER" and global_layer.enabled and global_layer != active_global_layer and layer not in children:
-                to_be_enabled_layers.append(global_layer)
-                global_layer.enabled = False
-        original_blend_mode = get_blend_type(active_global_layer)
-        set_blend_type(active_global_layer, 'MIX')
+            if layer.type != "FOLDER" and layer.enabled and layer != active_layer and layer not in children:
+                to_be_enabled_layers.append(layer)
+                layer.enabled = False
+        original_blend_mode = get_layer_blend_type(active_layer)
+        set_layer_blend_type(active_layer, 'MIX')
         active_channel.bake(context, ps_ctx.active_material, image, self.uv_map, use_group_tree=False)
-        set_blend_type(active_global_layer, original_blend_mode)
-        active_global_layer.type = 'IMAGE'
-        active_global_layer.coord_type = 'UV'
-        active_global_layer.uv_map_name = self.uv_map
-        active_global_layer.image = image
+        set_layer_blend_type(active_layer, original_blend_mode)
+        active_layer.type = 'IMAGE'
+        active_layer.coord_type = 'UV'
+        active_layer.uv_map_name = self.uv_map
+        active_layer.image = image
         for layer in to_be_enabled_layers:
             layer.enabled = True
         active_channel.remove_children(active_layer.id)
@@ -449,7 +446,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
-        flattened_layers = [v[0] for v in active_channel.flatten_hierarchy()]
+        flattened_layers = active_channel.flattened_layers
         if active_layer and flattened_layers.index(active_layer) < len(flattened_layers) - 1:
             return flattened_layers[flattened_layers.index(active_layer) + 1]
         return None
@@ -457,27 +454,25 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        active_global_layer = ps_ctx.active_global_layer
+        active_layer = ps_ctx.active_layer
         below_layer = cls.get_below_layer(cls, context)
         if not below_layer:
             return False
-        below_global_layer = get_global_layer(below_layer)
-        return (active_global_layer and 
-                below_global_layer and 
-                active_global_layer.type != "FOLDER" and 
-                below_global_layer.type != "FOLDER")
+        return (active_layer and 
+                below_layer and 
+                active_layer.type != "FOLDER" and 
+                below_layer.type != "FOLDER")
     
     def invoke(self, context, event):
         self.get_coord_type(context)
         below_layer = self.get_below_layer(context)
-        below_global_layer = get_global_layer(below_layer)
-        if below_global_layer.use_paint_system_uv:
+        if below_layer.use_paint_system_uv:
             self.uv_map = DEFAULT_PS_UV_MAP_NAME
         else:
-            self.uv_map = below_global_layer.uv_map_name
-        if below_global_layer.type == "IMAGE":
-            self.image_width = below_global_layer.image.size[0]
-            self.image_height = below_global_layer.image.size[1]
+            self.uv_map = below_layer.uv_map_name
+        if below_layer.type == "IMAGE":
+            self.image_width = below_layer.image.size[0]
+            self.image_height = below_layer.image.size[1]
             return self.execute(context)
         return context.window_manager.invoke_props_dialog(self)
     
@@ -492,9 +487,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
-        active_global_layer = ps_ctx.active_global_layer
         below_layer = self.get_below_layer(context)
-        below_global_layer = get_global_layer(below_layer)
         
         if not active_channel:
             return {'CANCELLED'}
@@ -504,35 +497,34 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         to_be_enabled_layers = []
         # Enable both active layer and below layer, disable all others
         for layer in active_channel.layers:
-            global_layer = get_global_layer(layer)
-            if global_layer.type != "FOLDER" and global_layer.enabled and global_layer != active_global_layer and global_layer != below_global_layer:
-                to_be_enabled_layers.append(global_layer)
-                global_layer.enabled = False
+            if layer.type != "FOLDER" and layer.enabled and layer != active_layer and layer != below_layer:
+                to_be_enabled_layers.append(layer)
+                layer.enabled = False
         
         # Enable the below layer if it's not already enabled
-        if not below_global_layer.enabled:
-            below_global_layer.enabled = True
+        if not below_layer.enabled:
+            below_layer.enabled = True
         
         # Store original blend modes
-        original_active_blend_mode = get_blend_type(active_global_layer)
-        original_below_blend_mode = get_blend_type(below_global_layer)
+        original_active_blend_mode = get_layer_blend_type(active_layer)
+        original_below_blend_mode = get_layer_blend_type(below_layer)
         
         # Set both layers to MIX for proper blending
-        set_blend_type(active_global_layer, 'MIX')
-        set_blend_type(below_global_layer, 'MIX')
+        set_layer_blend_type(active_layer, 'MIX')
+        set_layer_blend_type(below_layer, 'MIX')
         
         # Bake both layers into the new image
         active_channel.bake(context, ps_ctx.active_material, image, self.uv_map, use_group_tree=False)
         
         # Restore original blend modes
-        set_blend_type(active_global_layer, original_active_blend_mode)
-        set_blend_type(below_global_layer, original_below_blend_mode)
+        set_layer_blend_type(active_layer, original_active_blend_mode)
+        set_layer_blend_type(below_layer, original_below_blend_mode)
         
         # Replace the below layer with the merged result
-        below_global_layer.type = 'IMAGE'
-        below_global_layer.coord_type = 'UV'
-        below_global_layer.uv_map_name = self.uv_map
-        below_global_layer.image = image
+        below_layer.type = 'IMAGE'
+        below_layer.coord_type = 'UV'
+        below_layer.uv_map_name = self.uv_map
+        below_layer.image = image
         
         # Restore other layers
         for layer in to_be_enabled_layers:
