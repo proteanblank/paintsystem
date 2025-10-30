@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from typing import Dict, List
 import re
 import numpy as np
-from typing import Literal
-import time
+import uuid
 from collections import Counter
+import math
 
 import bpy
 from bpy.app.handlers import persistent
@@ -412,6 +412,39 @@ def ensure_sockets(node_tree: NodeTree, expected_sockets: List[ExpectedSocket], 
                 socket.min_value = -1e39
                 socket.max_value = 1e39
 
+
+def ensure_paint_system_uv_map(context: bpy.types.Context):
+    selection = context.selected_objects
+
+    # Get the active object
+    ps_object = parse_context(context).ps_object
+    
+    if ps_object.data.uv_layers.get(DEFAULT_PS_UV_MAP_NAME):
+        return
+
+    # Deselect all objects
+    for obj in selection:
+        if obj != ps_object:
+            obj.select_set(False)
+    # Make it active
+    context.view_layer.objects.active = ps_object
+    original_mode = str(ps_object.mode)
+    bpy.ops.object.mode_set(mode='EDIT')
+    obj.update_from_editmode()
+    bpy.ops.mesh.select_all(action='SELECT')
+    # Apply to only the active object
+    uv_layers = ps_object.data.uv_layers
+    uvmap = uv_layers.new(name=DEFAULT_PS_UV_MAP_NAME)
+    ps_object.data.uv_layers.active = uvmap
+    bpy.ops.uv.smart_project(angle_limit=30/180*math.pi, island_margin=0.005)
+    bpy.ops.object.mode_set(mode=original_mode)
+    # Deselect the object
+    ps_object.select_set(False)
+    # Restore the selection
+    for obj in selection:
+        obj.select_set(True)
+    context.view_layer.objects.active = ps_object
+
 class MarkerAction(PropertyGroup):
     action_bind: EnumProperty(
         name="Action Bind",
@@ -687,7 +720,6 @@ class Layer(BaseNestedListItem):
     )
     
     def update_node_tree(self, context):
-        start_time = time.time()
         if not self.node_tree and not self.is_linked:
             node_tree = bpy.data.node_groups.new(name=f"PS_Layer ({self.layer_name})", type='ShaderNodeTree')
             self.node_tree = node_tree
@@ -707,6 +739,9 @@ class Layer(BaseNestedListItem):
             ensure_sockets(node_tree, expected_output, "OUTPUT")
         if self.layer_name:
             self.node_tree.name = f".PS_Layer ({self.layer_name})"
+        
+        if self.coord_type == 'AUTO':
+            ensure_paint_system_uv_map(context)
         
         match self.type:
             case "IMAGE":
@@ -763,7 +798,6 @@ class Layer(BaseNestedListItem):
             layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
         layer_graph.compile()
         update_active_image(self, context)
-        print(f"Layer {self.name} node tree updated in {time.time() - start_time} seconds")
     
     # Not used anymore
     def update_layer_name(self, context):
@@ -1214,6 +1248,8 @@ class Channel(BaseNestedListManager):
                 parent_id=parent_id,
                 order=insert_order
             )
+        layer.layer_name = layer_name
+        layer.uid = str(uuid.uuid4())
         # Update active index
         new_id = layer.id
         if new_id != -1:

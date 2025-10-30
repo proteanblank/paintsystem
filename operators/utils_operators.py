@@ -147,47 +147,6 @@ class PAINTSYSTEM_OT_IsolateChannel(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_CreatePaintSystemUVMap(PSContextMixin, Operator):
-    bl_idname = "paint_system.create_paint_system_uv_map"
-    bl_label = "Create Paint System UV Map"
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Create a new UV Map"
-
-    def execute(self, context):
-        # Get all objects in selection
-        selection = context.selected_objects
-
-        # Get the active object
-        ps_object = self.parse_context(context).ps_object
-        
-        if ps_object.data.uv_layers.get(DEFAULT_PS_UV_MAP_NAME):
-            return {'FINISHED'}
-
-        # Deselect all objects
-        for obj in selection:
-            if obj != ps_object:
-                obj.select_set(False)
-        # Make it active
-        context.view_layer.objects.active = ps_object
-        original_mode = str(ps_object.mode)
-        bpy.ops.object.mode_set(mode='EDIT')
-        obj.update_from_editmode()
-        bpy.ops.mesh.select_all(action='SELECT')
-        # Apply to only the active object
-        uv_layers = ps_object.data.uv_layers
-        uvmap = uv_layers.new(name=DEFAULT_PS_UV_MAP_NAME)
-        ps_object.data.uv_layers.active = uvmap
-        bpy.ops.uv.smart_project(angle_limit=30/180*math.pi, island_margin=0.005)
-        bpy.ops.object.mode_set(mode=original_mode)
-        # Deselect the object
-        ps_object.select_set(False)
-        # Restore the selection
-        for obj in selection:
-            obj.select_set(True)
-        context.view_layer.objects.active = ps_object
-        return {'FINISHED'}
-
-
 class PAINTSYSTEM_OT_ToggleBrushEraseAlpha(Operator):
     bl_idname = "paint_system.toggle_brush_erase_alpha"
     bl_label = "Toggle Brush Erase Alpha"
@@ -406,7 +365,6 @@ classes = (
     PAINTSYSTEM_OT_SelectMaterialIndex,
     PAINTSYSTEM_OT_NewMaterial,
     PAINTSYSTEM_OT_IsolateChannel,
-    PAINTSYSTEM_OT_CreatePaintSystemUVMap,
     PAINTSYSTEM_OT_ToggleBrushEraseAlpha,
     PAINTSYSTEM_OT_ColorSampler,
     PAINTSYSTEM_OT_OpenPaintSystemPreferences,
