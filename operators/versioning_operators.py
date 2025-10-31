@@ -73,6 +73,7 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
         warning_messages = []
         for legacy_group in legacy_groups:
             bpy.ops.paint_system.new_group('EXEC_DEFAULT', group_name=legacy_group.name, add_layers=False, template='NONE')
+            ps_ctx = self.parse_context(context)
             for legacy_layer in legacy_group.items:
                 if legacy_layer.type not in [layer[0] for layer in LAYER_TYPE_ENUM]:
                     print(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
