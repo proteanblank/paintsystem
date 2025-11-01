@@ -47,6 +47,20 @@ def get_right_most_node(mat_node_tree: NodeTree) -> Node:
             right_most_node = node
     return right_most_node
 
+
+def node_tree_has_complex_setup(node_tree: NodeTree) -> bool:
+    material_output = get_material_output(node_tree)
+    nodes = traverse_connected_nodes(material_output)
+    if not nodes:
+        return False
+    if len(nodes) > 1:
+        return True
+    node = nodes[0]
+    if node.bl_idname == 'ShaderNodeBsdfPrincipled':
+        return False
+    return True
+
+
 class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOperator):
     """Create a new group in the Paint System"""
     bl_idname = "paint_system.new_group"
@@ -281,6 +295,8 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         else:
             self.group_name = "New Group"
         self.get_coord_type(context)
+        if node_tree_has_complex_setup(ps_ctx.active_material.node_tree):
+            self.template = 'PAINT_OVER'
         return context.window_manager.invoke_props_dialog(self, width=300)
     
     def draw(self, context):
