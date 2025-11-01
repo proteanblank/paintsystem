@@ -740,6 +740,7 @@ class Layer(BaseNestedListItem):
         if self.layer_name:
             self.node_tree.name = f".PS_Layer ({self.layer_name})"
         
+        print(self.coord_type)
         if self.coord_type == 'AUTO':
             ensure_paint_system_uv_map(context)
         

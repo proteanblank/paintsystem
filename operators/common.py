@@ -110,10 +110,19 @@ class PSUVOptionsMixin():
         description="Name of the UV map to use",
         default="UVMap"
     )
+    checked_coord_type: BoolProperty(
+        name="Checked Coordinate Type",
+        description="Checked coordinate type",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
     
     def store_coord_type(self, context):
         """Store the coord_type from the operator to the active channel"""
         ps_ctx = PSContextMixin.parse_context(context)
+        if not self.checked_coord_type:
+            self.get_coord_type(context)
+            return
         if self.use_paint_system_uv:
             self.coord_type = 'AUTO'
         if ps_ctx.active_group:
@@ -123,8 +132,10 @@ class PSUVOptionsMixin():
     def get_coord_type(self, context):
         """Get the coord_type from the active channel and set it on the operator"""
         ps_ctx = PSContextMixin.parse_context(context)
+        self.checked_coord_type = True
         if ps_ctx.active_channel:
             past_coord_type = ps_ctx.active_group.coord_type
+            print(f"Past coord type: {past_coord_type}")
             if past_coord_type == 'AUTO':
                 self.use_paint_system_uv = True
             else:

@@ -593,9 +593,9 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
     
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
+        self.store_coord_type(context)
         layer_name = next(name for texture_type, name, description in TEXTURE_TYPE_ENUM if texture_type == self.texture_type)
         layer = ps_ctx.active_channel.create_layer(layer_name, "TEXTURE")
-        self.store_coord_type(context)
         layer.texture_type = self.texture_type
         layer.coord_type = self.coord_type
         layer.uv_map_name = self.uv_map_name

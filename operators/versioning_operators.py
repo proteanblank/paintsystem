@@ -100,7 +100,11 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                         uv_map_name = uv_map_node.uv_map
                         new_layer.coord_type = "UV"
                         new_layer.uv_map_name = uv_map_name
-                    
+                if legacy_layer.type == "NODE_GROUP":
+                    new_layer.custom_color_input = 0
+                    new_layer.custom_alpha_input = 1
+                    new_layer.custom_color_output = 0
+                    new_layer.custom_alpha_output = 1
                 new_layer.update_node_tree(context)
                 # Apply node values
                 # Copy rgb node value
