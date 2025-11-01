@@ -53,9 +53,11 @@ def capture_node_properties(node: bpy.types.Node) -> dict:
                 continue
             if pid in {
                 'rna_type', 'type', 'location_absolute', 'location', 'internal_links',
-                'inputs', 'outputs', 'parent', 'name', 'label', 'node_width', 'mute', 'hide'
+                'inputs', 'outputs', 'parent', 'name', 'label', 'node_width', 'mute', 'hide', 'bl_idname'
             }:
                 continue
+            if node.type.startswith("TEX"):
+                print(f"node.type: {pid}")
             ptype = getattr(prop, 'type', None)
             if ptype in {'BOOLEAN', 'INT', 'FLOAT', 'STRING', 'ENUM'}:
                 try:
@@ -371,7 +373,7 @@ class NodeTreeBuilder:
                                     self.link(identifier, self.get_node_identifier(link.to_node), output, link.to_socket, force=True)
         # self.tree.links.new
         self._log(f"Time taken to hydrate existing nodes from frame: {time.time() - start_time_hydrate} seconds")
-        self._arrange_nodes()
+        # self._arrange_nodes()
         
 
     def clear_tree(self, clean: bool = False):
