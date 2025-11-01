@@ -1,8 +1,9 @@
 import bpy
-from .data import get_global_layer, sort_actions, parse_context, get_all_layers
+from .data import get_global_layer, sort_actions, parse_context, get_all_layers, is_valid_uuidv4
 from .graph.basic_layers import get_layer_version_for_type
 import time
 from .graph.nodetree_builder import get_nodetree_version
+import uuid
 
 @bpy.app.handlers.persistent
 def frame_change_pre(scene):
@@ -57,12 +58,16 @@ def load_post(scene):
                 for channel in group.channels:
                     has_migrated_global_layer = False
                     for layer in channel.layers:
+                        # Check if layer has valid uuid
+                        if not is_valid_uuidv4(layer.uid):
+                            layer.uid = str(uuid.uuid4())
                         if layer.name and not layer.layer_name: # data from global layer is not copied to layer
                             global_layer = get_global_layer(layer)
                             if global_layer:
                                 print(f"Migrating global layer data ({global_layer.name}) to layer data ({layer.name}) ({layer.layer_name})")
                                 has_migrated_global_layer = True
                                 layer.layer_name = layer.name
+                                layer.uid = global_layer.name
                                 if global_layer.name not in seen_global_layers_map:
                                     seen_global_layers_map[global_layer.name] = [mat, global_layer]
                                     for prop in global_layer.bl_rna.properties:
@@ -71,9 +76,8 @@ def load_post(scene):
                                             continue
                                         if pid in {"layer_name"}:
                                             continue
-                                        if pid == "name":
-                                            uid = getattr(global_layer, pid)
-                                            layer.uid = uid
+                                        if pid in {"name", "uid"}:
+                                            continue
                                         setattr(layer, pid, getattr(global_layer, pid))
                                 else:
                                     # as linked layer, properties will not be copied
@@ -84,13 +88,11 @@ def load_post(scene):
                     if has_migrated_global_layer:
                         channel.update_node_tree(bpy.context)
     # ps_scene_data Versioning
-    # As it is not used anymore, we can remove it in the future
+    # As layers in ps_scene_data is not used anymore, we can remove it in the future
     ps_scene_data = getattr(bpy.context.scene, 'ps_scene_data', None)
-    if ps_scene_data:
+    if ps_scene_data and hasattr(ps_scene_data, 'layers') and len(ps_scene_data.layers) > 0:
         # print(f"Removing ps_scene_data")
         ps_scene_data.layers.clear()
-        ps_scene_data.clipboard_layers.clear()
-        ps_scene_data.clipboard_material = None
         ps_scene_data.last_selected_ps_object = None
         ps_scene_data.last_selected_material = None
             

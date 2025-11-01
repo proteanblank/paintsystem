@@ -414,7 +414,7 @@ class NodeTreeBuilder:
         
         self.compiled = False  # Reset compiled state
 
-    def add_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None, force_properties: bool = False, force_default_values: bool = False) -> None:
+    def add_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None, force_properties: bool = False, force_default_values: bool = False) -> Add_Node:
         # Store the command to add a node
         """
         Adds a node to the graph definition.
@@ -448,8 +448,11 @@ class NodeTreeBuilder:
             return
         
         self._log(f"Adding node '{identifier}' of type '{node_type}' with properties '{properties}' and default values '{default_values}'")
-        self.__add_nodes_commands[identifier] = Add_Node(
+        add_command = Add_Node(
             identifier=identifier, node_type=node_type, properties=properties, default_values=default_values, default_outputs=default_outputs, force_properties=force_properties, force_default_values=force_default_values)
+        
+        self.__add_nodes_commands[identifier] = add_command
+        return add_command
 
     def _create_node(self, identifier: str, node_type: str, properties: dict = None, default_values: dict = None, default_outputs: dict = None, force_properties: bool = False, force_default_values: bool = False) -> None:
         """

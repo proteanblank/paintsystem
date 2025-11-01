@@ -41,6 +41,7 @@ from ..utils import get_next_unique_name
 from .common import PaintSystemPreferences
 from .graph import (
     NodeTreeBuilder,
+    Add_Node,
     create_adjustment_graph,
     create_attribute_graph,
     create_custom_graph,
@@ -161,6 +162,25 @@ FILTER_TYPE_ENUM = [
     ('EDGE_ENHANCE', "Edge Enhance", "Edge Enhance"),
     ('SHARPEN', "Sharpen", "Sharpen"),
 ]
+
+def is_valid_uuidv4(uuid_string):
+    """
+    Checks if a given string is a valid UUIDv4.
+
+    Args:
+        uuid_string (str): The string to validate.
+
+    Returns:
+        bool: True if the string is a valid UUIDv4, False otherwise.
+    """
+    try:
+        uuid_obj = uuid.UUID(uuid_string, version=4)
+        # Ensure the string representation of the object matches the original string
+        # to catch cases where a valid UUID string might have been padded or altered
+        return str(uuid_obj) == uuid_string
+    except ValueError:
+        return False
+
 
 def update_brush_settings(self=None, context: bpy.types.Context = bpy.context):
     if context.mode != 'PAINT_TEXTURE':
@@ -720,6 +740,9 @@ class Layer(BaseNestedListItem):
     )
     
     def update_node_tree(self, context):
+        self = self.get_layer_data()
+        if not is_valid_uuidv4(self.uid):
+            self.uid = str(uuid.uuid4())
         if not self.node_tree and not self.is_linked:
             node_tree = bpy.data.node_groups.new(name=f"PS_Layer ({self.layer_name})", type='ShaderNodeTree')
             self.node_tree = node_tree
@@ -972,6 +995,7 @@ class Layer(BaseNestedListItem):
     # Linked layer data
     @property
     def is_linked(self) -> bool:
+        # print(f"Linked layer {self.linked_layer_uid} to material {self.linked_material.name if self.linked_material else 'None'}")
         return bool(self.linked_layer_uid and self.linked_material)
     
     linked_layer_uid: StringProperty(
@@ -1003,6 +1027,10 @@ class Layer(BaseNestedListItem):
             uid_to_layer = _get_material_layer_uid_map(self.linked_material)
             return uid_to_layer.get(self.linked_layer_uid)
         return self
+
+def get_layer_by_uid(material: Material, uid: str) -> Layer | None:
+    uid_to_layer = _get_material_layer_uid_map(material)
+    return uid_to_layer.get(uid)
 
 # Module-level cache for material layer UID maps
 _material_uid_cache: Dict[Material, Dict[str, 'Layer']] = {}
@@ -1139,10 +1167,11 @@ class Channel(BaseNestedListManager):
             alpha_name: str
             alpha_socket: str
             clip_mode = False
-            clip_color_name: str|None = None
-            clip_alpha_name: str|None = None
-            clip_color_socket: str|None = None
-            clip_alpha_socket: str|None = None
+            add_command: Optional[Add_Node] = None
+            clip_color_name: Optional[str] = None
+            clip_alpha_name: Optional[str] = None
+            clip_color_socket: Optional[str] = None
+            clip_alpha_socket: Optional[str] = None
             
         previous_dict: Dict[int, PreviousLayer] = {}
         if self.type == "VECTOR" and self.use_normalize:
@@ -1159,8 +1188,17 @@ class Channel(BaseNestedListManager):
                 if not layer.node_tree:
                     continue
                 previous_data = previous_dict.get(layer.parent_id, None)
-                layer_identifier = layer.name
-                node_builder.add_node(layer_identifier, "ShaderNodeGroup", {"node_tree": layer.node_tree}, {"Clip": layer.is_clip}, force_default_values=True)
+                if previous_data and previous_data.add_command and previous_data.add_command.properties.get("mute", False):
+                    previous_data.add_command.properties["mute"] = False
+                layer_identifier = layer.uid
+                add_command = node_builder.add_node(
+                    layer_identifier, "ShaderNodeGroup",
+                    {"node_tree": layer.node_tree, "mute": layer.type == "ADJUSTMENT"},
+                    {"Clip": layer.is_clip},
+                    force_properties=True,
+                    force_default_values=True
+                )
+                previous_data.add_command = add_command
                 if layer.is_clip and not previous_data.clip_mode:
                     previous_data.clip_mode = True
                     clip_nt = get_alpha_over_nodetree()
@@ -1238,7 +1276,7 @@ class Channel(BaseNestedListManager):
         self.updating_name_flag = False
         update_active_group(self, context)
     
-    def create_layer(self, layer_name: str, layer_type: str) -> 'Layer':
+    def create_layer(self, layer_name: str = "Layer Name", layer_type: str = "IMAGE") -> 'Layer':
         parent_id, insert_order = self.get_insertion_data()
         # Adjust existing items' order
         self.adjust_sibling_orders(parent_id, insert_order)
@@ -1259,10 +1297,9 @@ class Channel(BaseNestedListManager):
                     break
         return layer
     
-    def create_linked_layer(self, layer: 'Layer', material: Material) -> 'Layer':
-        new_layer = self.create_layer(layer.name, layer.type)
-        new_layer.is_linked = True
-        new_layer.linked_layer_uid = layer.uid
+    def create_linked_layer(self, layer_uid: str, material: Material) -> 'Layer':
+        new_layer = self.create_layer()
+        new_layer.linked_layer_uid = layer_uid
         new_layer.linked_material = material
         return new_layer
     
@@ -1577,6 +1614,19 @@ class Group(PropertyGroup):
         type=NodeTree
     )
 
+
+class ClipboardLayer(PropertyGroup):
+    """Clipboard layer"""
+    uid: StringProperty(
+        name="UID",
+        description="UID of the layer",
+        default=""
+    )
+    material: PointerProperty(
+        name="Material",
+        type=Material
+    )
+
 class PaintSystemGlobalData(PropertyGroup):
     """Custom data for the Paint System"""
     
@@ -1606,15 +1656,9 @@ class PaintSystemGlobalData(PropertyGroup):
     
     
     clipboard_layers: CollectionProperty(
-        type=Layer,
+        type=ClipboardLayer,
         name="Clipboard Layers",
         description="Collection of layers in the clipboard",
-        options={'SKIP_SAVE'}
-    )
-    clipboard_material: PointerProperty(
-        name="Clipboard Material",
-        type=Material,
-        description="Clipboard material",
         options={'SKIP_SAVE'}
     )
     active_clipboard_index: IntProperty(name="Active Clipboard Layer Index")
@@ -2146,6 +2190,7 @@ classes = (
     Layer,
     Channel,
     Group,
+    ClipboardLayer,
     PaintSystemGlobalData,
     MaterialData,
     LegacyPaintSystemLayer,
