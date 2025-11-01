@@ -922,7 +922,7 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
             layer = get_layer_by_uid(clipboard_layer.material, clipboard_layer.uid)
             if not layer:
                 continue
-            new_layer = ps_ctx.active_channel.create_layer(layer.name, layer.type, update_active_index=False, handle_folder=False)
+            new_layer = ps_ctx.active_channel.create_layer(layer.name, "BLANK", update_active_index=False, handle_folder=False)
             new_layer_id_map[layer.id] = new_layer
             if layer.parent_id != -1:
                 new_layer.parent_id = new_layer_id_map[layer.parent_id].id

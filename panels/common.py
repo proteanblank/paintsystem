@@ -293,7 +293,7 @@ def toggle_paint_mode_ui(layout: bpy.types.UILayout, context: bpy.types.Context)
 def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
     ps_ctx = PSContextMixin.parse_context(context)
     active_layer = ps_ctx.active_layer
-    if not active_layer:
+    if not active_layer or active_layer.node_tree:
         return
     color_mix_node = active_layer.mix_node
     

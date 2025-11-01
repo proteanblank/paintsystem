@@ -76,6 +76,7 @@ LAYER_TYPE_ENUM = [
     ('RANDOM', "Random", "Random Color layer"),
     ('TEXTURE', "Texture", "Texture layer"),
     ('GEOMETRY', "Geometry", "Geometry layer"),
+    ('BLANK', "Blank", "Blank layer"),
 ]
 
 CHANNEL_TYPE_ENUM = [
@@ -743,7 +744,11 @@ class Layer(BaseNestedListItem):
         self = self.get_layer_data()
         if not is_valid_uuidv4(self.uid):
             self.uid = str(uuid.uuid4())
+        if self.type == "BLANK":
+            return
+        
         if not self.node_tree and not self.is_linked:
+            print(f"Creating node tree for {self.layer_name}")
             node_tree = bpy.data.node_groups.new(name=f"PS_Layer ({self.layer_name})", type='ShaderNodeTree')
             self.node_tree = node_tree
             expected_input = [
@@ -831,18 +836,22 @@ class Layer(BaseNestedListItem):
         self.update_node_tree(context)
             
     def find_node(self, identifier: str) -> Node | None:
+        self = self.get_layer_data()
         return get_node_from_nodetree(self.node_tree, identifier)
             
     @property
     def mix_node(self) -> Node | None:
+        self = self.get_layer_data()
         return self.find_node("mix_rgb")
     
     @property
     def post_mix_node(self) -> Node | None:
+        self = self.get_layer_data()
         return self.find_node("post_mix")
     
     @property
     def pre_mix_node(self) -> Node | None:
+        self = self.get_layer_data()
         return self.find_node("pre_mix")
     
     uid: StringProperty()
