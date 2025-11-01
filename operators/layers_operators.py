@@ -889,11 +889,10 @@ class PAINTSYSTEM_OT_CopyAllLayers(PSContextMixin, Operator):
         active_channel = ps_ctx.active_channel
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         clipboard_layers.clear()
-        for layer in active_channel.layers:
+        for layer in active_channel.flattened_layers:
             clipboard_layer = clipboard_layers.add()
-            clipboard_layer.name = layer.name
-            clipboard_layer.type = layer.type
-            clipboard_layer.ref_layer_id = layer.ref_layer_id
+            clipboard_layer.uid = layer.uid
+            clipboard_layer.material = ps_ctx.active_material
         return {'FINISHED'}
 
 
@@ -917,20 +916,27 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
     def execute(self, context):
         ps_ctx = self.parse_context(context)
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
+        new_layer_id_map = {}
+        base_parent_id = ps_ctx.active_layer.id
         for clipboard_layer in clipboard_layers:
-            if self.linked:
-                ps_ctx.active_channel.create_linked_layer(clipboard_layer.uid, clipboard_layer.material)
+            layer = get_layer_by_uid(clipboard_layer.material, clipboard_layer.uid)
+            if not layer:
+                continue
+            new_layer = ps_ctx.active_channel.create_layer(layer.name, layer.type, update_active_index=False, handle_folder=False)
+            new_layer_id_map[layer.id] = new_layer
+            if layer.parent_id != -1:
+                new_layer.parent_id = new_layer_id_map[layer.parent_id].id
             else:
-                # Create a new global layer and copy everything except the uid
-                layer = get_layer_by_uid(clipboard_layer.material, clipboard_layer.uid)
-                if not layer:
-                    continue
-                new_layer = ps_ctx.active_channel.create_layer(layer.name, layer.type)
+                new_layer.parent_id = base_parent_id
+            if self.linked:
+                new_layer.linked_layer_uid = clipboard_layer.uid
+                new_layer.linked_material = clipboard_layer.material
+            else:
                 for prop in layer.bl_rna.properties:
                     pid = getattr(prop, 'identifier', '')
                     if not pid or getattr(prop, 'is_readonly', False):
                         continue
-                    if pid in {"uid", "node_tree", "type"}:
+                    if pid in {"uid", "node_tree", "type", "id", "order", "parent_id"}:
                         continue
                     setattr(new_layer, pid, getattr(layer, pid))
         ps_ctx.active_channel.update_node_tree(context)

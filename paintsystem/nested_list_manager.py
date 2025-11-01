@@ -49,7 +49,7 @@ class BaseNestedListManager(PropertyGroup):
             if item.parent_id == parent_id and item.order >= insert_order:
                 item.order += 1
 
-    def get_insertion_data(self, active_item=None):
+    def get_insertion_data(self, active_item=None, handle_folder=True):
         """Get parent_id and insert_order for new item based on active item"""
         if active_item is None:
             active_item = self.get_active_item()
@@ -58,7 +58,7 @@ class BaseNestedListManager(PropertyGroup):
         insert_order = 1
 
         if active_item:
-            if active_item.type == 'FOLDER':
+            if active_item.type == 'FOLDER' and handle_folder:
                 # If selected item is a folder, add inside it
                 parent_id = active_item.id
                 # Find lowest order in folder or default to 1

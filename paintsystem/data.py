@@ -1055,7 +1055,7 @@ def _get_material_layer_uid_map(material: Material) -> Dict[str, 'Layer']:
     
     # Cache it
     _material_uid_cache[cache_key] = uid_map
-    print(f"Material {material.name} UID map: {uid_map}")
+    # print(f"Material {material.name} UID map: {uid_map}")
     return uid_map
 
 def _invalidate_material_layer_cache(material: Material = None):
@@ -1276,8 +1276,8 @@ class Channel(BaseNestedListManager):
         self.updating_name_flag = False
         update_active_group(self, context)
     
-    def create_layer(self, layer_name: str = "Layer Name", layer_type: str = "IMAGE") -> 'Layer':
-        parent_id, insert_order = self.get_insertion_data()
+    def create_layer(self, layer_name: str = "Layer Name", layer_type: str = "IMAGE", update_active_index: bool = True, handle_folder: bool = True) -> 'Layer':
+        parent_id, insert_order = self.get_insertion_data(handle_folder=handle_folder)
         # Adjust existing items' order
         self.adjust_sibling_orders(parent_id, insert_order)
         layer = self.add_item(
@@ -1289,12 +1289,13 @@ class Channel(BaseNestedListManager):
         layer.layer_name = layer_name
         layer.uid = str(uuid.uuid4())
         # Update active index
-        new_id = layer.id
-        if new_id != -1:
-            for i, item in enumerate(self.layers):
-                if item.id == new_id:
-                    self.active_index = i
-                    break
+        if update_active_index:
+            new_id = layer.id
+            if new_id != -1:
+                for i, item in enumerate(self.layers):
+                    if item.id == new_id:
+                        self.active_index = i
+                        break
         return layer
     
     def create_linked_layer(self, layer_uid: str, material: Material) -> 'Layer':

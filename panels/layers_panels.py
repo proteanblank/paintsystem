@@ -108,6 +108,7 @@ def draw_layer_icon(layer: Layer, layout: bpy.types.UILayout):
             layout.label(icon='BLANK1')
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
+        original_item = item
         item = item.get_layer_data()
         if not item:
             return
@@ -115,7 +116,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
         active_channel = data
         flattened = active_channel.flattened_layers
         if index < len(flattened):
-            level = active_channel.get_item_level_from_id(item.id)
+            level = active_channel.get_item_level_from_id(original_item.id)
             main_row = layout.row()
             # Check if parent of the current item is enabled
             parent_item = active_channel.get_item_by_id(
