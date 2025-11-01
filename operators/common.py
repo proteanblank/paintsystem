@@ -144,12 +144,13 @@ class PSUVOptionsMixin():
             self.uv_map_name = ps_ctx.active_group.uv_map_name
             
     def select_coord_type_ui(self, layout, context):
+        ps_ctx = PSContextMixin.parse_context(context)
         row = layout.row(align=True)
         row.label(text="Coordinate Type", icon='UV')
         row.prop(self, "use_paint_system_uv", text="Use AUTO UV?", toggle =1)
         if self.use_paint_system_uv:
             info_box = layout.box()
-            if not context.object.data.uv_layers.get(DEFAULT_PS_UV_MAP_NAME):
+            if not ps_ctx.ps_object.data.uv_layers.get(DEFAULT_PS_UV_MAP_NAME):
                 info_box.label(text="Will create UV Map: " + DEFAULT_PS_UV_MAP_NAME, icon='ERROR')
             else:
                 info_box.label(text="Using UV Map: " + DEFAULT_PS_UV_MAP_NAME, icon='INFO')

@@ -55,7 +55,7 @@ def node_tree_has_complex_setup(node_tree: NodeTree) -> bool:
         return False
     if len(nodes) > 1:
         return True
-    node = nodes[0]
+    node = nodes.pop()
     if node.bl_idname == 'ShaderNodeBsdfPrincipled':
         return False
     return True
@@ -295,7 +295,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         else:
             self.group_name = "New Group"
         self.get_coord_type(context)
-        if node_tree_has_complex_setup(ps_ctx.active_material.node_tree):
+        if ps_ctx.active_material and node_tree_has_complex_setup(ps_ctx.active_material.node_tree):
             self.template = 'PAINT_OVER'
         return context.window_manager.invoke_props_dialog(self, width=300)
     

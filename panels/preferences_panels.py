@@ -19,6 +19,11 @@ class PaintSystemPreferences(AddonPreferences):
         description="Show hex color in the color picker settings",
         default=False
     )
+    show_more_color_picker_settings: BoolProperty(
+        name="Show More Color Picker Settings",
+        description="Show more color picker settings",
+        default=False
+    )
 
     use_compact_design: BoolProperty(
         name="Use Compact Design",
@@ -46,10 +51,11 @@ class PaintSystemPreferences(AddonPreferences):
         default=False
     )
 
-    # name_layers_group: BoolProperty(
-    #     name="Name Layers According to Group Name",
-    #     default=False
-    # )
+    use_legacy_ui: BoolProperty(
+        name="Use Legacy UI",
+        description="Use the legacy UI",
+        default=False
+    )
 
     def draw_shortcut(self, layout, kmi, text):
         row = layout.row(align=True)
@@ -80,6 +86,7 @@ class PaintSystemPreferences(AddonPreferences):
 
         layout.prop(self, "show_tooltips", text="Show Tooltips")
         layout.prop(self, "use_compact_design", text="Use Compact Design")
+        layout.prop(self, "use_legacy_ui", text="Use Legacy UI")
         # layout.prop(self, "name_layers_group",
         #             text="Name Layers According to Group Name")
 

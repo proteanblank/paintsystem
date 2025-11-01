@@ -5,7 +5,8 @@ from .common import (
     PSContextMixin,
     get_icon,
     scale_content,
-    check_group_multiuser
+    check_group_multiuser,
+    toggle_paint_mode_ui
 )
 
 from ..paintsystem.data import LegacyPaintSystemContextParser
@@ -20,9 +21,11 @@ creators = [
 class MAT_PT_Support(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_Support'
     bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
+    bl_region_type = "WINDOW"
     bl_label = "Support"
+    bl_options = {"INSTANCED"}
     bl_ui_units_x = 10
+    
 
     def draw(self, context):
         layout = self.layout
@@ -75,10 +78,8 @@ class MAT_PT_PaintSystemGroups(PSContextMixin, Panel):
     bl_idname = "MAT_PT_PaintSystemGroups"
     bl_label = "Groups"
     bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    # bl_category = 'Paint System'
-    # bl_parent_id = 'MAT_PT_LayerSettings'
-    # bl_options = {'DEFAULT_CLOSED'}
+    bl_region_type = "WINDOW"
+    bl_options = {"INSTANCED"}
     bl_ui_units_x = 12
 
     def draw(self, context):
@@ -93,7 +94,8 @@ class MAT_PT_PaintSystemMaterialSettings(PSContextMixin, Panel):
     bl_idname = "MAT_PT_PaintSystemMaterialSettings"
     bl_label = "Material Settings"
     bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
+    bl_region_type = "WINDOW"
+    bl_options = {"INSTANCED"}
     bl_ui_units_x = 12
     
     def draw(self, context):
@@ -157,25 +159,28 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             
             return
         ps_ctx = self.parse_context(context)
+        if not ps_ctx.ps_settings.use_legacy_ui and ps_ctx.active_channel:
+            toggle_paint_mode_ui(layout, context)
         ob = ps_ctx.ps_object
         if ob.type != 'MESH':
             return
-        mat = ps_ctx.active_material
-        groups = ps_ctx.ps_mat_data.groups if mat else []
-        if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
-            col = layout.column(align=True)
-            row = col.row(align=True)
-            scale_content(context, row, 1.5, 1.2)
-            row.menu("MAT_MT_PaintSystemMaterialSelectMenu", text="" if ob.active_material else "Empty Material", icon="MATERIAL" if ob.active_material else "MESH_CIRCLE")
-            if mat:
-                row.prop(mat, "name", text="")
-            
-            # row.operator("object.material_slot_add", icon='ADD', text="")
-            if mat:
-                row.popover("MAT_PT_PaintSystemMaterialSettings", text="", icon="PREFERENCES")
         
-            
+        if ps_ctx.ps_settings.use_legacy_ui:
+            mat = ps_ctx.active_material
+            groups = ps_ctx.ps_mat_data.groups if mat else []
+            if any([ob.material_slots[i].material for i in range(len(ob.material_slots))]):
+                col = layout.column(align=True)
+                row = col.row(align=True)
+                scale_content(context, row, 1.5, 1.2)
+                row.menu("MAT_MT_PaintSystemMaterialSelectMenu", text="" if ob.active_material else "Empty Material", icon="MATERIAL" if ob.active_material else "MESH_CIRCLE")
+                if mat:
+                    row.prop(mat, "name", text="")
+                
+                # row.operator("object.material_slot_add", icon='ADD', text="")
+                if mat:
+                    row.popover("MAT_PT_PaintSystemMaterialSettings", text="", icon="PREFERENCES")
         
+
         if ps_ctx.active_group and check_group_multiuser(ps_ctx.active_group.node_tree):
             # Show a warning
             box = layout.box()

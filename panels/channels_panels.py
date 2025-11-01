@@ -62,8 +62,9 @@ class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
 class MAT_PT_ChannelsSelect(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_ChannelsSelect'
     bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
+    bl_region_type = "WINDOW"
     bl_label = "Channels"
+    bl_options = {"INSTANCED"}
     bl_ui_units_x = 10
     
     def draw(self, context):

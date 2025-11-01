@@ -151,7 +151,7 @@ class PAINTSYSTEM_OT_ExportImage(PSContextMixin, Operator):
 
         image = bpy.data.images.get(self.image_name)
         if not image:
-            self.report({'ERROR'}, "Image not found.")
+            self.report({'ERROR'}, "Baked Image not found.")
             return {'CANCELLED'}
 
         with bpy.context.temp_override(**{'edit_image': image}):
@@ -189,6 +189,14 @@ class PAINTSYSTEM_OT_ExportAllImages(PSContextMixin, Operator):
         return ps_ctx.active_group
     
     def invoke(self, context, event):
+        ps_ctx = self.parse_context(context)
+        bake_image_num = 0
+        for channel in ps_ctx.active_group.channels:
+            if channel.bake_image:
+                bake_image_num += 1
+        if bake_image_num == 0:
+            self.report({'ERROR'}, "No baked images found.")
+            return {'CANCELLED'}
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
     

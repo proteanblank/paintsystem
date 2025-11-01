@@ -17,7 +17,8 @@ class MAT_PT_BrushTooltips(Panel):
     bl_description = "Brush Tooltips"
     bl_idname = "MAT_PT_BrushTooltips"
     bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
+    bl_region_type = "WINDOW"
+    bl_options = {"INSTANCED"}
     bl_ui_units_x = 8
 
     def draw_shortcut(self, layout, kmi, text):
@@ -147,7 +148,8 @@ class MAT_PT_BrushColorSettings(PSContextMixin, Panel):
     bl_idname = "MAT_PT_BrushColorSettings"
     bl_label = "Color Picker Settings"
     bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
+    bl_region_type = "WINDOW"
+    bl_options = {"INSTANCED"}
     bl_ui_units_x = 10
     
     def draw(self, context):
@@ -156,6 +158,7 @@ class MAT_PT_BrushColorSettings(PSContextMixin, Panel):
         layout.prop(context.preferences.view, "color_picker_type", text="")
         layout.prop(ps_ctx.ps_settings, "color_picker_scale", text="Color Picker Scale", slider=True)
         layout.prop(ps_ctx.ps_settings, "show_hex_color", text="Show Hex Color")
+        layout.prop(ps_ctx.ps_settings, "show_more_color_picker_settings", text="Show HSV Sliders")
 
 class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
     bl_idname = 'MAT_PT_BrushColor'
@@ -228,10 +231,11 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
             row = col.row()
             row.scale_y = ps_ctx.ps_settings.color_picker_scale
             self.prop_unified_color_picker(row, context, brush, "color", value_slider=True)
-            if not context.preferences.view.color_picker_type == "SQUARE_SV":
-                col.prop(ps_ctx.ps_scene_data, "hue", text="Hue")
-            col.prop(ps_ctx.ps_scene_data, "saturation", text="Saturation")
-            col.prop(ps_ctx.ps_scene_data, "value", text="Value")
+            if ps_ctx.ps_settings.show_more_color_picker_settings:
+                if not context.preferences.view.color_picker_type == "SQUARE_SV":
+                    col.prop(ps_ctx.ps_scene_data, "hue", text="Hue")
+                col.prop(ps_ctx.ps_scene_data, "saturation", text="Saturation")
+                col.prop(ps_ctx.ps_scene_data, "value", text="Value")
             if ps_ctx.ps_settings.show_hex_color:
                 row = col.row()
                 row.prop(ps_ctx.ps_scene_data, "hex_color", text="Hex")

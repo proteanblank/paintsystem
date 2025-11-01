@@ -11,7 +11,9 @@ from .common import (
     get_icon,
     get_icon_from_channel,
     check_group_multiuser,
-    image_node_settings
+    image_node_settings,
+    toggle_paint_mode_ui,
+    layer_settings_ui
 )
 
 from ..utils.nodes import find_node, traverse_connected_nodes, get_material_output
@@ -53,18 +55,6 @@ def is_image_painted(image: Image | ImagePreview) -> bool:
         image.image_pixels_float.foreach_get(pixels)
         return len(pixels) > 0 and any(pixels)
     return False
-
-
-def is_basic_setup(node_tree: NodeTree) -> bool:
-    material_output = get_material_output(node_tree)
-    nodes = traverse_connected_nodes(material_output)
-    is_basic_setup = True
-    # Only first 3 nodes
-    for check in ('ShaderNodeGroup', 'ShaderNodeMixShader', 'ShaderNodeBsdfTransparent'):
-        if not any(node.bl_idname == check for node in nodes):
-            is_basic_setup = False
-            break
-    return is_basic_setup
 
 
 def draw_layer_icon(layer: Layer, layout: bpy.types.UILayout):
@@ -238,23 +228,14 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         ps_ctx = self.parse_context(context)
 
         layout = self.layout
-        current_mode = context.mode
         box = layout.box()
-        col = box.column(align=True)
-        row = col.row(align=True)
-        row.scale_y = 1.7
-        row.scale_x = 1.7
-        # if contains_mat_setup:
-        paint_row = row.row(align=True)
-        paint_row.operator("paint_system.toggle_paint_mode",
-            text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon('paintbrush'))
+        if ps_ctx.ps_settings.use_legacy_ui:
+            toggle_paint_mode_ui(box, context)
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             grease_pencil = context.grease_pencil
             layers = grease_pencil.layers
             is_layer_active = layers.active is not None
             is_group_active = grease_pencil.layer_groups.active is not None
-            row.operator("wm.save_mainfile",
-                text="", icon_value=get_icon('save'))
             row = box.row()
             scale_content(context, row, scale_x=1, scale_y=1.2)
             row.template_grease_pencil_layer_tree()
@@ -280,7 +261,23 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             sub.operator("grease_pencil.layer_move", icon='TRIA_UP', text="").direction = 'UP'
             sub.operator("grease_pencil.layer_move", icon='TRIA_DOWN', text="").direction = 'DOWN'
         elif ps_ctx.ps_object.type == 'MESH':
-            paint_row.enabled = not ps_ctx.active_channel.use_bake_image
+            if not ps_ctx.ps_settings.use_legacy_ui:
+                layer_settings_ui(box, context)
+                col = box.column()
+                row = col.row()
+                row.scale_y = 1.2
+                new_row = row.row(align=True)
+                new_row.operator("wm.call_menu", text="New Layer", icon_value=get_icon('layer_add')).name = "MAT_MT_AddLayerMenu"
+                new_row.menu("MAT_MT_LayerMenu",
+                    text="", icon='COLLAPSEMENU')
+                move_row = row.row(align=True)
+                move_row.operator("paint_system.move_up", icon="TRIA_UP", text="")
+                move_row.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
+                row.operator("paint_system.delete_item",
+                            text="", icon="TRASH")
+            else:
+                box = layout.box()
+        
             active_group = ps_ctx.active_group
             active_channel = ps_ctx.active_channel
             mat = ps_ctx.active_material
@@ -299,63 +296,38 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                 warning_col.label(text="Paint System not connected", icon='ERROR')
                 warning_col.label(text="to material output!", icon='BLANK1')
 
-            if not is_basic_setup(mat.node_tree) or len(ps_ctx.active_group.channels) > 1:
-                row.operator("paint_system.isolate_active_channel",
-                            text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon("channel"))
-            row.operator("wm.save_mainfile",
-                        text="", icon_value=get_icon('save'))
-            # Baking and Exporting
-            
-            if ps_ctx.ps_settings.show_tooltips and not ps_ctx.ps_settings.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
-                row = col.row(align=True)
-                row.scale_y = 1.5
-                row.scale_x = 1.5
-                tip_box = col.box()
-                tip_box.scale_x = 1.4
-                tip_row = tip_box.row()
-                tip_col = tip_row.column(align=True)
-                tip_col.label(text="The button above will")
-                tip_col.label(text="show object normal")
-                tip_row.label(icon_value=get_icon('arrow_up'))
-                tip_row.operator("paint_system.hide_painting_tips",
-                            text="", icon='X').attribute_name = 'hide_norm_paint_tips'
-
-            row = col.row(align=True)
-            row.scale_y = 1.3
-            row.scale_x = 1.2
-            
-            row.menu("MAT_MT_PaintSystemMergeAndExport",
-                        text="Bake and Export")
-
             if active_channel.use_bake_image:
                 image_node = find_node(active_channel.node_tree, {'bl_idname': 'ShaderNodeTexImage', 'image': active_channel.bake_image})
-                bake_box = box.box()
+                bake_box = layout.box()
                 col = bake_box.column()
                 col.label(text="Baked Image", icon="TEXTURE_DATA")
                 col.operator("wm.call_menu", text="Apply Image Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
                 col.operator("paint_system.delete_bake_image", text="Delete", icon="TRASH")
-                image_node_settings(box, image_node, active_channel, "bake_image")
+                image_node_settings(layout, image_node, active_channel, "bake_image")
                 return
 
 
             row = box.row()
+            layers_col = row.column()
             scale_content(context, row, scale_x=1, scale_y=1.5)
-            row.template_list(
+            layers_col.template_list(
                 "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
                 rows=min(max(5, len(layers)), 7)
             )
 
-            col = row.column(align=True)
-            col.scale_x = 1.2
-            col.operator("wm.call_menu", text="", icon_value=get_icon('layer_add')).name = "MAT_MT_AddLayerMenu"
-            col.menu("MAT_MT_LayerMenu",
-                    text="", icon='COLLAPSEMENU')
-            col.separator()
-            col.operator("paint_system.delete_item",
-                            text="", icon="TRASH")
-            col.separator()
-            col.operator("paint_system.move_up", icon="TRIA_UP", text="")
-            col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
+            
+            if ps_ctx.ps_settings.use_legacy_ui:
+                col = row.column(align=True)
+                col.scale_x = 1.2
+                col.operator("wm.call_menu", text="", icon_value=get_icon('layer_add')).name = "MAT_MT_AddLayerMenu"
+                col.menu("MAT_MT_LayerMenu",
+                        text="", icon='COLLAPSEMENU')
+                col.separator()
+                col.operator("paint_system.delete_item",
+                                text="", icon="TRASH")
+                col.separator()
+                col.operator("paint_system.move_up", icon="TRIA_UP", text="")
+                col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 
 
 class MAT_MT_ImageFilterMenu(PSContextMixin, Menu):
@@ -454,46 +426,12 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
             if not active_layer:
                 return
                 # Settings
-            row = layout.row(align=True)
-            scale_content(context, row)
-            row.popover(
-                panel="MAT_PT_Actions",
-                text=f"{len(active_layer.actions)} Active Actions" if active_layer.actions else "Add Layer Actions",
-                icon="KEYTYPE_KEYFRAME_VEC"
-            )
+            if active_layer.type not in ('ADJUSTMENT', 'NODE_GROUP', 'ATTRIBUTE', 'GRADIENT', 'SOLID_COLOR', 'RANDOM', 'TEXTURE', 'GEOMETRY'):
+                return
             box = layout.box()
-
-            # if ps.preferences.show_tooltips:
-            #     row.menu("MAT_MT_LayersSettingsTooltips", text='', icon='QUESTION')
-
-            # Let user set opacity and blend mode:
-            color_mix_node = active_layer.mix_node
-            col = box.column(align=True)
-            row = col.row(align=True)
-            row.scale_y = 1.2
-            row.scale_x = 1.2
-            scale_content(context, row, 1.7, 1.5)
-            clip_row = row.row(align=True)
-            clip_row.enabled = not active_layer.lock_layer
-            clip_row.prop(active_layer, "is_clip", text="",
-                    icon="SELECT_INTERSECT")
-            if active_layer.type == 'IMAGE':
-                clip_row.prop(active_layer, "lock_alpha",
-                        text="", icon='TEXTURE')
-            lock_row = row.row(align=True)
-            lock_row.prop(active_layer, "lock_layer",
-                    text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
-            blend_type_row = row.row(align=True)
-            blend_type_row.enabled = not active_layer.lock_layer
-            blend_type_row.prop(color_mix_node, "blend_type", text="")
-            row = col.row(align=True)
-            scale_content(context, row, scale_x=1.2, scale_y=1.5)
-            row.enabled = not active_layer.lock_layer
-            row.prop(active_layer.pre_mix_node.inputs['Opacity'], "default_value",
-                    text="Opacity", slider=True)
+            if ps_ctx.ps_settings.use_legacy_ui:
+                layer_settings_ui(box, context)
             match active_layer.type:
-                case 'IMAGE':
-                    pass
                 case 'ADJUSTMENT':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
@@ -906,7 +844,6 @@ class PAINTSYSTEM_UL_Actions(PSContextMixin, UIList):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = 'Paint System'
-    bl_parent_id = 'MAT_PT_LayerSettings'
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_property, index):
         layout.prop(item, "action_bind", text="", icon_only=True, emboss=False)
@@ -929,16 +866,19 @@ class MAT_PT_Actions(PSContextMixin, Panel):
     bl_label = "Actions"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    # bl_category = 'Paint System'
-    # bl_parent_id = 'MAT_PT_LayerSettings'
-    # bl_options = {'DEFAULT_CLOSED'}
-    bl_ui_units_x = 12
+    bl_category = 'Paint System'
+    bl_parent_id = 'MAT_PT_LayerSettings'
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
         active_layer = ps_ctx.active_layer
         return active_layer is not None
+    
+    def draw_header(self, context):
+        layout = self.layout
+        layout.label(icon="KEYTYPE_KEYFRAME_VEC")
 
     def draw(self, context):
         ps_ctx = self.parse_context(context)
@@ -947,7 +887,6 @@ class MAT_PT_Actions(PSContextMixin, Panel):
         layout.use_property_split = True
         layout.alignment = 'LEFT'
         layout.use_property_decorate = False
-        layout.label(text="Layer Actions")
         if ps_ctx.ps_settings.show_tooltips and not active_layer.actions:
             box = layout.box()
             col = box.column(align=True)
@@ -991,8 +930,8 @@ classes = (
     MAT_PT_LayerSettings,
     MAT_PT_GreasePencilMaskSettings,
     MAT_PT_GreasePencilOnionSkinningSettings,
-    MAT_PT_LayerTransformSettings,
     MAT_PT_ImageLayerSettings,
+    MAT_PT_LayerTransformSettings,
     MAT_PT_Actions,
     PAINTSYSTEM_UL_Actions,
 )

@@ -4,7 +4,7 @@ import bpy
 from ..paintsystem.data import PSContextMixin, Channel
 from ..custom_icons import get_icon
 from ..preferences import get_preferences
-from ..utils.nodes import find_node
+from ..utils.nodes import find_node, get_material_output, traverse_connected_nodes
 
 def scale_content(context, layout, scale_x=1.2, scale_y=1.2):
     """Scale the content of the panel."""
@@ -229,3 +229,121 @@ def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, 
         # Color space settings
         col.prop(image.colorspace_settings, "name", text="Color Space")
         col.prop(image, "alpha_mode", text="Alpha")
+
+
+def is_basic_setup(node_tree: bpy.types.NodeTree) -> bool:
+    material_output = get_material_output(node_tree)
+    nodes = traverse_connected_nodes(material_output)
+    is_basic_setup = True
+    # Only first 3 nodes
+    for check in ('ShaderNodeGroup', 'ShaderNodeMixShader', 'ShaderNodeBsdfTransparent'):
+        if not any(node.bl_idname == check for node in nodes):
+            is_basic_setup = False
+            break
+    return is_basic_setup
+
+
+def toggle_paint_mode_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
+    current_mode = context.mode
+    ps_ctx = PSContextMixin.parse_context(context)
+    active_group = ps_ctx.active_group
+    active_channel = ps_ctx.active_channel
+    mat = ps_ctx.active_material
+    col = layout.column(align=True)
+    row = col.row(align=True)
+    row.scale_y = 1.7
+    row.scale_x = 1.7
+    paint_row = row.row(align=True)
+    paint_row.operator("paint_system.toggle_paint_mode",
+        text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon('paintbrush'))
+    
+    group_node = find_node(mat.node_tree, {
+                                'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
+    if (not is_basic_setup(mat.node_tree) or len(active_group.channels) > 1) and group_node:
+                row.operator("paint_system.isolate_active_channel",
+                            text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon("channel"))
+    row.operator("wm.save_mainfile",
+                text="", icon_value=get_icon('save'))
+    
+    # Baking and Exporting
+    
+    if ps_ctx.ps_object.type == 'MESH':
+        paint_row.enabled = not active_channel.use_bake_image
+        if ps_ctx.ps_settings.show_tooltips and not ps_ctx.ps_settings.hide_norm_paint_tips and active_group.template in {'NORMAL', 'PBR'} and any(channel.name == 'Normal' for channel in active_group.channels) and active_channel.name == 'Normal':
+            row = col.row(align=True)
+            row.scale_y = 1.5
+            row.scale_x = 1.5
+            tip_box = col.box()
+            tip_box.scale_x = 1.4
+            tip_row = tip_box.row()
+            tip_col = tip_row.column(align=True)
+            tip_col.label(text="The button above will")
+            tip_col.label(text="show object normal")
+            tip_row.label(icon_value=get_icon('arrow_up'))
+            tip_row.operator("paint_system.hide_painting_tips",
+                        text="", icon='X').attribute_name = 'hide_norm_paint_tips'
+
+        row = col.row(align=True)
+        row.scale_y = 1.3
+        row.scale_x = 1.5
+        
+        row.menu("MAT_MT_PaintSystemMergeAndExport",
+                    text="Bake and Export")
+
+def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
+    ps_ctx = PSContextMixin.parse_context(context)
+    active_layer = ps_ctx.active_layer
+    if not active_layer:
+        return
+    color_mix_node = active_layer.mix_node
+    
+    if ps_ctx.ps_settings.use_legacy_ui:
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.scale_y = 1.2
+        row.scale_x = 1.2
+        scale_content(context, row, 1.7, 1.5)
+        clip_row = row.row(align=True)
+        clip_row.enabled = not active_layer.lock_layer
+        clip_row.prop(active_layer, "is_clip", text="",
+                icon="SELECT_INTERSECT")
+        if active_layer.type == 'IMAGE':
+            clip_row.prop(active_layer, "lock_alpha",
+                    text="", icon='TEXTURE')
+        lock_row = row.row(align=True)
+        lock_row.prop(active_layer, "lock_layer",
+                text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
+        blend_type_row = row.row(align=True)
+        blend_type_row.enabled = not active_layer.lock_layer
+        blend_type_row.prop(color_mix_node, "blend_type", text="")
+        row = col.row(align=True)
+        scale_content(context, row, scale_x=1.2, scale_y=1.5)
+        row.enabled = not active_layer.lock_layer
+        row.prop(active_layer.pre_mix_node.inputs['Opacity'], "default_value",
+                text="Opacity", slider=True)
+    else:
+        ui_scale = context.preferences.view.ui_scale
+        panel_width = context.region.width - 35*2 * ui_scale
+        offset_pixels = 70 * ui_scale
+        split_factor = (panel_width - offset_pixels) / panel_width
+        split = layout.split(factor = split_factor)
+        split.scale_y = 1.3
+        split.scale_x = 1.3
+        main_row = split.row(align=True)
+        clip_row = main_row.row(align=True)
+        clip_row.enabled = not active_layer.lock_layer
+        clip_row.prop(active_layer, "is_clip", text="",
+                icon="SELECT_INTERSECT")
+        if active_layer.type == 'IMAGE':
+            clip_row.prop(active_layer, "lock_alpha",
+                    text="", icon='TEXTURE')
+        lock_row = main_row.row(align=True)
+        lock_row.prop(active_layer, "lock_layer",
+                text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
+        blend_type_row = main_row.row(align=True)
+        blend_type_row.enabled = not active_layer.lock_layer
+        blend_type_row.prop(color_mix_node, "blend_type", text="")
+        opacity_row = split.row(align=True)
+        opacity_row.enabled = not active_layer.lock_layer
+        opacity_row.prop(active_layer.pre_mix_node.inputs['Opacity'], "default_value",
+                text="", slider=True)
