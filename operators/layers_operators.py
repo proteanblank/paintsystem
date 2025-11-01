@@ -917,7 +917,7 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
         ps_ctx = self.parse_context(context)
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         new_layer_id_map = {}
-        base_parent_id = ps_ctx.active_layer.id
+        base_parent_id = ps_ctx.active_layer.id if ps_ctx.active_layer else -1
         for clipboard_layer in clipboard_layers:
             layer = get_layer_by_uid(clipboard_layer.material, clipboard_layer.uid)
             if not layer:
