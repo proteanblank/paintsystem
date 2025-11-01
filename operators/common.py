@@ -121,6 +121,7 @@ class PSUVOptionsMixin():
         """Store the coord_type from the operator to the active channel"""
         ps_ctx = PSContextMixin.parse_context(context)
         if not self.checked_coord_type:
+            # Don't store now, get the coord type from the active channel later
             self.get_coord_type(context)
             return
         if self.use_paint_system_uv:
@@ -135,7 +136,6 @@ class PSUVOptionsMixin():
         self.checked_coord_type = True
         if ps_ctx.active_channel:
             past_coord_type = ps_ctx.active_group.coord_type
-            print(f"Past coord type: {past_coord_type}")
             if past_coord_type == 'AUTO':
                 self.use_paint_system_uv = True
             else:

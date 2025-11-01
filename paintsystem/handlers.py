@@ -83,8 +83,18 @@ def load_post(scene):
                                     layer.linked_material = mat
                     if has_migrated_global_layer:
                         channel.update_node_tree(bpy.context)
+    # ps_scene_data Versioning
+    # As it is not used anymore, we can remove it in the future
+    ps_scene_data = getattr(bpy.context.scene, 'ps_scene_data', None)
+    if ps_scene_data:
+        # print(f"Removing ps_scene_data")
+        ps_scene_data.layers.clear()
+        ps_scene_data.clipboard_layers.clear()
+        ps_scene_data.clipboard_material = None
+        ps_scene_data.last_selected_ps_object = None
+        ps_scene_data.last_selected_material = None
             
-    print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers)} layers in {round((time.time() - start_time) * 1000, 2)} ms")
+    print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers) if ps_ctx.ps_scene_data else 0} layers in {round((time.time() - start_time) * 1000, 2)} ms")
 
 @bpy.app.handlers.persistent
 def save_handler(scene: bpy.types.Scene):
