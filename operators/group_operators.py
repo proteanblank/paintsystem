@@ -160,6 +160,11 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         new_group.template = self.template
         mat_node_tree = mat.node_tree
         
+        ps_ctx = self.parse_context(context)
+        if not self.add_layers:
+            self.coord_type = "UV"
+        self.store_coord_type(context)
+        
         # Create Channels and layers and setup the group
         match self.template:
             case 'BASIC':
@@ -282,9 +287,6 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
                 node_group = mat_node_tree.nodes.new(type='ShaderNodeGroup')
                 node_group.node_tree = node_tree
                 node_group.location = right_most_node.location + Vector((200, 0))
-        if not self.add_layers:
-            self.coord_type = "UV"
-        self.store_coord_type(context)
         redraw_panel(context)
         return {'FINISHED'}
     

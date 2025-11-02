@@ -216,7 +216,6 @@ class PSImageCreateMixin():
             col.prop(self, "image_height", text="Height")
             
     def create_image(self):
-        print("Creating image")
         self.image_width = int(self.image_resolution)
         self.image_height = int(self.image_resolution)
         img = bpy.data.images.new(
