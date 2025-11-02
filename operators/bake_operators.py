@@ -491,10 +491,10 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
     def invoke(self, context, event):
         self.get_coord_type(context)
         below_layer = self.get_below_layer(context)
-        if below_layer.use_paint_system_uv:
+        if below_layer.coord_type == 'AUTO':
             self.uv_map = DEFAULT_PS_UV_MAP_NAME
         else:
-            self.uv_map = below_layer.uv_map_name
+            self.uv_map = below_layer.uv_map_name if below_layer.uv_map_name else self.get_default_uv_map_name(context)
         if below_layer.type == "IMAGE":
             self.image_width = below_layer.image.size[0]
             self.image_height = below_layer.image.size[1]

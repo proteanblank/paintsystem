@@ -93,7 +93,8 @@ class PSUVOptionsMixin():
         name="Use Paint System UV",
         description="Use the Paint System UV",
         default=True,
-        update=update_use_paint_system_uv
+        update=update_use_paint_system_uv,
+        options={'SKIP_SAVE'}
     )
     def update_coord_type(self, context):
         if self.coord_type == 'AUTO' and not self.use_paint_system_uv:
@@ -103,12 +104,13 @@ class PSUVOptionsMixin():
         name="Coordinate Type",
         items=COORDINATE_TYPE_ENUM,
         default='UV',
-        update=update_coord_type
+        update=update_coord_type,
+        options={'SKIP_SAVE'}
     )
     uv_map_name: StringProperty(
         name="UV Map",
         description="Name of the UV map to use",
-        default="UVMap"
+        options={'SKIP_SAVE'}
     )
     checked_coord_type: BoolProperty(
         name="Checked Coordinate Type",
@@ -117,13 +119,18 @@ class PSUVOptionsMixin():
         options={'SKIP_SAVE'}
     )
     
+    def get_default_uv_map_name(self, context):
+        ps_ctx = PSContextMixin.parse_context(context)
+        ob = ps_ctx.ps_object
+        if ob and ob.type == 'MESH' and ob.data.uv_layers:
+            return ob.data.uv_layers[0].name
+        return ""
+    
     def store_coord_type(self, context):
         """Store the coord_type from the operator to the active channel"""
         ps_ctx = PSContextMixin.parse_context(context)
         if not self.checked_coord_type:
-            # Don't store now, get the coord type from the active channel later
             self.get_coord_type(context)
-            return
         if self.use_paint_system_uv:
             self.coord_type = 'AUTO'
         if ps_ctx.active_group:
@@ -141,7 +148,10 @@ class PSUVOptionsMixin():
             else:
                 self.use_paint_system_uv = False
                 self.coord_type = past_coord_type
-            self.uv_map_name = ps_ctx.active_group.uv_map_name
+            past_uv_map_name = ps_ctx.active_group.uv_map_name
+            self.uv_map_name = past_uv_map_name if past_uv_map_name else self.get_default_uv_map_name(context)
+        else:
+            self.uv_map_name = self.get_default_uv_map_name(context)
             
     def select_coord_type_ui(self, layout, context, show_warning=True):
         ps_ctx = PSContextMixin.parse_context(context)
