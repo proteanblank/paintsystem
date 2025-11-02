@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Literal
 import re
 import numpy as np
 import uuid
@@ -748,7 +748,6 @@ class Layer(BaseNestedListItem):
             return
         
         if not self.node_tree and not self.is_linked:
-            print(f"Creating node tree for {self.layer_name}")
             node_tree = bpy.data.node_groups.new(name=f"PS_Layer ({self.layer_name})", type='ShaderNodeTree')
             self.node_tree = node_tree
             expected_input = [
@@ -1285,8 +1284,8 @@ class Channel(BaseNestedListManager):
         self.updating_name_flag = False
         update_active_group(self, context)
     
-    def create_layer(self, layer_name: str = "Layer Name", layer_type: str = "IMAGE", update_active_index: bool = True, handle_folder: bool = True) -> 'Layer':
-        parent_id, insert_order = self.get_insertion_data(handle_folder=handle_folder)
+    def create_layer(self, layer_name: str = "Layer Name", layer_type: str = "IMAGE", update_active_index: bool = True, insert_at: Literal["TOP", "BOTTOM", "CURSOR"] = "CURSOR", handle_folder: bool = True) -> 'Layer':
+        parent_id, insert_order = self.get_insertion_data(handle_folder=handle_folder, insert_at=insert_at)
         # Adjust existing items' order
         self.adjust_sibling_orders(parent_id, insert_order)
         layer = self.add_item(

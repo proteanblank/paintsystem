@@ -182,6 +182,7 @@ class MAT_MT_PaintSystemMergeAndExport(PSContextMixin, Menu):
             layout.separator()
         layout.label(text="Bake")
         layout.operator("paint_system.bake_channel", text=f"Bake Active Channel ({active_channel.name})", icon_value=get_icon_from_channel(active_channel))
+        layout.operator("paint_system.bake_channel", text=f"Bake Active Channel as Layer", icon_value=get_icon("image")).as_layer = True
         # layout.operator("paint_system.bake_all_channels", text="Bake all Channels")
         layout.separator()
         layout.label(text="Export")

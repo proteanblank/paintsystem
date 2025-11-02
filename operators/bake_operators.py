@@ -42,6 +42,12 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         default= "UVMap",
         options={'SKIP_SAVE'}
     )
+    as_layer: BoolProperty(
+        name="As Layer",
+        description="Bake the channel as a layer",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
     
     @classmethod
     def poll(cls, context):
@@ -59,23 +65,34 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         mat = ps_ctx.active_material
-        bake_image = active_channel.bake_image
-        active_channel.bake_uv_map = self.uv_map
-        
+        self.image_name = f"{active_channel.name}_Baked"
         self.image_width = int(self.image_resolution)
         self.image_height = int(self.image_resolution)
         
-        if not bake_image:
-            self.image_name = f"{ps_ctx.active_group.name}_{ps_ctx.active_channel.name}"
+        bake_image = None
+        if self.as_layer:
             bake_image = self.create_image()
             bake_image.colorspace_settings.name = 'sRGB'
-            active_channel.bake_image = bake_image
-        elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
-            bake_image.scale(self.image_width, self.image_height)
-            
-        active_channel.use_bake_image = False
-        active_channel.bake(context, mat, bake_image, self.uv_map)
-        active_channel.use_bake_image = True
+            layer = active_channel.create_layer(self.image_name, "IMAGE", insert_at="START")
+            layer.image = bake_image
+            layer.coord_type = 'UV'
+            layer.uv_map_name = self.uv_map
+            layer.update_node_tree(context)
+            active_channel.bake(context, mat, bake_image, self.uv_map)
+            active_channel.update_node_tree(context)
+        else:
+            bake_image = active_channel.bake_image
+            if not bake_image:
+                bake_image = self.create_image()
+                bake_image.colorspace_settings.name = 'sRGB'
+                active_channel.bake_image = bake_image
+            elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
+                bake_image.scale(self.image_width, self.image_height)
+            active_channel.bake_uv_map = self.uv_map
+                
+            active_channel.use_bake_image = False
+            active_channel.bake(context, mat, bake_image, self.uv_map)
+            active_channel.use_bake_image = True
         # Return to object mode
         bpy.ops.object.mode_set(mode="OBJECT")
         return {'FINISHED'}

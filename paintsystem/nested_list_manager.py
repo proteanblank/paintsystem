@@ -1,3 +1,4 @@
+from typing import Literal
 import bpy
 from bpy.props import StringProperty, IntProperty, EnumProperty
 from bpy.types import (PropertyGroup, Operator)
@@ -49,26 +50,33 @@ class BaseNestedListManager(PropertyGroup):
             if item.parent_id == parent_id and item.order >= insert_order:
                 item.order += 1
 
-    def get_insertion_data(self, active_item=None, handle_folder=True):
+    def get_insertion_data(self, active_item=None, handle_folder=True, insert_at: Literal["TOP", "BOTTOM", "CURSOR"] = "CURSOR"):
         """Get parent_id and insert_order for new item based on active item"""
         if active_item is None:
             active_item = self.get_active_item()
 
         parent_id = -1
         insert_order = 1
-
-        if active_item:
-            if active_item.type == 'FOLDER' and handle_folder:
-                # If selected item is a folder, add inside it
-                parent_id = active_item.id
-                # Find lowest order in folder or default to 1
-                orders = [
-                    item.order for item in getattr(self, self.collection_name) if item.parent_id == parent_id]
-                insert_order = min(orders) if orders else 1
-            else:
-                # If selected item is not a folder, add at same level
-                parent_id = active_item.parent_id
-                insert_order = active_item.order
+        
+        match insert_at:
+            case "TOP":
+                insert_order = 1
+            case "BOTTOM":
+                insert_order = len(getattr(self, self.collection_name)) + 1
+            case "CURSOR":
+                # CURSOR
+                if active_item:
+                    if active_item.type == 'FOLDER' and handle_folder:
+                        # If selected item is a folder, add inside it
+                        parent_id = active_item.id
+                        # Find lowest order in folder or default to 1
+                        orders = [
+                            item.order for item in getattr(self, self.collection_name) if item.parent_id == parent_id]
+                        insert_order = min(orders) if orders else 1
+                    else:
+                        # If selected item is not a folder, add at same level
+                        parent_id = active_item.parent_id
+                        insert_order = active_item.order
 
         return parent_id, insert_order
 
