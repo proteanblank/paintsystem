@@ -324,9 +324,12 @@ def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
     else:
         ui_scale = context.preferences.view.ui_scale
         panel_width = context.region.width - 35*2 * ui_scale
-        offset_pixels = 60 * ui_scale
-        split_factor = (panel_width - offset_pixels) / panel_width
-        split = layout.split(factor = split_factor)
+        threshold_width = 170 * ui_scale
+        use_wide_ui = panel_width > threshold_width
+        if use_wide_ui:
+            split = layout.split(factor = 0.7)
+        else:
+            split = layout.column(align=True)
         split.scale_y = 1.3
         split.scale_x = 1.3
         main_row = split.row(align=True)
@@ -345,5 +348,7 @@ def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
         blend_type_row.prop(color_mix_node, "blend_type", text="")
         opacity_row = split.row(align=True)
         opacity_row.enabled = not active_layer.lock_layer
+        if not use_wide_ui:
+            opacity_row.scale_y = 0.8
         opacity_row.prop(active_layer.pre_mix_node.inputs['Opacity'], "default_value",
-                text="", slider=True)
+                text="" if use_wide_ui else "Opacity", slider=True)
