@@ -56,8 +56,6 @@ def capture_node_properties(node: bpy.types.Node) -> dict:
                 'inputs', 'outputs', 'parent', 'name', 'label', 'node_width', 'mute', 'hide', 'bl_idname'
             }:
                 continue
-            if node.type.startswith("TEX"):
-                print(f"node.type: {pid}")
             ptype = getattr(prop, 'type', None)
             if ptype in {'BOOLEAN', 'INT', 'FLOAT', 'STRING', 'ENUM'}:
                 try:

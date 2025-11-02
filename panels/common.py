@@ -293,7 +293,7 @@ def toggle_paint_mode_ui(layout: bpy.types.UILayout, context: bpy.types.Context)
 def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
     ps_ctx = PSContextMixin.parse_context(context)
     active_layer = ps_ctx.active_layer
-    if not active_layer or active_layer.node_tree:
+    if not active_layer or not active_layer.node_tree:
         return
     color_mix_node = active_layer.mix_node
     
@@ -324,7 +324,7 @@ def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
     else:
         ui_scale = context.preferences.view.ui_scale
         panel_width = context.region.width - 35*2 * ui_scale
-        offset_pixels = 70 * ui_scale
+        offset_pixels = 60 * ui_scale
         split_factor = (panel_width - offset_pixels) / panel_width
         split = layout.split(factor = split_factor)
         split.scale_y = 1.3

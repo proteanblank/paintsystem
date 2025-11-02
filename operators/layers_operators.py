@@ -589,7 +589,7 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
         layout = self.layout
         self.multiple_objects_ui(layout, context)
         box = layout.box()
-        self.select_coord_type_ui(box, context)
+        self.select_coord_type_ui(box, context, show_warning=False)
     
     def process_material(self, context):
         ps_ctx = self.parse_context(context)

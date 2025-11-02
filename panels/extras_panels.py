@@ -167,7 +167,7 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
     bl_label = "Color"
     bl_category = 'Paint System'
     bl_parent_id = 'MAT_PT_PaintSystemMainPanel'
-    # bl_options = {'DEFAULT_CLOSED'}
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):

@@ -143,7 +143,7 @@ class PSUVOptionsMixin():
                 self.coord_type = past_coord_type
             self.uv_map_name = ps_ctx.active_group.uv_map_name
             
-    def select_coord_type_ui(self, layout, context):
+    def select_coord_type_ui(self, layout, context, show_warning=True):
         ps_ctx = PSContextMixin.parse_context(context)
         row = layout.row(align=True)
         row.label(text="Coordinate Type", icon='UV')
@@ -157,10 +157,11 @@ class PSUVOptionsMixin():
             return
         layout.prop(self, "coord_type", text="")
         if self.coord_type != 'UV':
+            if show_warning:
             # Warning that painting may not work as expected
-            box = layout.box()
-            box.alert = True
-            box.label(text="Painting may not work in this mode", icon='ERROR')
+                box = layout.box()
+                box.alert = True
+                box.label(text="Painting may not work in this mode", icon='ERROR')
         else:
             row = layout.row(align=True)
             row.prop_search(self, "uv_map_name", context.object.data, "uv_layers", text="")

@@ -1811,7 +1811,7 @@ def get_layer_blend_type(layer: Layer) -> str:
     mix_node = find_node(node_tree, {'label': 'mix_rgb', 'bl_idname': 'ShaderNodeMix'})
     if not mix_node:
         raise ValueError("Mix node is not found")
-    return mix_node.blend_type
+    return str(mix_node.blend_type)
 
 def set_layer_blend_type(layer: Layer, blend_type: str) -> None:
     """Set the blend mode of the global layer"""

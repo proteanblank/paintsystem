@@ -228,9 +228,11 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         ps_ctx = self.parse_context(context)
 
         layout = self.layout
-        box = layout.box()
         if ps_ctx.ps_settings.use_legacy_ui:
+            box = layout.box()
             toggle_paint_mode_ui(box, context)
+        else:
+            box = layout
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             grease_pencil = context.grease_pencil
             layers = grease_pencil.layers
@@ -262,19 +264,26 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             sub.operator("grease_pencil.layer_move", icon='TRIA_DOWN', text="").direction = 'DOWN'
         elif ps_ctx.ps_object.type == 'MESH':
             if not ps_ctx.ps_settings.use_legacy_ui:
-                layer_settings_ui(box, context)
-                col = box.column()
-                row = col.row()
-                row.scale_y = 1.2
-                new_row = row.row(align=True)
-                new_row.operator("wm.call_menu", text="New Layer", icon_value=get_icon('layer_add')).name = "MAT_MT_AddLayerMenu"
-                new_row.menu("MAT_MT_LayerMenu",
-                    text="", icon='COLLAPSEMENU')
-                move_row = row.row(align=True)
-                move_row.operator("paint_system.move_up", icon="TRIA_UP", text="")
-                move_row.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
-                row.operator("paint_system.delete_item",
-                            text="", icon="TRASH")
+                # col = layout.column()
+                # row = col.row()
+                # row.scale_y = 1.2
+                # row.scale_x = 1.2
+                # new_row = row.row(align=True)
+                # new_row.operator("wm.call_menu", text="New", icon_value=get_icon('layer_add')).name = "MAT_MT_AddLayerMenu"
+                # new_row.operator("paint_system.new_folder_layer",
+                #      icon_value=get_icon('folder'), text="")
+                # new_row.menu("MAT_MT_LayerMenu",
+                #     text="", icon='COLLAPSEMENU')
+                # move_row = row.row(align=True)
+                # move_row.operator("paint_system.move_up", icon="TRIA_UP", text="")
+                # move_row.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
+                # row.operator("paint_system.delete_item",
+                #             text="", icon="TRASH")
+                main_row = layout.row()
+                box = main_row.box()
+                if ps_ctx.active_layer and ps_ctx.active_layer.node_tree:
+                    settings_box = box.box()
+                    layer_settings_ui(settings_box, context)
             else:
                 box = layout.box()
         
@@ -312,7 +321,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             scale_content(context, row, scale_x=1, scale_y=1.5)
             layers_col.template_list(
                 "MAT_PT_UL_LayerList", "", active_channel, "layers", active_channel, "active_index",
-                rows=min(max(5, len(layers)), 7)
+                rows=min(max(6, len(layers)), 7)
             )
 
             
@@ -326,6 +335,21 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                 col.operator("paint_system.delete_item",
                                 text="", icon="TRASH")
                 col.separator()
+                col.operator("paint_system.move_up", icon="TRIA_UP", text="")
+                col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
+            else:
+                # main_row
+                col = row.column(align=True)
+                col.scale_x = 1.2
+                col.operator("wm.call_menu", text="", icon_value=get_icon('layer_add')).name = "MAT_MT_AddLayerMenu"
+                col.operator("paint_system.new_folder_layer",
+                     icon_value=get_icon('folder'), text="")
+                col.menu("MAT_MT_LayerMenu",
+                        text="", icon='COLLAPSEMENU')
+                col.separator(type = 'LINE')
+                col.operator("paint_system.delete_item",
+                                text="", icon="TRASH")
+                col.separator(type = 'LINE')
                 col.operator("paint_system.move_up", icon="TRIA_UP", text="")
                 col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 
@@ -386,8 +410,9 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
         layout = self.layout
         ps_ctx = self.parse_context(context)
         layer = ps_ctx.active_layer
-        if ps_ctx.ps_object.type == 'MESH' and layer.type == 'IMAGE':
-            layout.operator("wm.call_menu", text="Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
+        if ps_ctx.ps_settings.use_legacy_ui:
+            if ps_ctx.ps_object.type == 'MESH' and layer.type == 'IMAGE':
+                layout.operator("wm.call_menu", text="Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
 
     def draw(self, context):
         layout = self.layout
@@ -492,14 +517,6 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     if rgb_node:
                         col.prop(rgb_node.outputs[0], "default_value", text="Color",
                                 icon='IMAGE_RGB_ALPHA')
-
-                case 'ADJUSTMENT':
-                    col = box.column()
-                    col.enabled = not active_layer.lock_layer
-                    adjustment_node = active_layer.find_node("adjustment")
-                    if adjustment_node:
-                        col.label(text="Adjustment Settings:", icon='SHADERFX')
-                        col.template_node_inputs(adjustment_node)
 
                 case 'RANDOM':
                     col = box.column()
@@ -648,7 +665,7 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
         if active_layer.coord_type == 'UV':
             col.prop_search(active_layer, "uv_map_name", text="UV Map",
                                 search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
-        if active_layer.coord_type not in ['UV', 'AUTO']:
+        if active_layer.coord_type not in ['UV', 'AUTO'] and active_layer.type == 'IMAGE':
             info_box = col.box()
             info_box.alert = True
             info_col = info_box.column(align=True)
@@ -702,7 +719,15 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
     def draw_header(self, context):
         layout = self.layout
         layout.label(icon_value=get_icon('image'))
-
+        
+    def draw_header_preset(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        layer = ps_ctx.active_layer
+        if not ps_ctx.ps_settings.use_legacy_ui:
+            if ps_ctx.ps_object.type == 'MESH' and layer.type == 'IMAGE':
+                layout.operator("wm.call_menu", text="Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
+    
     def draw(self, context):
         ps_ctx = self.parse_context(context)
         active_layer = ps_ctx.active_layer
