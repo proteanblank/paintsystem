@@ -240,8 +240,13 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
                 row = col.row()
                 row.prop(ps_ctx.ps_scene_data, "hex_color", text="Hex")
             if is_newer_than(4,5):
-                from bl_ui.properties_paint_common import color_jitter_panel
-                color_jitter_panel(col, context, brush)
+                # Bforartists/Blender variants may not expose color_jitter_panel; fail gracefully
+                try:
+                    from bl_ui.properties_paint_common import color_jitter_panel
+                except Exception:
+                    color_jitter_panel = None
+                if color_jitter_panel:
+                    color_jitter_panel(col, context, brush)
             # draw_color_settings(context, col, brush)
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             row = col.row()
