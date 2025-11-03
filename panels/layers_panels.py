@@ -495,7 +495,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.use_property_decorate = False
                         if active_layer.gradient_type in ('LINEAR', 'RADIAL'):
                             if active_layer.empty_object and active_layer.empty_object.name in context.view_layer.objects:
-                                col.operator("paint_system.select_gradient_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
+                                col.operator("paint_system.select_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
                             else:
                                 err_box = col.box()
                                 err_box.alert = True
@@ -665,7 +665,9 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
         row.operator("paint_system.transfer_image_layer_uv", text="", icon='UV_DATA')
         if active_layer.coord_type == 'UV':
             col.prop_search(active_layer, "uv_map_name", text="UV Map",
-                                search_data=context.object.data, search_property="uv_layers", icon='GROUP_UVS')
+                                search_data=ps_ctx.ps_object.data, search_property="uv_layers", icon='GROUP_UVS')
+        elif active_layer.coord_type == 'DECAL':
+            col.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
         if active_layer.coord_type not in ['UV', 'AUTO'] and active_layer.type == 'IMAGE':
             info_box = col.box()
             info_box.alert = True
@@ -735,6 +737,9 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
+        row = layout.row()
+        row.use_property_split = False
+        row.prop(active_layer, "correct_image_aspect", text="Correct Aspect")
         if not active_layer.external_image:
             layout.operator("paint_system.quick_edit", text="Edit Externally (View Capture)")
         else:

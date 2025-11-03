@@ -110,7 +110,7 @@ def create_mixing_graph(builder: NodeTreeBuilder, color_node_name: str = None, c
     return builder
 
 
-def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: str, node_name: str, socket_name: str) -> NodeTreeBuilder:
+def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: str, node_name: str, socket_name: str, empty_object: bpy.types.Object = None) -> NodeTreeBuilder:
     builder.add_node("mapping", "ShaderNodeMapping")
     if coord_type == "AUTO":
         builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": DEFAULT_PS_UV_MAP_NAME}, force_properties=True)
@@ -120,12 +120,16 @@ def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: s
         builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": uv_map_name}, force_properties=True)
         builder.link("uvmap", "mapping", "UV", "Vector")
         builder.link("mapping", node_name, "Vector", socket_name)
-    elif coord_type in ["OBJECT", "CAMERA", "WINDOW", "REFLECTION"]:
-        builder.add_node("tex_coord", "ShaderNodeTexCoord")
+    elif coord_type in ["OBJECT", "CAMERA", "WINDOW", "REFLECTION", "GENERATED"]:
+        builder.add_node("tex_coord", "ShaderNodeTexCoord", {"object": empty_object})
         builder.link("tex_coord", "mapping", coord_type.title(), "Vector")
         builder.link("mapping", node_name, "Vector", socket_name)
     elif coord_type == "POSITION":
         builder.add_node("geometry", "ShaderNodeGeometry")
         builder.link("geometry", "mapping", "Position", "Vector")
+        builder.link("mapping", node_name, "Vector", socket_name)
+    elif coord_type == "DECAL":
+        builder.add_node("tex_coord", "ShaderNodeTexCoord", {"object": empty_object})
+        builder.link("tex_coord", "mapping", "Object", "Vector")
         builder.link("mapping", node_name, "Vector", socket_name)
     return builder

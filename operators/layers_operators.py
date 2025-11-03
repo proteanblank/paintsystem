@@ -355,10 +355,10 @@ class PAINTSYSTEM_OT_FixMissingGradientEmpty(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_SelectGradientEmpty(PSContextMixin, Operator):
-    """Select the gradient empty"""
-    bl_idname = "paint_system.select_gradient_empty"
-    bl_label = "Select Gradient Empty"
+class PAINTSYSTEM_OT_SelectEmpty(PSContextMixin, Operator):
+    """Select the empty"""
+    bl_idname = "paint_system.select_empty"
+    bl_label = "Select Empty"
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
@@ -1041,7 +1041,7 @@ classes = (
     PAINTSYSTEM_OT_NewGradient,
     PAINTSYSTEM_OT_NewGeometry,
     PAINTSYSTEM_OT_FixMissingGradientEmpty,
-    PAINTSYSTEM_OT_SelectGradientEmpty,
+    PAINTSYSTEM_OT_SelectEmpty,
     PAINTSYSTEM_OT_NewRandomColor,
     PAINTSYSTEM_OT_NewTexture,
     PAINTSYSTEM_OT_NewCustomNodeGroup,

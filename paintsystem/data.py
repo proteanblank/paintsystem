@@ -118,12 +118,13 @@ TEXTURE_TYPE_ENUM = [
 COORDINATE_TYPE_ENUM = [
     ('AUTO', "Auto UV", "Automatically create a new UV Map"),
     ('UV', "UV", "Open an existing UV Map"),
-    # ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
     ('OBJECT', "Object", "Use a object output of Texture Coordinate node"),
     ('CAMERA', "Camera", "Use a camera output of Texture Coordinate node"),
     ('WINDOW', "Window", "Use a window output of Texture Coordinate node"),
     ('REFLECTION', "Reflection", "Use a reflection output of Texture Coordinate node"),
     ('POSITION', "Position", "Use a position output of Geometry node"),
+    ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
+    ('DECAL', "Decal", "Use a decal output of Geometry node"),
 ]
 
 ATTRIBUTE_TYPE_ENUM = [
@@ -727,6 +728,13 @@ class GlobalLayer(PropertyGroup):
         update=update_brush_settings
     )
 
+
+
+def add_empty_to_collection(context: bpy.types.Context, empty_object: bpy.types.Object):
+    collection = get_paint_system_collection(context)
+    if empty_object.name not in collection.objects:
+        collection.objects.link(empty_object)
+
 class Layer(BaseNestedListItem):
     """Base class for material layers in the Paint System"""
     
@@ -741,7 +749,8 @@ class Layer(BaseNestedListItem):
     )
     
     def update_node_tree(self, context):
-        self = self.get_layer_data()
+        if self.is_linked:
+            return
         if not is_valid_uuidv4(self.uid):
             self.uid = str(uuid.uuid4())
         if self.type == "BLANK":
@@ -765,7 +774,7 @@ class Layer(BaseNestedListItem):
             ensure_sockets(node_tree, expected_input, "INPUT")
             ensure_sockets(node_tree, expected_output, "OUTPUT")
         if self.layer_name:
-            self.node_tree.name = f".PS_Layer ({self.layer_name})"
+            self.node_tree.name = f"PS {self.layer_name} ({self.uid[:8]})"
         
         if self.coord_type == 'AUTO':
             ensure_paint_system_uv_map(context)
@@ -774,6 +783,26 @@ class Layer(BaseNestedListItem):
             case "IMAGE":
                 if self.image:
                     self.image.name = self.layer_name
+                if self.coord_type == "DECAL":
+                    if not self.empty_object:
+                        image_tex_node = self.find_node("image")
+                        if image_tex_node and image_tex_node.extension != "CLIP":
+                            image_tex_node.extension = "CLIP"
+                        ps_ctx = parse_context(context)
+                        empty_name = f"{self.layer_name} ({self.uid[:8]}) Empty"
+                        if empty_name in bpy.data.objects:
+                            empty_object = bpy.data.objects[empty_name]
+                            empty_object.parent = ps_ctx.ps_object
+                            add_empty_to_collection(context, empty_object)
+                        else:
+                            with bpy.context.temp_override():
+                                empty_object = bpy.data.objects.new(empty_name, None)
+                                empty_object.parent = ps_ctx.ps_object
+                                add_empty_to_collection(context, empty_object)
+                        self.empty_object = empty_object
+                        self.empty_object.empty_display_type = 'SINGLE_ARROW'
+                    elif self.empty_object.name not in context.view_layer.objects:
+                        add_empty_to_collection(context, self.empty_object)
                 layer_graph = create_image_graph(self)
             case "FOLDER":
                 layer_graph = create_folder_graph(self)
@@ -784,17 +813,19 @@ class Layer(BaseNestedListItem):
             case "ADJUSTMENT":
                 layer_graph = create_adjustment_graph(self)
             case "GRADIENT":
-                def add_empty_to_collection(empty_object):
-                    collection = get_paint_system_collection(context)
-                    collection.objects.link(empty_object)
-                    
                 if self.gradient_type in ('LINEAR', 'RADIAL'):
                     if not self.empty_object:
                         ps_ctx = parse_context(context)
-                        with bpy.context.temp_override():
-                            empty_object = bpy.data.objects.new(f"{self.name}", None)
+                        empty_name = f"{self.layer_name} ({self.uid[:8]}) Empty"
+                        if empty_name in bpy.data.objects:
+                            empty_object = bpy.data.objects[empty_name]
                             empty_object.parent = ps_ctx.ps_object
-                            add_empty_to_collection(empty_object)
+                            add_empty_to_collection(context, empty_object)
+                        else:
+                            with bpy.context.temp_override():
+                                empty_object = bpy.data.objects.new(empty_name, None)
+                                empty_object.parent = ps_ctx.ps_object
+                                add_empty_to_collection(context, empty_object)
                         self.empty_object = empty_object
                         if self.gradient_type == 'LINEAR':
                             self.empty_object.empty_display_type = 'SINGLE_ARROW'
@@ -815,11 +846,15 @@ class Layer(BaseNestedListItem):
                 raise ValueError(f"Invalid layer type: {self.type}")
         
         # Clean up
-        if self.empty_object and self.type != "GRADIENT":
+        if self.empty_object and self.type not in ("GRADIENT", "IMAGE"):
             collection = get_paint_system_collection(context)
             if self.empty_object.name in collection.objects:
                 collection.objects.unlink(self.empty_object)
-        
+        elif self.type == "IMAGE" and self.empty_object and self.coord_type != "DECAL":
+            collection = get_paint_system_collection(context)
+            if self.empty_object.name in collection.objects:
+                collection.objects.unlink(self.empty_object)
+
         if not self.enabled:
             layer_graph.link("group_input", "group_output", "Color", "Color")
             layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
@@ -869,6 +904,12 @@ class Layer(BaseNestedListItem):
         type=Image,
         update=update_node_tree
     )
+    correct_image_aspect: BoolProperty(
+        name="Correct Image Aspect",
+        description="Correct the image aspect",
+        default=True,
+        update=update_node_tree
+    )
     actions: CollectionProperty(
         type=MarkerAction,
         name="Actions",
@@ -913,7 +954,7 @@ class Layer(BaseNestedListItem):
         name="Coordinate Type",
         description="Coordinate type",
         default='UV',
-        update=update_node_tree
+        update=update_node_tree,
     )
     uv_map_name: StringProperty(
         name="UV Map",
@@ -935,7 +976,7 @@ class Layer(BaseNestedListItem):
         items=GRADIENT_TYPE_ENUM,
         name="Gradient Type",
         description="Gradient type",
-        default='LINEAR',
+        default='GRADIENT_MAP',
         update=update_node_tree
     )
     texture_type: EnumProperty(
@@ -1125,6 +1166,7 @@ def ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu=True):
             bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
         except Exception as e:
             # Try baking with CPU if GPU fails
+            print(f"GPU baking failed, trying CPU")
             cycles.device = 'CPU'
             bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
 
@@ -1601,8 +1643,7 @@ class Group(PropertyGroup):
     )
     uv_map_name: StringProperty(
         name="UV Map",
-        description="UV map",
-        default="UVMap"
+        description="UV map"
     )
     
     def update_channel(self, context):

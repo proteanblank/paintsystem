@@ -2,12 +2,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import bpy
-from .common import create_mixing_graph, NodeTreeBuilder, create_coord_graph
+from .common import create_mixing_graph, NodeTreeBuilder, create_coord_graph, get_library_nodetree
 
 if TYPE_CHECKING:
     from ..data import Layer
 
-IMAGE_LAYER_VERSION = 2
+IMAGE_LAYER_VERSION = 3
 FOLDER_LAYER_VERSION = 1
 SOLID_COLOR_LAYER_VERSION = 1
 ATTRIBUTE_LAYER_VERSION = 1
@@ -73,12 +73,37 @@ def get_adjustment_identifier(adjustment_type: str) -> str:
 def create_image_graph(layer: "Layer"):
     node_tree = layer.node_tree
     img = layer.image
+    correct_image_aspect = layer.correct_image_aspect
+    resolution_x = 0
+    resolution_y = 0
+    if img:
+        resolution_x = img.size[0]
+        resolution_y = img.size[1]
     coord_type = layer.coord_type
+    empty_object = layer.empty_object
     uv_map_name = layer.uv_map_name
     builder = NodeTreeBuilder(node_tree, "Layer", version=IMAGE_LAYER_VERSION)
-    create_mixing_graph(builder, "image", "Color", "image", "Alpha")
+    if coord_type == "DECAL":
+        builder.add_node("decal_depth_separate_xyz", "ShaderNodeSeparateXYZ")
+        builder.add_node("decal_depth_clip", "ShaderNodeMath", {"operation": "COMPARE"}, default_values={1: 0, 2: 0.5}, force_default_values=True)
+        builder.add_node("decal_alpha_multiply", "ShaderNodeMath", {"operation": "MULTIPLY"})
+        builder.link("multiply_vector", "decal_depth_separate_xyz", "Vector", 0)
+        builder.link("decal_depth_separate_xyz", "decal_depth_clip", "Z", 0)
+        builder.link("decal_depth_clip", "decal_alpha_multiply", "Value", 0)
+        builder.link("image", "decal_alpha_multiply", "Alpha", 1)
+        create_mixing_graph(builder, "image", "Color", "decal_alpha_multiply", "Value")
+    else:
+        create_mixing_graph(builder, "image", "Color", "image", "Alpha")
     builder.add_node("image", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest"})
-    create_coord_graph(builder, coord_type, uv_map_name, 'image', 'Vector')
+    if correct_image_aspect:
+        aspect_correct = get_library_nodetree(".PS Correct Aspect")
+        builder.add_node("multiply_vector", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, default_values={2: (0.5, 0.5, 0) if coord_type == "DECAL" else (0, 0, 0)})
+        builder.add_node("aspect_correct", "ShaderNodeGroup", {"node_tree": aspect_correct}, default_values={0: resolution_x, 1: resolution_y}, force_default_values=True)
+        builder.link("aspect_correct", "multiply_vector", "Vector", 1)
+        builder.link("multiply_vector", "image", "Vector", "Vector")
+        create_coord_graph(builder, coord_type, uv_map_name, "multiply_vector", 0, empty_object=empty_object)
+    else:
+        create_coord_graph(builder, coord_type, uv_map_name, "image", "Vector", empty_object=empty_object)
     return builder
 
 def create_folder_graph(layer: "Layer"):
