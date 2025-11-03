@@ -1200,7 +1200,7 @@ class Channel(BaseNestedListManager):
         node_builder.add_node("group_output", "NodeGroupOutput")
         
         if self.bake_image:
-            node_builder.add_node("uv_map", "ShaderNodeUVMap", {"uv_map": self.bake_uv_map})
+            node_builder.add_node("uv_map", "ShaderNodeUVMap", {"uv_map": self.bake_uv_map}, force_properties=True)
             node_builder.add_node("bake_image", "ShaderNodeTexImage", {"image": self.bake_image})
             node_builder.link("uv_map", "bake_image", "UV", "Vector")
             if self.use_bake_image:
