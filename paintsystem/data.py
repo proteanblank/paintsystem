@@ -1375,6 +1375,12 @@ class Channel(BaseNestedListManager):
         ps_context = parse_context(context)
         obj = ps_context.ps_object
         
+        # Ensure ps_object is the only object selected
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode="OBJECT")
+        
         material_output = get_material_output(node_tree)
         surface_socket = material_output.inputs['Surface']
         from_socket = surface_socket.links[0].from_socket if surface_socket.links else None
