@@ -1060,11 +1060,27 @@ class Layer(BaseNestedListItem):
     )
     
     def copy_layer_data(self, layer: "Layer"):
+        if layer.node_tree:
+            self.node_tree = layer.node_tree.copy()
+        if layer.image:
+            # if image is not saved, save it
+            image: Image = layer.image
+            if image.is_dirty:
+                if image.filepath != '':
+                    image.save()
+                else:
+                    image.pack()
+            self.image = image.copy()
         for prop in layer.bl_rna.properties:
             pid = getattr(prop, 'identifier', '')
             if not pid or getattr(prop, 'is_readonly', False):
                 continue
-            setattr(self, pid, getattr(layer, pid))
+            if pid in {"name", "uid", "node_tree", "image", "empty_object", "type", "id", "order", "parent_id", "layer_name"}:
+                continue
+            value = getattr(layer, pid)
+            if getattr(self, pid) == value:
+                continue
+            setattr(self, pid, value)
     
     def get_layer_data(self) -> "Layer":
         if self.is_linked:
@@ -1074,24 +1090,30 @@ class Layer(BaseNestedListItem):
             
             # Use cached UID lookup dictionary for O(1) access instead of nested loops
             uid_to_layer = _get_material_layer_uid_map(self.linked_material)
+            layer = uid_to_layer.get(self.linked_layer_uid)
+            if not layer:
+                layer = _get_material_layer_uid_map(self.linked_material, force_refresh=True).get(self.linked_layer_uid)
             return uid_to_layer.get(self.linked_layer_uid)
         return self
 
 def get_layer_by_uid(material: Material, uid: str) -> Layer | None:
     uid_to_layer = _get_material_layer_uid_map(material)
-    return uid_to_layer.get(uid)
+    layer = uid_to_layer.get(uid)
+    if not layer:
+        layer = _get_material_layer_uid_map(material, force_refresh=True).get(uid)
+    return layer
 
 # Module-level cache for material layer UID maps
 _material_uid_cache: Dict[Material, Dict[str, 'Layer']] = {}
 
-def _get_material_layer_uid_map(material: Material) -> Dict[str, 'Layer']:
+def _get_material_layer_uid_map(material: Material, force_refresh: bool = False) -> Dict[str, 'Layer']:
     """Get a UID to Layer mapping for a material. Uses caching for performance."""
     if not material or not material.ps_mat_data:
         return {}
     
     # Check if cache is valid (simple version check using material name as key)
     cache_key = material
-    if cache_key in _material_uid_cache:
+    if cache_key in _material_uid_cache and not force_refresh:
         return _material_uid_cache[cache_key]
     
     # Build the UID map
@@ -1104,11 +1126,11 @@ def _get_material_layer_uid_map(material: Material) -> Dict[str, 'Layer']:
     
     # Cache it
     _material_uid_cache[cache_key] = uid_map
-    # print(f"Material {material.name} UID map: {uid_map}")
     return uid_map
 
 def _invalidate_material_layer_cache(material: Material = None):
     """Invalidate the layer UID cache for a material or all materials."""
+    print(f"Invalidating material layer cache for {material.name if material else 'all materials'}")
     global _material_uid_cache
     if material:
         _material_uid_cache.pop(material, None)

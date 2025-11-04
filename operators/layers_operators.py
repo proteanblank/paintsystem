@@ -906,7 +906,8 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
     linked: BoolProperty(
         name="Linked",
         description="Paste the copied layer as linked",
-        default=False
+        default=False,
+        options={'SKIP_SAVE'}
     )
     
     @classmethod
@@ -915,14 +916,19 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
+        active_layer = ps_ctx.active_layer
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         new_layer_id_map = {}
-        base_parent_id = ps_ctx.active_layer.id if ps_ctx.active_layer else -1
+        is_folder = active_layer and active_layer.type == "FOLDER"
+        base_parent_id = active_layer.id if is_folder else -1
         for clipboard_layer in clipboard_layers:
             layer = get_layer_by_uid(clipboard_layer.material, clipboard_layer.uid)
             if not layer:
                 continue
-            new_layer = ps_ctx.active_channel.create_layer(layer.name, "BLANK", update_active_index=False, handle_folder=False)
+            if self.linked:
+                new_layer = ps_ctx.active_channel.create_layer(layer.layer_name, "BLANK", update_active_index=not is_folder, handle_folder=not is_folder)
+            else:
+                new_layer = ps_ctx.active_channel.create_layer(layer.layer_name, layer.type)
             new_layer_id_map[layer.id] = new_layer
             if layer.parent_id != -1:
                 new_layer.parent_id = new_layer_id_map[layer.parent_id].id
@@ -932,13 +938,8 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
                 new_layer.linked_layer_uid = clipboard_layer.uid
                 new_layer.linked_material = clipboard_layer.material
             else:
-                for prop in layer.bl_rna.properties:
-                    pid = getattr(prop, 'identifier', '')
-                    if not pid or getattr(prop, 'is_readonly', False):
-                        continue
-                    if pid in {"uid", "node_tree", "type", "id", "order", "parent_id"}:
-                        continue
-                    setattr(new_layer, pid, getattr(layer, pid))
+                new_layer.copy_layer_data(layer)
+            new_layer.update_node_tree(context)
         ps_ctx.active_channel.update_node_tree(context)
         
         return {'FINISHED'}
