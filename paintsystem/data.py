@@ -1416,10 +1416,10 @@ class Channel(BaseNestedListManager):
         obj = ps_context.ps_object
         
         # Ensure ps_object is the only object selected
+        bpy.ops.object.mode_set(mode="OBJECT")
         bpy.ops.object.select_all(action='DESELECT')
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.mode_set(mode="OBJECT")
         
         material_output = get_material_output(node_tree)
         surface_socket = material_output.inputs['Surface']
