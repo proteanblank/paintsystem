@@ -1059,6 +1059,25 @@ class Layer(BaseNestedListItem):
         update=update_node_tree
     )
     
+    def get_layer_warnings(self, context: Context) -> List[str]:
+        ps_ctx = parse_context(context)
+        layer_data = self.get_layer_data()
+        active_channel = ps_ctx.active_channel
+        flattened = active_channel.flatten_hierarchy()
+        current_flat_index = next(
+            (i for i, (it, _) in enumerate(flattened) if it.id == self.id), -1)
+        below_layer, next_index = active_channel.get_next_sibling_item(flattened, current_flat_index)
+        warnings = []
+        blend_mode = get_layer_blend_type(layer_data)
+        # If no layer below
+        if not below_layer or below_layer.parent_id != self.parent_id:
+            if blend_mode != 'MIX':
+                warnings.append("Blend mode is not MIX and there is no layer below")
+            if layer_data.type == "ADJUSTMENT":
+                warnings.append("Adjustment do not work without a layer below")
+            
+        return warnings
+    
     def copy_layer_data(self, layer: "Layer"):
         if layer.node_tree:
             self.node_tree = layer.node_tree.copy()
@@ -1130,7 +1149,6 @@ def _get_material_layer_uid_map(material: Material, force_refresh: bool = False)
 
 def _invalidate_material_layer_cache(material: Material = None):
     """Invalidate the layer UID cache for a material or all materials."""
-    print(f"Invalidating material layer cache for {material.name if material else 'all materials'}")
     global _material_uid_cache
     if material:
         _material_uid_cache.pop(material, None)
@@ -1502,6 +1520,10 @@ class Channel(BaseNestedListManager):
     @property
     def flattened_layers(self):
         return [layer.get_layer_data() for layer, _ in self.flatten_hierarchy()]
+
+    @property
+    def flattened_layers_unprocessed(self):
+        return [layer for layer, _ in self.flatten_hierarchy()]
     
     active_index: IntProperty(name="Active Material Layer Index", update=update_active_image)
     type: EnumProperty(
@@ -1873,10 +1895,7 @@ def get_global_layer(layer: Layer) -> GlobalLayer | None:
 
 def get_layer_blend_type(layer: Layer) -> str:
     """Get the blend mode of the global layer"""
-    node_tree = layer.node_tree
-    if not node_tree:
-        raise ValueError("Node tree is not found")
-    mix_node = find_node(node_tree, {'label': 'mix_rgb', 'bl_idname': 'ShaderNodeMix'})
+    mix_node = layer.mix_node
     if not mix_node:
         raise ValueError("Mix node is not found")
     return str(mix_node.blend_type)

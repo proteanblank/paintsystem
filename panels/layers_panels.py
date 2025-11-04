@@ -108,6 +108,8 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
         if index < len(flattened):
             level = active_channel.get_item_level_from_id(original_item.id)
             main_row = layout.row()
+            warnings = original_item.get_layer_warnings(context)
+                # main_row.label(text="\n".join(warnings), icon='ERROR')
             # Check if parent of the current item is enabled
             parent_item = active_channel.get_item_by_id(
                 item.parent_id)
@@ -115,8 +117,11 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                 main_row.enabled = False
 
             row = main_row.row(align=True)
-            for _ in range(level):
-                row.label(icon='BLANK1')
+            for i in range(level):
+                if i == level - 1:
+                    row.label(icon_value=get_icon('folder_indent'))
+                else:
+                    row.label(icon='BLANK1')
             draw_layer_icon(item, row)
 
             row = main_row.row(align=True)
@@ -129,6 +134,8 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                 row.label(icon="KEYTYPE_KEYFRAME_VEC")
             if is_layer_linked(item):
                 row.label(icon="LINKED")
+            if warnings:
+                row.label(icon='ERROR')
             row.prop(item, "enabled", text="",
                      icon="HIDE_OFF" if item.enabled else "HIDE_ON", emboss=False)
             self.draw_custom_properties(row, item)
@@ -145,7 +152,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
         # If you do not make filtering and/or ordering, return empty list(s) (this will be more efficient than
         # returning full lists doing nothing!).
         layers = getattr(data, propname).values()
-        flattened_layers = data.flattened_layers
+        flattened_layers = data.flattened_layers_unprocessed
 
         # Default return values.
         flt_flags = []
@@ -154,7 +161,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
         # Filtering by name
         flt_flags = [self.bitflag_filter_item] * len(layers)
         for idx, layer in enumerate(layers):
-            flt_neworder.append(flattened_layers.index(layer.get_layer_data()))
+            flt_neworder.append(flattened_layers.index(layer))
             while layer.parent_id != -1:
                 layer = data.get_item_by_id(layer.parent_id)
                 if layer and not layer.is_expanded:
@@ -453,6 +460,16 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
             if not active_layer:
                 return
                 # Settings
+            warnings = active_layer.get_layer_warnings(context)
+            if warnings:
+                warnings_box = layout.box()
+                warnings_col = warnings_box.column(align=True)
+                for warning in warnings:
+                    # Split warning into chunks of 6 words
+                    words = warning.split()
+                    chunks = [' '.join(words[j:j+6]) for j in range(0, len(words), 6)]
+                    for i, chunk in enumerate(chunks):
+                        warnings_col.label(text=chunk, icon='ERROR' if not i else 'BLANK1')
             if ps_ctx.ps_settings.use_legacy_ui:
                 box = layout.box()
                 layer_settings_ui(box, context)
