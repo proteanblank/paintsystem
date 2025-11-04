@@ -492,7 +492,9 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
             below_layer and 
             active_layer.type != "FOLDER" and 
             below_layer.type != "FOLDER" and
-            active_layer.parent_id == below_layer.parent_id
+            active_layer.parent_id == below_layer.parent_id and
+            active_layer.enabled and
+            below_layer.enabled
             )
     
     def invoke(self, context, event):
@@ -608,6 +610,8 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
             and active_layer.type != "FOLDER"
             and above_layer.type != "FOLDER"
             and active_layer.parent_id == above_layer.parent_id
+            and active_layer.enabled
+            and above_layer.enabled
         )
 
     def invoke(self, context, event):
