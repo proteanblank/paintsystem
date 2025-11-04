@@ -1059,6 +1059,10 @@ class Layer(BaseNestedListItem):
         update=update_node_tree
     )
     
+    @property
+    def uses_coord_type(self) -> bool:
+        return self.type in ['IMAGE', 'TEXTURE']
+    
     def get_layer_warnings(self, context: Context) -> List[str]:
         ps_ctx = parse_context(context)
         layer_data = self.get_layer_data()
