@@ -140,8 +140,6 @@ class MAT_PT_BrushAdvanced(PSContextMixin, Panel):
         col.use_property_split = True
         col.use_property_decorate = False
         col.prop(image_paint, "normal_angle", text="Angle")
-        layout.prop(ps_ctx.ps_settings, "allow_image_overwrite",
-                 text="Auto Image Select", icon='FILE_IMAGE')
 
 
 class MAT_PT_BrushColorSettings(PSContextMixin, Panel):

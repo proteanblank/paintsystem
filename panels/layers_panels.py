@@ -453,11 +453,13 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
             if not active_layer:
                 return
                 # Settings
+            if ps_ctx.ps_settings.use_legacy_ui:
+                box = layout.box()
+                layer_settings_ui(box, context)
             if active_layer.type not in ('ADJUSTMENT', 'NODE_GROUP', 'ATTRIBUTE', 'GRADIENT', 'SOLID_COLOR', 'RANDOM', 'TEXTURE', 'GEOMETRY'):
                 return
-            box = layout.box()
-            if ps_ctx.ps_settings.use_legacy_ui:
-                layer_settings_ui(box, context)
+            elif not ps_ctx.ps_settings.use_legacy_ui:
+                box = layout.box()
             match active_layer.type:
                 case 'ADJUSTMENT':
                     col = box.column()
