@@ -56,10 +56,11 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -117,10 +118,11 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -359,9 +361,10 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -419,10 +422,11 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -506,10 +510,11 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -619,10 +624,11 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
 
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
