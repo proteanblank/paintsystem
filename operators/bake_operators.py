@@ -551,6 +551,11 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         below_layer.uv_map_name = self.uv_map
         below_layer.image = image
         
+        # Unlink layer if linked
+        if below_layer.is_linked:
+            below_layer.linked_layer_uid = None
+            below_layer.linked_material = None
+        
         # Restore other layers
         for layer in to_be_enabled_layers:
             layer.enabled = True
@@ -662,6 +667,11 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         above_layer.coord_type = 'UV'
         above_layer.uv_map_name = self.uv_map
         above_layer.image = image
+        
+        # Unlink layer if linked
+        if above_layer.is_linked:
+            above_layer.linked_layer_uid = None
+            above_layer.linked_material = None
 
         # Restore other layers
         for layer in to_be_enabled_layers:
