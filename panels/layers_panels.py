@@ -759,7 +759,7 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
         ps_ctx = self.parse_context(context)
         layout = self.layout
 
-        if ps_ctx.active_layer and ps_ctx.active_layer.type != 'IMAGE':
+        if ps_ctx.active_layer and ps_ctx.active_layer.type not in ('IMAGE', 'ADJUSTMENT'):
             layout.operator(
                 "paint_system.convert_to_image_layer",
                 text="Convert to Image Layer",
