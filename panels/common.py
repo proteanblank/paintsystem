@@ -235,6 +235,8 @@ def is_basic_setup(node_tree: bpy.types.NodeTree) -> bool:
     material_output = get_material_output(node_tree)
     nodes = traverse_connected_nodes(material_output)
     is_basic_setup = True
+    if len(nodes) <= 1:
+        return True
     # Only first 3 nodes
     for check in ('ShaderNodeGroup', 'ShaderNodeMixShader', 'ShaderNodeBsdfTransparent'):
         if not any(node.bl_idname == check for node in nodes):
