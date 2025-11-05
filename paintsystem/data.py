@@ -533,7 +533,7 @@ class GlobalLayer(PropertyGroup):
                         elif self.gradient_type == 'RADIAL':
                             self.empty_object.empty_display_type = 'SPHERE'
                     elif self.empty_object.name not in context.view_layer.objects:
-                        add_empty_to_collection(self.empty_object)
+                        add_empty_to_collection(context, self.empty_object)
                 layer_graph = create_gradient_graph(self)
             case "RANDOM":
                 layer_graph = create_random_graph(self)
@@ -832,7 +832,7 @@ class Layer(BaseNestedListItem):
                         elif self.gradient_type == 'RADIAL':
                             self.empty_object.empty_display_type = 'SPHERE'
                     elif self.empty_object.name not in context.view_layer.objects:
-                        add_empty_to_collection(self.empty_object)
+                        add_empty_to_collection(context, self.empty_object)
                 layer_graph = create_gradient_graph(self)
             case "RANDOM":
                 layer_graph = create_random_graph(self)
