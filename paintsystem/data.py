@@ -1244,7 +1244,7 @@ class Channel(BaseNestedListManager):
                 add_command = node_builder.add_node(
                     layer_identifier, "ShaderNodeGroup",
                     {"node_tree": layer.node_tree, "mute": layer.type == "ADJUSTMENT"},
-                    {"Clip": layer.is_clip},
+                    {"Clip": layer.is_clip or layer.type == "ADJUSTMENT"},
                     force_properties=True,
                     force_default_values=True
                 )
