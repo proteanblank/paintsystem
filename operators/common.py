@@ -174,7 +174,7 @@ class PSUVOptionsMixin():
                 box.label(text="Painting may not work in this mode", icon='ERROR')
         else:
             row = layout.row(align=True)
-            row.prop_search(self, "uv_map_name", context.object.data, "uv_layers", text="")
+            row.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
             if not self.uv_map_name:
                 row.alert = True
 

@@ -56,10 +56,11 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -117,10 +118,11 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -359,9 +361,10 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -419,10 +422,11 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -483,18 +487,28 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         below_layer = cls.get_below_layer(cls, context)
         if not below_layer:
             return False
-        return (active_layer and 
-                below_layer and 
-                active_layer.type != "FOLDER" and 
-                below_layer.type != "FOLDER")
+        return (
+            active_layer and 
+            below_layer and 
+            active_layer.type != "FOLDER" and 
+            below_layer.type != "FOLDER" and
+            active_layer.parent_id == below_layer.parent_id and
+            active_layer.enabled and
+            below_layer.enabled
+            )
     
     def invoke(self, context, event):
         self.get_coord_type(context)
         below_layer = self.get_below_layer(context)
-        if below_layer.coord_type == 'AUTO':
-            self.uv_map = DEFAULT_PS_UV_MAP_NAME
-        else:
-            self.uv_map = below_layer.uv_map_name if below_layer.uv_map_name else self.get_default_uv_map_name(context)
+        if below_layer:
+            if below_layer.uses_coord_type:
+                if getattr(below_layer, 'coord_type', 'UV') == 'AUTO':
+                    self.uv_map = DEFAULT_PS_UV_MAP_NAME
+                else:
+                    self.uv_map = below_layer.uv_map_name
+            else:
+                print("Using paint system UV")
+                self.uv_map = DEFAULT_PS_UV_MAP_NAME if self.use_paint_system_uv else self.uv_map_name
         if below_layer.type == "IMAGE":
             self.image_width = below_layer.image.size[0]
             self.image_height = below_layer.image.size[1]
@@ -503,10 +517,11 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
     
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -599,6 +614,9 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
             and above_layer
             and active_layer.type != "FOLDER"
             and above_layer.type != "FOLDER"
+            and active_layer.parent_id == above_layer.parent_id
+            and active_layer.enabled
+            and above_layer.enabled
         )
 
     def invoke(self, context, event):
@@ -606,10 +624,11 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         above_layer = self.get_above_layer(context)
         # Choose UV based on the layer above
         if above_layer:
-            if getattr(above_layer, 'coord_type', 'UV') == 'AUTO':
-                self.uv_map = DEFAULT_PS_UV_MAP_NAME
-            elif getattr(above_layer, 'coord_type', 'UV') == 'UV' and getattr(above_layer, 'uv_map_name', ''):
-                self.uv_map = above_layer.uv_map_name
+            if above_layer.uses_coord_type:
+                if getattr(above_layer, 'coord_type', 'UV') == 'AUTO':
+                    self.uv_map = DEFAULT_PS_UV_MAP_NAME
+                else:
+                    self.uv_map = above_layer.uv_map_name
             else:
                 self.uv_map = DEFAULT_PS_UV_MAP_NAME if self.use_paint_system_uv else self.uv_map_name
         if above_layer.type == "IMAGE":
@@ -620,10 +639,11 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
 
     def draw(self, context):
         layout = self.layout
+        ps_ctx = self.parse_context(context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map", context.object.data, "uv_layers", text="")
+        box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)

@@ -1059,12 +1059,51 @@ class Layer(BaseNestedListItem):
         update=update_node_tree
     )
     
+    @property
+    def uses_coord_type(self) -> bool:
+        return self.type in ['IMAGE', 'TEXTURE']
+    
+    def get_layer_warnings(self, context: Context) -> List[str]:
+        ps_ctx = parse_context(context)
+        layer_data = self.get_layer_data()
+        active_channel = ps_ctx.active_channel
+        flattened = active_channel.flatten_hierarchy()
+        current_flat_index = next(
+            (i for i, (it, _) in enumerate(flattened) if it.id == self.id), -1)
+        below_layer, next_index = active_channel.get_next_sibling_item(flattened, current_flat_index)
+        warnings = []
+        blend_mode = get_layer_blend_type(layer_data)
+        # If no layer below
+        if not below_layer or below_layer.parent_id != self.parent_id:
+            if blend_mode != 'MIX':
+                warnings.append("Blend mode is not MIX and there is no layer below")
+            if layer_data.type == "ADJUSTMENT":
+                warnings.append("Adjustment do not work without a layer below")
+            
+        return warnings
+    
     def copy_layer_data(self, layer: "Layer"):
+        if layer.node_tree:
+            self.node_tree = layer.node_tree.copy()
+        if layer.image:
+            # if image is not saved, save it
+            image: Image = layer.image
+            if image.is_dirty:
+                if image.filepath != '':
+                    image.save()
+                else:
+                    image.pack()
+            self.image = image.copy()
         for prop in layer.bl_rna.properties:
             pid = getattr(prop, 'identifier', '')
             if not pid or getattr(prop, 'is_readonly', False):
                 continue
-            setattr(self, pid, getattr(layer, pid))
+            if pid in {"name", "uid", "node_tree", "image", "empty_object", "type", "id", "order", "parent_id", "layer_name"}:
+                continue
+            value = getattr(layer, pid)
+            if getattr(self, pid) == value:
+                continue
+            setattr(self, pid, value)
     
     def get_layer_data(self) -> "Layer":
         if self.is_linked:
@@ -1074,24 +1113,30 @@ class Layer(BaseNestedListItem):
             
             # Use cached UID lookup dictionary for O(1) access instead of nested loops
             uid_to_layer = _get_material_layer_uid_map(self.linked_material)
+            layer = uid_to_layer.get(self.linked_layer_uid)
+            if not layer:
+                layer = _get_material_layer_uid_map(self.linked_material, force_refresh=True).get(self.linked_layer_uid)
             return uid_to_layer.get(self.linked_layer_uid)
         return self
 
 def get_layer_by_uid(material: Material, uid: str) -> Layer | None:
     uid_to_layer = _get_material_layer_uid_map(material)
-    return uid_to_layer.get(uid)
+    layer = uid_to_layer.get(uid)
+    if not layer:
+        layer = _get_material_layer_uid_map(material, force_refresh=True).get(uid)
+    return layer
 
 # Module-level cache for material layer UID maps
 _material_uid_cache: Dict[Material, Dict[str, 'Layer']] = {}
 
-def _get_material_layer_uid_map(material: Material) -> Dict[str, 'Layer']:
+def _get_material_layer_uid_map(material: Material, force_refresh: bool = False) -> Dict[str, 'Layer']:
     """Get a UID to Layer mapping for a material. Uses caching for performance."""
     if not material or not material.ps_mat_data:
         return {}
     
     # Check if cache is valid (simple version check using material name as key)
     cache_key = material
-    if cache_key in _material_uid_cache:
+    if cache_key in _material_uid_cache and not force_refresh:
         return _material_uid_cache[cache_key]
     
     # Build the UID map
@@ -1104,7 +1149,6 @@ def _get_material_layer_uid_map(material: Material) -> Dict[str, 'Layer']:
     
     # Cache it
     _material_uid_cache[cache_key] = uid_map
-    # print(f"Material {material.name} UID map: {uid_map}")
     return uid_map
 
 def _invalidate_material_layer_cache(material: Material = None):
@@ -1375,6 +1419,12 @@ class Channel(BaseNestedListManager):
         ps_context = parse_context(context)
         obj = ps_context.ps_object
         
+        # Ensure ps_object is the only object selected
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        
         material_output = get_material_output(node_tree)
         surface_socket = material_output.inputs['Surface']
         from_socket = surface_socket.links[0].from_socket if surface_socket.links else None
@@ -1474,6 +1524,10 @@ class Channel(BaseNestedListManager):
     @property
     def flattened_layers(self):
         return [layer.get_layer_data() for layer, _ in self.flatten_hierarchy()]
+
+    @property
+    def flattened_layers_unprocessed(self):
+        return [layer for layer, _ in self.flatten_hierarchy()]
     
     active_index: IntProperty(name="Active Material Layer Index", update=update_active_image)
     type: EnumProperty(
@@ -1845,20 +1899,14 @@ def get_global_layer(layer: Layer) -> GlobalLayer | None:
 
 def get_layer_blend_type(layer: Layer) -> str:
     """Get the blend mode of the global layer"""
-    node_tree = layer.node_tree
-    if not node_tree:
-        raise ValueError("Node tree is not found")
-    mix_node = find_node(node_tree, {'label': 'mix_rgb', 'bl_idname': 'ShaderNodeMix'})
+    mix_node = layer.mix_node
     if not mix_node:
         raise ValueError("Mix node is not found")
     return str(mix_node.blend_type)
 
 def set_layer_blend_type(layer: Layer, blend_type: str) -> None:
     """Set the blend mode of the global layer"""
-    node_tree = layer.node_tree
-    if not node_tree:
-        raise ValueError("Node tree is not found")
-    mix_node = find_node(node_tree, {'label': 'mix_rgb', 'bl_idname': 'ShaderNodeMix'})
+    mix_node = layer.mix_node
     if not mix_node:
         raise ValueError("Mix node is not found")
     mix_node.blend_type = blend_type
