@@ -471,11 +471,11 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         options={'SKIP_SAVE'},
     )
     
-    def get_below_layer(self, context):
+    def get_below_layer(self, context, unprocessed: bool = False):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
-        flattened_layers = active_channel.flattened_layers
+        flattened_layers = active_channel.flattened_layers_unprocessed if unprocessed else active_channel.flattened_layers
         if active_layer and flattened_layers.index(active_layer) < len(flattened_layers) - 1:
             return flattened_layers[flattened_layers.index(active_layer) + 1]
         return None
@@ -560,6 +560,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         set_layer_blend_type(active_layer, original_active_blend_mode)
         set_layer_blend_type(below_layer, original_below_blend_mode)
         
+        below_layer = self.get_below_layer(context, unprocessed=True)
         # Replace the below layer with the merged result
         below_layer.type = 'IMAGE'
         below_layer.coord_type = 'UV'
@@ -567,9 +568,8 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         below_layer.image = image
         
         # Unlink layer if linked
-        if below_layer.is_linked:
-            below_layer.linked_layer_uid = None
-            below_layer.linked_material = None
+        below_layer.linked_layer_uid = ""
+        below_layer.linked_material = None
         
         # Restore other layers
         for layer in to_be_enabled_layers:
@@ -593,11 +593,11 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         options={'SKIP_SAVE'},
     )
 
-    def get_above_layer(self, context):
+    def get_above_layer(self, context, unprocessed: bool = False):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
-        flattened_layers = active_channel.flattened_layers
+        flattened_layers = active_channel.flattened_layers_unprocessed if unprocessed else active_channel.flattened_layers
         if active_layer and flattened_layers.index(active_layer) > 0:
             return flattened_layers[flattened_layers.index(active_layer) - 1]
         return None
@@ -682,6 +682,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         set_layer_blend_type(active_layer, original_active_blend_mode)
         set_layer_blend_type(above_layer, original_above_blend_mode)
 
+        above_layer = self.get_above_layer(context, unprocessed=True)
         # Replace the above layer with the merged result
         above_layer.type = 'IMAGE'
         above_layer.coord_type = 'UV'
@@ -689,9 +690,8 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         above_layer.image = image
         
         # Unlink layer if linked
-        if above_layer.is_linked:
-            above_layer.linked_layer_uid = None
-            above_layer.linked_material = None
+        above_layer.linked_layer_uid = ""
+        above_layer.linked_material = None
 
         # Restore other layers
         for layer in to_be_enabled_layers:
