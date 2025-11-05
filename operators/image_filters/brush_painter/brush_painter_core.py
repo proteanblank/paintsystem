@@ -403,7 +403,7 @@ class BrushPainterCore:
             num_samples = self.calculate_brush_area_density(scaled_brush_list, H, W, actual_brush_size)
             
             # Generate random coordinates
-            np.random.seed(42 + step)
+            # np.random.seed(42 + step)
             random_y = np.random.randint(0, H, num_samples)
             random_x = np.random.randint(0, W, num_samples)
             
