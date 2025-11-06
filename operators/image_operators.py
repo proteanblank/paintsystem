@@ -216,13 +216,15 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
     bl_description = "Paint the active image with the brushes"
     
     brush_coverage_density: FloatProperty(name="Brush Coverage Density", default=0.7, min=0.1, max=1.0)
-    min_brush_scale: FloatProperty(name="Min Brush Scale", default=0.03, min=0.01, max=1.0)
-    max_brush_scale: FloatProperty(name="Max Brush Scale", default=0.1, min=0.01, max=1.0)
+    min_brush_scale: FloatProperty(name="Min Brush Scale", default=0.03, min=0.001, max=1.0)
+    max_brush_scale: FloatProperty(name="Max Brush Scale", default=0.1, min=0.001, max=1.0)
     start_opacity: FloatProperty(name="Start Opacity", default=0.4, min=0.0, max=1.0)
     end_opacity: FloatProperty(name="End Opacity", default=1.0, min=0.0, max=1.0)
     steps: IntProperty(name="Steps", default=7, min=1, max=20)
     gradient_threshold: FloatProperty(name="Gradient Threshold", default=0.0, min=0.0, max=1.0)
-    gaussian_sigma: IntProperty(name="Gaussian Sigma", default=3, min=1, max=10)
+    gaussian_sigma: IntProperty(name="Gaussian Sigma", default=3, min=0, max=10)
+    use_random_seed: BoolProperty(name="Use Random Seed", default=False)
+    random_seed: IntProperty(name="Random Seed", default=42, min=0, max=1000000)
     
     brush_mode: EnumProperty(
         name="Brush Mode",
@@ -257,13 +259,20 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
         subtype='FILE_PATH'
     )
     
-    hue_shift: FloatProperty(name="Hue Shift", default=0.0, min=0.0, max=1.0)
-    saturation_shift: FloatProperty(name="Saturation Shift", default=0.0, min=0.0, max=1.0)
-    value_shift: FloatProperty(name="Value Shift", default=0.0, min=0.0, max=1.0)
+    use_hsv_shift: BoolProperty(name="Use HSV Shift", default=False)
+    hue_shift: FloatProperty(name="Hue Shift", default=0.0, min=0.0, max=1.0, options={'SKIP_SAVE'})
+    saturation_shift: FloatProperty(name="Saturation Shift", default=0.0, min=0.0, max=1.0, options={'SKIP_SAVE'})
+    value_shift: FloatProperty(name="Value Shift", default=0.0, min=0.0, max=1.0, options={'SKIP_SAVE'})
+    
+    custom_image_gradient: BoolProperty(name="Use Custom Image Gradient", default=False)
+    custom_image_name: StringProperty(name="Custom Image Name", default="")
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
         image = self.get_image(context)
+        custom_image_gradient = None
+        if self.custom_image_gradient:
+            custom_image_gradient = bpy.data.images.get(self.custom_image_name)
         if not image:
             return {'CANCELLED'}
         painter = BrushPainterCore()
@@ -276,9 +285,11 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
         painter.steps = self.steps
         painter.gradient_threshold = self.gradient_threshold
         painter.gaussian_sigma = self.gaussian_sigma
-        painter.hue_shift = self.hue_shift
-        painter.saturation_shift = self.saturation_shift
-        painter.value_shift = self.value_shift
+        painter.hue_shift = self.hue_shift if self.use_hsv_shift else 0.0
+        painter.saturation_shift = self.saturation_shift if self.use_hsv_shift else 0.0
+        painter.value_shift = self.value_shift if self.use_hsv_shift else 0.0
+        painter.use_random_seed = self.use_random_seed
+        painter.random_seed = self.random_seed
         # Set brush paths based on mode
         brush_folder_path = None
         brush_texture_path = None
@@ -296,7 +307,7 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
             else:
                 self.report({'WARNING'}, f"Brush texture not found: {self.brush_texture_path}")
         
-        new_image = painter.apply_brush_painting(image, brush_folder_path=brush_folder_path, brush_texture_path=brush_texture_path)
+        new_image = painter.apply_brush_painting(image, brush_folder_path=brush_folder_path, brush_texture_path=brush_texture_path, custom_image_gradient=custom_image_gradient)
         if ps_ctx.active_channel.use_bake_image:
             ps_ctx.active_channel.bake_image = new_image
         else:
@@ -304,6 +315,7 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
         return {'FINISHED'}
     
     def invoke(self, context, event):
+        self.invoke_get_image(context)
         return context.window_manager.invoke_props_dialog(self)
     
     def draw(self, context):
@@ -326,9 +338,17 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
         row.label(text="Brush Parameters", icon="BRUSH_DATA")
         col.prop(self, "brush_coverage_density", text="Coverage Density", slider=True)
         col.prop(self, "steps")
-        col.prop(self, "hue_shift", slider=True)
-        col.prop(self, "saturation_shift", slider=True)
-        col.prop(self, "value_shift", slider=True)
+        col.prop(self, "use_hsv_shift")
+        if self.use_hsv_shift:
+            col.prop(self, "hue_shift", slider=True)
+            col.prop(self, "saturation_shift", slider=True)
+            col.prop(self, "value_shift", slider=True)
+        col.prop(self, "use_random_seed")
+        if self.use_random_seed:
+            col.prop(self, "random_seed")
+        col.prop(self, "custom_image_gradient")
+        if self.custom_image_gradient:
+            col.prop_search(self, "custom_image_name", bpy.data, "images", text="Image")
         box = layout.box()
         col = box.column()
         row = col.row()
@@ -337,8 +357,8 @@ class PAINTSYSTEM_OT_BrushPainter(PSContextMixin, PSImageFilterMixin, Operator):
         split = col.split(factor=0.5)
         split.use_property_split = False
         col = split.column()
-        col.prop(self, "min_brush_scale", slider=True)
-        col.prop(self, "max_brush_scale", slider=True)
+        col.prop(self, "min_brush_scale", text="Min Scale", slider=True)
+        col.prop(self, "max_brush_scale", text="Max Scale", slider=True)
         col.prop(self, "gradient_threshold", slider=True)
         col = split.column()
         col.prop(self, "start_opacity", slider=True)

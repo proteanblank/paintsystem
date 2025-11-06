@@ -238,6 +238,15 @@ class PSImageCreateMixin():
 class PSImageFilterMixin():
 
     image_name: StringProperty()
+    
+    def invoke_get_image(self, context):
+        ps_ctx = PSContextMixin.parse_context(context)
+        if ps_ctx.active_channel.use_bake_image:
+            image = ps_ctx.active_channel.bake_image
+        elif ps_ctx.active_layer:
+            image = ps_ctx.active_layer.image
+        if image:
+            self.image_name = image.name
 
     def get_image(self, context) -> bpy.types.Image:
         if self.image_name:

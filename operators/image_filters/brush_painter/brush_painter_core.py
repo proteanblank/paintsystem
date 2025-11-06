@@ -22,6 +22,8 @@ class BrushPainterCore:
         self.saturation_shift = 0.0 # 0.0 to 1.0
         self.value_shift = 0.0 # 0.0 to 1.0
         self.brush_rotation_offset = 0.0 # 0 to 360 degrees
+        self.use_random_seed = False
+        self.random_seed = 42
         
         # Brush texture paths
         self.brush_texture_path = None
@@ -113,6 +115,9 @@ class BrushPainterCore:
     
     def calculate_gaussian_blur(self, img_float):
         """Calculates Gaussian blur for the image using Pillow."""
+        if self.gaussian_sigma <= 0:
+            return img_float
+        
         img_uint8 = (np.clip(img_float, 0, 1) * 255).astype(np.uint8)
         
         if len(img_float.shape) == 3:
@@ -357,7 +362,7 @@ class BrushPainterCore:
         
         return True
     
-    def apply_brush_painting(self, image, brush_folder_path=None, brush_texture_path=None, hue_shift=0.0, saturation_shift=0.0, value_shift=0.0):
+    def apply_brush_painting(self, image, brush_folder_path=None, brush_texture_path=None, custom_image_gradient=None):
         """Main function to apply brush painting to a Blender image."""
         if image is None:
             return None
@@ -380,7 +385,15 @@ class BrushPainterCore:
         
         # Calculate blurred image and gradients
         img_blurred = self.calculate_gaussian_blur(img_float)
-        G_normalized, theta = self.calculate_gradients(img_float)
+        
+        if custom_image_gradient:
+            custom_img_float = blender_image_to_numpy(image)
+            if custom_img_float is None:
+                return None
+            custom_blurred = self.calculate_gaussian_blur(custom_img_float)
+            G_normalized, theta = self.calculate_gradients(custom_blurred)
+        else:
+            G_normalized, theta = self.calculate_gradients(img_float)
         
         # Create extended canvas
         canvas, extended_H, extended_W, offset_y, offset_x = self.create_extended_canvas(
@@ -403,7 +416,8 @@ class BrushPainterCore:
             num_samples = self.calculate_brush_area_density(scaled_brush_list, H, W, actual_brush_size)
             
             # Generate random coordinates
-            # np.random.seed(42 + step)
+            if self.use_random_seed:
+                np.random.seed(self.random_seed + step)
             random_y = np.random.randint(0, H, num_samples)
             random_x = np.random.randint(0, W, num_samples)
             
