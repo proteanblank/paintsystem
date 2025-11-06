@@ -73,13 +73,24 @@ jobs:
             # This is the new step you added
             - name: Install Pillow for Blender Python
               run: |
-                echo "Locating Python executable for Blender ${{ matrix.version }}"
-                # The path to Blender's python is predictable based on its version
-                BLENDER_PYTHON_EXECUTABLE=./blender-${{ matrix.version }}/${{ matrix.version_x_y }}/python/bin/python
+                BLENDER_DIR="./blender-${{ matrix.version }}"
+                echo "Searching for Python executable in: $BLENDER_DIR"
+                
+                # Use 'find' to locate the python executable robustly.
+                # We search for a file named 'python' inside a 'bin' directory.
+                # 'head -n 1' ensures we only get one result if multiple are found.
+                BLENDER_PYTHON_EXECUTABLE=$(find "$BLENDER_DIR" -type f -path "*/bin/python" | head -n 1)
+
+                # Add a check to ensure the file was found
+                if [ -z "$BLENDER_PYTHON_EXECUTABLE" ]; then
+                    echo "Error: Could not find Blender's Python executable."
+                    echo "Contents of $BLENDER_DIR:"
+                    ls -R "$BLENDER_DIR" # List contents for debugging
+                    exit 1
+                fi
 
                 echo "Found Blender Python at: $BLENDER_PYTHON_EXECUTABLE"
                 echo "Upgrading pip..."
-                # It's good practice to upgrade pip first
                 $BLENDER_PYTHON_EXECUTABLE -m pip install --upgrade pip
 
                 echo "Installing Pillow..."
