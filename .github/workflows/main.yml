@@ -8,7 +8,7 @@ on:
         inputs:
             version:
                 description: 'version'
-                required: false # Make this optional
+                required: false
                 default: ''
             release_stage:
                 type: choice
@@ -25,7 +25,6 @@ permissions:
     contents: write
 
 jobs:
-    # Job to generate the test matrix by running the python script
     make-tests-matrix:
         runs-on: ubuntu-latest
         outputs:
@@ -33,27 +32,21 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
-
             - name: Set up Python
               uses: actions/setup-python@v5
               with:
                 python-version: '3.10'
-
             - name: Generate test matrix
               id: set-matrix
               run: python .github/make-tests-matrix.py >> $GITHUB_OUTPUT
 
-    # Job to run tests against all Blender versions in the matrix
-    # GOOD YAML - CORRECTED INDENTATION
-
-    # Job to run tests against all Blender versions in the matrix
     Test:
         needs: make-tests-matrix
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
             matrix: ${{ fromJSON(needs.make-tests-matrix.outputs.matrix) }}
-        steps: # The list of steps starts here
+        steps:
             - name: Checkout repository
               uses: actions/checkout@v4
 
@@ -64,7 +57,6 @@ jobs:
                   path: blender-${{ matrix.version }}
                   key: blender-${{ runner.os }}-${{ matrix.version }}
 
-            # --- First Step in the list ---
             - name: Download and extract Blender
               if: steps.blender-cache.outputs.cache-hit != 'true'
               run: |
@@ -78,14 +70,28 @@ jobs:
                 tar -xf blender.tar.xz -C blender-${{ matrix.version }} --strip-components=1
                 echo "Extraction complete."
 
-            # --- Second Step, indented correctly ---
+            # This is the new step you added
+            - name: Install Pillow for Blender Python
+              run: |
+                echo "Locating Python executable for Blender ${{ matrix.version }}"
+                # The path to Blender's python is predictable based on its version
+                BLENDER_PYTHON_EXECUTABLE=./blender-${{ matrix.version }}/${{ matrix.version_x_y }}/python/bin/python
+
+                echo "Found Blender Python at: $BLENDER_PYTHON_EXECUTABLE"
+                echo "Upgrading pip..."
+                # It's good practice to upgrade pip first
+                $BLENDER_PYTHON_EXECUTABLE -m pip install --upgrade pip
+
+                echo "Installing Pillow..."
+                $BLENDER_PYTHON_EXECUTABLE -m pip install pillow
+                echo "Pillow installed successfully."
+
             - name: Run Addon Tests in Blender ${{ matrix.version }}
               run: |
                   BLENDER_EXECUTABLE=./blender-${{ matrix.version }}/blender
                   ADDON_FOLDER_NAME=paint_system
 
                   echo "Finding user script path for Blender ${{ matrix.version }}"
-                  # Run Blender and pipe the output to grep to isolate the path.
                   BLENDER_USER_SCRIPTS=$(./blender-${{ matrix.version }}/blender --background --python-expr "import bpy; print(bpy.utils.script_path_user())" | grep '^/')
                   
                   if [ -z "$BLENDER_USER_SCRIPTS" ]; then

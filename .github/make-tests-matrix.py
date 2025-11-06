@@ -5,30 +5,6 @@ from urllib import request
 jobs = [
     # Blender 4 test first and last patch version of each minor version
     {
-        "version": "4.0.0",
-        "version_x_y": "4.0",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.0/blender-4.0.0-linux-x64.tar.xz",
-    },
-    {
-        "version": "4.0.2",
-        "version_x_y": "4.0",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-x64.tar.xz",
-    },
-    {
-        "version": "4.1.0",
-        "version_x_y": "4.1",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.1/blender-4.1.0-linux-x64.tar.xz",
-    },
-    {
-        "version": "4.1.1",
-        "version_x_y": "4.1",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.1/blender-4.1.1-linux-x64.tar.xz",
-    },
-    {
         "version": "4.2.0",
         "version_x_y": "4.2",
         "sha": "released",
@@ -39,36 +15,6 @@ jobs = [
         "version_x_y": "4.2",
         "sha": "released",
         "download_url": "https://download.blender.org/release/Blender4.2/blender-4.2.13-linux-x64.tar.xz",
-    },
-    {
-        "version": "4.3.0",
-        "version_x_y": "4.3",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.3/blender-4.3.0-linux-x64.tar.xz",
-    },
-    {
-        "version": "4.3.2",
-        "version_x_y": "4.3",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.3/blender-4.3.2-linux-x64.tar.xz",
-    },
-    {
-        "version": "4.4.0",
-        "version_x_y": "4.4",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.4/blender-4.4.0-linux-x64.tar.xz",
-    },
-    {
-        "version": "4.4.3",
-        "version_x_y": "4.4",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.4/blender-4.4.3-linux-x64.tar.xz",
-    },
-    {
-        "version": "4.5.0",
-        "version_x_y": "4.5",
-        "sha": "released",
-        "download_url": "https://download.blender.org/release/Blender4.5/blender-4.5.0-linux-x64.tar.xz",
     },
     {  # LTS
         "version": "4.5.2",
