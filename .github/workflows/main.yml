@@ -65,13 +65,23 @@ jobs:
             - name: Download and extract Blender
               if: steps.blender-cache.outputs.cache-hit != 'true'
               run: |
-                # Use curl to download the file. The -L flag follows redirects.
-                curl -L -o blender.tar.xz "${{ matrix.download_url }}"
+                echo "Downloading Blender from ${{ matrix.download_url }}"
                 
+                # Use curl to download the file. -S shows errors, -L follows redirects.
+                curl -SL --fail -o blender.tar.xz "${{ matrix.download_url }}"
+                
+                echo "Download complete. Checking file..."
+                
+                # --- Debugging Checks ---
+                # Check the file size and type. This will fail if it's a small HTML file.
+                ls -lh blender.tar.xz
+                file blender.tar.xz
+                
+                echo "Extracting Blender..."
                 # Create the destination directory and extract the archive into it.
-                # The --strip-components=1 flag removes the top-level folder from the archive.
                 mkdir -p blender-${{ matrix.version }}
                 tar -xf blender.tar.xz -C blender-${{ matrix.version }} --strip-components=1
+                echo "Extraction complete."
 
             - name: Run Addon Tests in Blender ${{ matrix.version }}
               run: |
