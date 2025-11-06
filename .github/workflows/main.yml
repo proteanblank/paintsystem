@@ -83,21 +83,31 @@ jobs:
                 tar -xf blender.tar.xz -C blender-${{ matrix.version }} --strip-components=1
                 echo "Extraction complete."
 
-            - name: Run Addon Tests in Blender ${{ matrix.version }}
-              run: |
-                  BLENDER_EXECUTABLE=./blender-${{ matrix.version }}/blender
-                  # This is the folder containing your addon's __init__.py
-                  ADDON_FOLDER_NAME=paint_system
-
-                  # Get the addon installation path for the specific Blender version
-                  ADDON_INSTALL_PATH=$(./blender-${{ matrix.version }}/blender --background --python-expr "import bpy; print(bpy.utils.script_path_user())")/addons
-
-                  # Create the addon directory and a symbolic link to the addon source
-                  mkdir -p $ADDON_INSTALL_PATH
-                  ln -s $GITHUB_WORKSPACE $ADDON_INSTALL_PATH/$ADDON_FOLDER_NAME
-
-                  echo "Running tests with Blender from: $BLENDER_EXECUTABLE"
-                  $BLENDER_EXECUTABLE --background --python run_tests.py
+                - name: Run Addon Tests in Blender ${{ matrix.version }}
+                run: |
+                    BLENDER_EXECUTABLE=./blender-${{ matrix.version }}/blender
+                    ADDON_FOLDER_NAME=paint_system
+  
+                    echo "Finding user script path for Blender ${{ matrix.version }}"
+                    # Run Blender and pipe the output to grep to isolate the path.
+                    # grep '^/' will find the one line that starts with '/', which is the path.
+                    BLENDER_USER_SCRIPTS=$(./blender-${{ matrix.version }}/blender --background --python-expr "import bpy; print(bpy.utils.script_path_user())" | grep '^/')
+                    
+                    # Check if we successfully found the path
+                    if [ -z "$BLENDER_USER_SCRIPTS" ]; then
+                        echo "Error: Could not determine Blender's user script path."
+                        exit 1
+                    fi
+  
+                    ADDON_INSTALL_PATH="$BLENDER_USER_SCRIPTS/addons"
+                    echo "Addon will be linked to: $ADDON_INSTALL_PATH"
+  
+                    # Create the addon directory and a symbolic link to the addon source
+                    mkdir -p "$ADDON_INSTALL_PATH"
+                    ln -s "$GITHUB_WORKSPACE" "$ADDON_INSTALL_PATH/$ADDON_FOLDER_NAME"
+  
+                    echo "Running tests with Blender from: $BLENDER_EXECUTABLE"
+                    $BLENDER_EXECUTABLE --background --python run_tests.py
 
     # Your existing Build job, now dependent on the Test job
     Build:
