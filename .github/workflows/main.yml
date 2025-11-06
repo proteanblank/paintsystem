@@ -44,13 +44,16 @@ jobs:
               run: python .github/make-tests-matrix.py >> $GITHUB_OUTPUT
 
     # Job to run tests against all Blender versions in the matrix
+    # GOOD YAML - CORRECTED INDENTATION
+
+    # Job to run tests against all Blender versions in the matrix
     Test:
         needs: make-tests-matrix
         runs-on: ubuntu-latest
         strategy:
-            fail-fast: false # Allows all tests to run even if one fails
+            fail-fast: false
             matrix: ${{ fromJSON(needs.make-tests-matrix.outputs.matrix) }}
-        steps:
+        steps: # The list of steps starts here
             - name: Checkout repository
               uses: actions/checkout@v4
 
@@ -61,53 +64,43 @@ jobs:
                   path: blender-${{ matrix.version }}
                   key: blender-${{ runner.os }}-${{ matrix.version }}
 
-            # --- THIS IS THE UPDATED STEP ---
+            # --- First Step in the list ---
             - name: Download and extract Blender
               if: steps.blender-cache.outputs.cache-hit != 'true'
               run: |
                 echo "Downloading Blender from ${{ matrix.download_url }}"
-                
-                # Use curl to download the file. -S shows errors, -L follows redirects.
                 curl -SL --fail -o blender.tar.xz "${{ matrix.download_url }}"
-                
                 echo "Download complete. Checking file..."
-                
-                # --- Debugging Checks ---
-                # Check the file size and type. This will fail if it's a small HTML file.
                 ls -lh blender.tar.xz
                 file blender.tar.xz
-                
                 echo "Extracting Blender..."
-                # Create the destination directory and extract the archive into it.
                 mkdir -p blender-${{ matrix.version }}
                 tar -xf blender.tar.xz -C blender-${{ matrix.version }} --strip-components=1
                 echo "Extraction complete."
 
-                - name: Run Addon Tests in Blender ${{ matrix.version }}
-                run: |
-                    BLENDER_EXECUTABLE=./blender-${{ matrix.version }}/blender
-                    ADDON_FOLDER_NAME=paint_system
-  
-                    echo "Finding user script path for Blender ${{ matrix.version }}"
-                    # Run Blender and pipe the output to grep to isolate the path.
-                    # grep '^/' will find the one line that starts with '/', which is the path.
-                    BLENDER_USER_SCRIPTS=$(./blender-${{ matrix.version }}/blender --background --python-expr "import bpy; print(bpy.utils.script_path_user())" | grep '^/')
-                    
-                    # Check if we successfully found the path
-                    if [ -z "$BLENDER_USER_SCRIPTS" ]; then
-                        echo "Error: Could not determine Blender's user script path."
-                        exit 1
-                    fi
-  
-                    ADDON_INSTALL_PATH="$BLENDER_USER_SCRIPTS/addons"
-                    echo "Addon will be linked to: $ADDON_INSTALL_PATH"
-  
-                    # Create the addon directory and a symbolic link to the addon source
-                    mkdir -p "$ADDON_INSTALL_PATH"
-                    ln -s "$GITHUB_WORKSPACE" "$ADDON_INSTALL_PATH/$ADDON_FOLDER_NAME"
-  
-                    echo "Running tests with Blender from: $BLENDER_EXECUTABLE"
-                    $BLENDER_EXECUTABLE --background --python run_tests.py
+            # --- Second Step, indented correctly ---
+            - name: Run Addon Tests in Blender ${{ matrix.version }}
+              run: |
+                  BLENDER_EXECUTABLE=./blender-${{ matrix.version }}/blender
+                  ADDON_FOLDER_NAME=paint_system
+
+                  echo "Finding user script path for Blender ${{ matrix.version }}"
+                  # Run Blender and pipe the output to grep to isolate the path.
+                  BLENDER_USER_SCRIPTS=$(./blender-${{ matrix.version }}/blender --background --python-expr "import bpy; print(bpy.utils.script_path_user())" | grep '^/')
+                  
+                  if [ -z "$BLENDER_USER_SCRIPTS" ]; then
+                      echo "Error: Could not determine Blender's user script path."
+                      exit 1
+                  fi
+
+                  ADDON_INSTALL_PATH="$BLENDER_USER_SCRIPTS/addons"
+                  echo "Addon will be linked to: $ADDON_INSTALL_PATH"
+
+                  mkdir -p "$ADDON_INSTALL_PATH"
+                  ln -s "$GITHUB_WORKSPACE" "$ADDON_INSTALL_PATH/$ADDON_FOLDER_NAME"
+
+                  echo "Running tests with Blender from: $BLENDER_EXECUTABLE"
+                  $BLENDER_EXECUTABLE --background --python run_tests.py
 
     # Your existing Build job, now dependent on the Test job
     Build:
