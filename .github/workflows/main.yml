@@ -1,4 +1,5 @@
-name: release-and-test
+# .github/workflows/main.yaml
+name: Release
 
 on:
     pull_request:
@@ -7,7 +8,7 @@ on:
         inputs:
             version:
                 description: 'version'
-                required: false # Make this optional
+                required: false
                 default: ''
             release_stage:
                 type: choice
@@ -24,7 +25,6 @@ permissions:
     contents: write
 
 jobs:
-    # Job to generate the test matrix by running the python script
     make-tests-matrix:
         runs-on: ubuntu-latest
         outputs:
@@ -32,22 +32,19 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
-
             - name: Set up Python
               uses: actions/setup-python@v5
               with:
                 python-version: '3.10'
-
             - name: Generate test matrix
               id: set-matrix
               run: python .github/make-tests-matrix.py >> $GITHUB_OUTPUT
 
-    # Job to run tests against all Blender versions in the matrix
     Test:
         needs: make-tests-matrix
         runs-on: ubuntu-latest
         strategy:
-            fail-fast: false # Allows all tests to run even if one fails
+            fail-fast: false
             matrix: ${{ fromJSON(needs.make-tests-matrix.outputs.matrix) }}
         steps:
             - name: Checkout repository
@@ -62,24 +59,81 @@ jobs:
 
             - name: Download and extract Blender
               if: steps.blender-cache.outputs.cache-hit != 'true'
-              uses: dawidd6/action-download-and-extract@v1
-              with:
-                  url: ${{ matrix.download_url }}
-                  dest: blender-${{ matrix.version }}
-                  strip: 1
+              run: |
+                echo "Downloading Blender from ${{ matrix.download_url }}"
+                curl -SL --fail -o blender.tar.xz "${{ matrix.download_url }}"
+                echo "Download complete. Checking file..."
+                ls -lh blender.tar.xz
+                file blender.tar.xz
+                echo "Extracting Blender..."
+                mkdir -p blender-${{ matrix.version }}
+                tar -xf blender.tar.xz -C blender-${{ matrix.version }} --strip-components=1
+                echo "Extraction complete."
+
+            # This is the new step you added
+            - name: Install Pillow for Blender Python
+              run: |
+                echo "Locating Python executable for Blender ${{ matrix.version }}"
+                echo "Checking directory structure..."
+                ls -la blender-${{ matrix.version }}/
+                echo "Looking for Python executable..."
+                find blender-${{ matrix.version }} -name python -type f 2>/dev/null | head -5
+                
+                # Try multiple possible paths for Blender's Python executable
+                BLENDER_DIR=./blender-${{ matrix.version }}
+                BLENDER_PYTHON_EXECUTABLE=""
+                
+                # Try the expected path first
+                if [ -f "$BLENDER_DIR/${{ matrix.version_x_y }}/python/bin/python" ]; then
+                  BLENDER_PYTHON_EXECUTABLE="$BLENDER_DIR/${{ matrix.version_x_y }}/python/bin/python"
+                # Try alternative path with blender- prefix
+                elif [ -f "$BLENDER_DIR/blender-${{ matrix.version_x_y }}/python/bin/python" ]; then
+                  BLENDER_PYTHON_EXECUTABLE="$BLENDER_DIR/blender-${{ matrix.version_x_y }}/python/bin/python"
+                # Try direct python path
+                elif [ -f "$BLENDER_DIR/python/bin/python" ]; then
+                  BLENDER_PYTHON_EXECUTABLE="$BLENDER_DIR/python/bin/python"
+                # Fallback: search for python executable
+                else
+                  FOUND_PYTHON=$(find "$BLENDER_DIR" -type f -name python -path '*/python/bin/python' 2>/dev/null | head -1)
+                  if [ -n "$FOUND_PYTHON" ] && [ -f "$FOUND_PYTHON" ]; then
+                    BLENDER_PYTHON_EXECUTABLE="$FOUND_PYTHON"
+                  fi
+                fi
+                
+                if [ -z "$BLENDER_PYTHON_EXECUTABLE" ]; then
+                  echo "Error: Could not find Blender Python executable"
+                  echo "Searched in: $BLENDER_DIR"
+                  exit 1
+                fi
+                
+                echo "Found Blender Python at: $BLENDER_PYTHON_EXECUTABLE"
+
+                echo "Upgrading pip..."
+                # It's good practice to upgrade pip first
+                $BLENDER_PYTHON_EXECUTABLE -m pip install --upgrade pip
+
+                echo "Installing Pillow..."
+                $BLENDER_PYTHON_EXECUTABLE -m pip install pillow
+                echo "Pillow installed successfully."
 
             - name: Run Addon Tests in Blender ${{ matrix.version }}
               run: |
                   BLENDER_EXECUTABLE=./blender-${{ matrix.version }}/blender
-                  # This is the folder containing your addon's __init__.py
                   ADDON_FOLDER_NAME=paint_system
 
-                  # Get the addon installation path for the specific Blender version
-                  ADDON_INSTALL_PATH=$(./blender-${{ matrix.version }}/blender --background --python-expr "import bpy; print(bpy.utils.script_path_user())")/addons
+                  echo "Finding user script path for Blender ${{ matrix.version }}"
+                  BLENDER_USER_SCRIPTS=$(./blender-${{ matrix.version }}/blender --background --python-expr "import bpy; print(bpy.utils.script_path_user())" | grep '^/')
+                  
+                  if [ -z "$BLENDER_USER_SCRIPTS" ]; then
+                      echo "Error: Could not determine Blender's user script path."
+                      exit 1
+                  fi
 
-                  # Create the addon directory and a symbolic link to the addon source
-                  mkdir -p $ADDON_INSTALL_PATH
-                  ln -s $GITHUB_WORKSPACE $ADDON_INSTALL_PATH/$ADDON_FOLDER_NAME
+                  ADDON_INSTALL_PATH="$BLENDER_USER_SCRIPTS/addons"
+                  echo "Addon will be linked to: $ADDON_INSTALL_PATH"
+
+                  mkdir -p "$ADDON_INSTALL_PATH"
+                  ln -s "$GITHUB_WORKSPACE" "$ADDON_INSTALL_PATH/$ADDON_FOLDER_NAME"
 
                   echo "Running tests with Blender from: $BLENDER_EXECUTABLE"
                   $BLENDER_EXECUTABLE --background --python run_tests.py
@@ -99,7 +153,7 @@ jobs:
               run: |
                   # Make sure this path is correct
                   VERSION=$(python <<EOF
-                  import re
+                  import re, sys
 
                   with open("paint_system/__init__.py", "r", encoding="utf-8") as f:
                       content = f.read()
@@ -137,7 +191,6 @@ jobs:
               with:
                   name: paint-system
                   # This should be the root folder that gets zipped.
-                #   addon_folder_name: paint_system
                   exclude-files: '.git;.github;README.md;*.blend1;run_tests.py'
 
     # Your existing Release job, which remains unchanged
