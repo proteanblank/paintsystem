@@ -1,6 +1,12 @@
 import bpy
 import numpy as np
-from PIL import Image, ImageFilter
+try:
+    from PIL import Image, ImageFilter
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    Image = None
+    ImageFilter = None
 import os
 import glob
 from ..common import blender_image_to_numpy, numpy_to_blender_image
@@ -40,6 +46,8 @@ class BrushPainterCore:
     
     def load_brush_texture(self, path):
         """Loads a brush texture and converts it to a grayscale mask."""
+        if not PIL_AVAILABLE:
+            raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
         try:
             if not os.path.exists(path):
                 return self.create_circular_brush(50)
@@ -104,6 +112,8 @@ class BrushPainterCore:
     
     def resize_brushes(self, brush_list, size):
         """Resizes a list of brush masks to the specified size."""
+        if not PIL_AVAILABLE:
+            raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
         resized_brush_list = []
         for brush in brush_list:
             brush_uint8 = (brush * 255).astype(np.uint8)
@@ -115,6 +125,8 @@ class BrushPainterCore:
     
     def calculate_gaussian_blur(self, img_float):
         """Calculates Gaussian blur for the image using Pillow."""
+        if not PIL_AVAILABLE:
+            raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
         if self.gaussian_sigma <= 0:
             return img_float
         
@@ -136,6 +148,8 @@ class BrushPainterCore:
     
     def calculate_sobel_filter(self, img_float):
         """Calculates Sobel filter for the image using PIL.ImageFilter.Kernel."""
+        if not PIL_AVAILABLE:
+            raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
         if len(img_float.shape) == 3:
             if img_float.shape[2] == 4:
                 img_gray = img_float[..., :3]
@@ -364,6 +378,8 @@ class BrushPainterCore:
     
     def apply_brush_painting(self, image, brush_folder_path=None, brush_texture_path=None, custom_image_gradient=None):
         """Main function to apply brush painting to a Blender image."""
+        if not PIL_AVAILABLE:
+            raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
         if image is None:
             return None
         
