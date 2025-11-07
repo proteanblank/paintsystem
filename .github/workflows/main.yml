@@ -70,52 +70,6 @@ jobs:
                 tar -xf blender.tar.xz -C blender-${{ matrix.version }} --strip-components=1
                 echo "Extraction complete."
 
-            # This is the new step you added
-            - name: Install Pillow for Blender Python
-              run: |
-                echo "Locating Python executable for Blender ${{ matrix.version }}"
-                echo "Checking directory structure..."
-                ls -la blender-${{ matrix.version }}/
-                echo "Looking for Python executable..."
-                find blender-${{ matrix.version }} -name python -type f 2>/dev/null | head -5
-                
-                # Try multiple possible paths for Blender's Python executable
-                BLENDER_DIR=./blender-${{ matrix.version }}
-                BLENDER_PYTHON_EXECUTABLE=""
-                
-                # Try the expected path first
-                if [ -f "$BLENDER_DIR/${{ matrix.version_x_y }}/python/bin/python" ]; then
-                  BLENDER_PYTHON_EXECUTABLE="$BLENDER_DIR/${{ matrix.version_x_y }}/python/bin/python"
-                # Try alternative path with blender- prefix
-                elif [ -f "$BLENDER_DIR/blender-${{ matrix.version_x_y }}/python/bin/python" ]; then
-                  BLENDER_PYTHON_EXECUTABLE="$BLENDER_DIR/blender-${{ matrix.version_x_y }}/python/bin/python"
-                # Try direct python path
-                elif [ -f "$BLENDER_DIR/python/bin/python" ]; then
-                  BLENDER_PYTHON_EXECUTABLE="$BLENDER_DIR/python/bin/python"
-                # Fallback: search for python executable
-                else
-                  FOUND_PYTHON=$(find "$BLENDER_DIR" -type f -name python -path '*/python/bin/python' 2>/dev/null | head -1)
-                  if [ -n "$FOUND_PYTHON" ] && [ -f "$FOUND_PYTHON" ]; then
-                    BLENDER_PYTHON_EXECUTABLE="$FOUND_PYTHON"
-                  fi
-                fi
-                
-                if [ -z "$BLENDER_PYTHON_EXECUTABLE" ]; then
-                  echo "Error: Could not find Blender Python executable"
-                  echo "Searched in: $BLENDER_DIR"
-                  exit 1
-                fi
-                
-                echo "Found Blender Python at: $BLENDER_PYTHON_EXECUTABLE"
-
-                echo "Upgrading pip..."
-                # It's good practice to upgrade pip first
-                $BLENDER_PYTHON_EXECUTABLE -m pip install --upgrade pip
-
-                echo "Installing Pillow..."
-                $BLENDER_PYTHON_EXECUTABLE -m pip install pillow
-                echo "Pillow installed successfully."
-
             - name: Run Addon Tests in Blender ${{ matrix.version }}
               run: |
                   BLENDER_EXECUTABLE=./blender-${{ matrix.version }}/blender
