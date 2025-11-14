@@ -226,8 +226,9 @@ class PSImageCreateMixin():
             col.prop(self, "image_height", text="Height")
             
     def create_image(self):
-        self.image_width = int(self.image_resolution)
-        self.image_height = int(self.image_resolution)
+        if self.image_resolution != 'CUSTOM':
+            self.image_width = int(self.image_resolution)
+            self.image_height = int(self.image_resolution)
         img = bpy.data.images.new(
             name=self.image_name, width=self.image_width, height=self.image_height, alpha=True)
         img.generated_color = (0, 0, 0, 0)
