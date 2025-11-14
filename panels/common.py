@@ -261,7 +261,7 @@ def toggle_paint_mode_ui(layout: bpy.types.UILayout, context: bpy.types.Context)
     
     group_node = find_node(mat.node_tree, {
                                 'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
-    if (not is_basic_setup(mat.node_tree) or len(active_group.channels) > 1) and group_node:
+    if (not is_basic_setup(mat.node_tree) or len(active_group.channels) > 1 or ps_ctx.ps_mat_data.preview_channel) and group_node:
                 row.operator("paint_system.isolate_active_channel",
                             text="", depress=ps_ctx.ps_mat_data.preview_channel, icon_value=get_icon_from_channel(ps_ctx.active_channel) if ps_ctx.ps_mat_data.preview_channel else get_icon("channel"))
     row.operator("wm.save_mainfile",
