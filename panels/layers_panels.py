@@ -521,7 +521,9 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.use_property_decorate = False
                         if active_layer.gradient_type in ('LINEAR', 'RADIAL'):
                             if active_layer.empty_object and active_layer.empty_object.name in context.view_layer.objects:
-                                col.operator("paint_system.select_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
+                                empty_col = col.column(align=True)
+                                empty_col.operator("paint_system.select_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
+                                empty_col.prop(active_layer, "empty_object", text="")
                             else:
                                 err_box = col.box()
                                 err_box.alert = True
@@ -693,7 +695,13 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
             col.prop_search(active_layer, "uv_map_name", text="UV Map",
                                 search_data=ps_ctx.ps_object.data, search_property="uv_layers", icon='GROUP_UVS')
         elif active_layer.coord_type == 'DECAL':
-            col.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
+            decal_clip = active_layer.find_node("decal_depth_clip")
+            if decal_clip:
+                decal_clip_col = col.column(align=True)
+                decal_clip_col.prop(decal_clip.inputs[2], "default_value", text="Depth Clip")
+            empty_col = col.column(align=True)
+            empty_col.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
+            empty_col.prop(active_layer, "empty_object", text="")
         if active_layer.coord_type not in ['UV', 'AUTO'] and active_layer.type == 'IMAGE':
             info_box = col.box()
             info_box.alert = True
