@@ -53,9 +53,19 @@ from .graph import (
     get_alpha_over_nodetree,
     create_texture_graph,
     create_geometry_graph,
+    get_layer_blend_type,
+    set_layer_blend_type,
 )
 from .graph.common import get_library_object, DEFAULT_PS_UV_MAP_NAME
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
+
+BLEND_MODES = []
+for blend_mode in bpy.types.ShaderNodeMixRGB.bl_rna.properties['blend_type'].enum_items:
+    BLEND_MODES.append((blend_mode.identifier, blend_mode.name, blend_mode.description))
+    if blend_mode.identifier in ["MIX", "COLOR_BURN", "ADD", "LINEAR_LIGHT", "DIVIDE"]:
+        if blend_mode.identifier == "MIX":
+            BLEND_MODES.append(("PASSTHROUGH", "Pass Through", "Pass Through"))
+        BLEND_MODES.append((None))
 
 TEMPLATE_ENUM = [
     ('BASIC', "Basic", "Basic painting setup", "IMAGE", 0),
@@ -165,7 +175,16 @@ FILTER_TYPE_ENUM = [
     ('SHARPEN', "Sharpen", "Sharpen"),
 ]
 
-
+STRING_CACHE = {}
+def intern_enum_items(items):
+    def intern_string(s):
+        if not isinstance(s, str):
+            return s
+        global STRING_CACHE
+        if s not in STRING_CACHE:
+            STRING_CACHE[s] = s
+        return STRING_CACHE[s]
+    return [tuple(intern_string(s) for s in item) for item in items]
 
 def is_valid_uuidv4(uuid_string):
     """
@@ -205,9 +224,6 @@ def update_active_image(self=None, context: bpy.types.Context = None):
     obj = ps_ctx.ps_object
     mat = ps_ctx.active_material
     active_channel = ps_ctx.active_channel
-    if not obj.name == "PS Camera Plane":
-        # print("Setting last selected PS object: ", obj.name)
-        ps_ctx.ps_scene_data.last_selected_ps_object = obj
     if not mat or not active_channel:
         return
     active_layer = ps_ctx.active_layer
@@ -245,6 +261,18 @@ def update_active_group(self, context):
     active_group = ps_ctx.active_group
     if active_group:
         active_group.update_node_tree(context)
+
+def find_channels_containing_layer(check_layer: "Layer") -> list["Channel"]:
+    channels = []
+    for material in bpy.data.materials:
+        if hasattr(material, 'ps_mat_data'):
+            for group in material.ps_mat_data.groups:
+                for channel in group.channels:
+                    for layer in channel.layers:
+                        if layer == check_layer or layer.linked_layer_uid == check_layer.uid:
+                            channels.append(channel)
+    print(f"Found {len(channels)} channels containing layer {check_layer.layer_name}")
+    return channels
 
 def get_node_from_nodetree(node_tree: NodeTree, identifier: str) -> Node | None:
     for node in node_tree.nodes:
@@ -760,6 +788,9 @@ class Layer(BaseNestedListItem):
         if self.type == "BLANK":
             return
         
+        if self.blend_mode == "PASSTHROUGH" and self.type != "FOLDER":
+            self.blend_mode = "MIX"
+        
         if not self.node_tree and not self.is_linked:
             node_tree = bpy.data.node_groups.new(name=f"PS_Layer ({self.layer_name})", type='ShaderNodeTree')
             self.node_tree = node_tree
@@ -1023,6 +1054,19 @@ class Layer(BaseNestedListItem):
         default=False,
         update=update_brush_settings
     )
+    def update_blend_mode(self, context: Context):
+        layer_data = self.get_layer_data()
+        layer_data.update_node_tree(context)
+        for channel in find_channels_containing_layer(layer_data):
+            channel.update_node_tree(context)
+    def get_blend_mode_items(self, context: Context) -> list[tuple[str, str, str]]:
+        return BLEND_MODES if self.type == "FOLDER" else [blend_mode for blend_mode in BLEND_MODES if blend_mode == None or blend_mode[0] != "PASSTHROUGH"]
+    blend_mode: EnumProperty(
+        items=get_blend_mode_items,
+        name="Blend Mode",
+        description="Blend mode",
+        update=update_blend_mode
+    )
     
     auto_update_node_tree: BoolProperty(
         name="Update Node Tree",
@@ -1071,7 +1115,7 @@ class Layer(BaseNestedListItem):
         warnings = []
         blend_mode = get_layer_blend_type(layer_data)
         # If no layer below
-        if not below_layer or below_layer.parent_id != self.parent_id:
+        if not below_layer or active_channel.get_parent_layer_id(below_layer) != active_channel.get_parent_layer_id(self):
             if blend_mode != 'MIX':
                 warnings.append("Blend mode is not MIX and there is no layer below")
             if layer_data.type == "ADJUSTMENT":
@@ -1304,6 +1348,15 @@ def ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu=True):
 class Channel(BaseNestedListManager):
     """Custom data for material layers in the Paint System"""
     
+    def get_parent_layer_id(self, layer: "Layer") -> int:
+        if layer.parent_id == -1:
+            return -1
+        parent_layer = self.get_item_by_id(layer.parent_id)
+        parent_layer_linked = parent_layer.get_layer_data()
+        if parent_layer_linked.blend_mode == "PASSTHROUGH":
+            return self.get_parent_layer_id(parent_layer)
+        return parent_layer.id
+    
     def get_item_name(self, item):
         return item.layer_name if item else "root"
     
@@ -1362,7 +1415,12 @@ class Channel(BaseNestedListManager):
                 layer = unlinked_layer.get_layer_data()
                 if layer is None or not layer.node_tree:
                     continue
-                previous_data = previous_dict.get(unlinked_layer.parent_id, None)
+                if layer.blend_mode == "PASSTHROUGH":
+                    continue
+                sample_id = unlinked_layer.parent_id
+                if unlinked_layer.parent_id != -1:
+                    sample_id = self.get_parent_layer_id(unlinked_layer)
+                previous_data = previous_dict.get(sample_id, None)
                 if previous_data and previous_data.add_command and previous_data.add_command.properties.get("mute", False):
                     previous_data.add_command.properties["mute"] = False
                 layer_identifier = unlinked_layer.uid
@@ -2107,27 +2165,11 @@ def get_global_layer(layer: Layer) -> GlobalLayer | None:
     #         return global_layer
     return bpy.context.scene.ps_scene_data.layers.get(layer.ref_layer_id, None)
 
-def get_layer_blend_type(layer: Layer) -> str:
-    """Get the blend mode of the global layer"""
-    mix_node = layer.mix_node
-    if not mix_node:
-        raise ValueError("Mix node is not found")
-    return str(mix_node.blend_type)
-
-def set_layer_blend_type(layer: Layer, blend_type: str) -> None:
-    """Set the blend mode of the global layer"""
-    mix_node = layer.mix_node
-    if not mix_node:
-        raise ValueError("Mix node is not found")
-    mix_node.blend_type = blend_type
-
 def is_layer_linked(check_layer: Layer) -> bool:
     """Check if the layer is linked"""
     # Check all material in the scene and count the number of times the global layer is used
     counter = Counter()
     for material in bpy.data.materials:
-        if material.name == "PS Camera Plane Material":
-            continue
         if hasattr(material, 'ps_mat_data'):
             for group in material.ps_mat_data.groups:
                 for channel in group.channels:

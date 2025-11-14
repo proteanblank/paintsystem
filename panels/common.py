@@ -317,7 +317,7 @@ def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
                 text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
         blend_type_row = row.row(align=True)
         blend_type_row.enabled = not active_layer.lock_layer
-        blend_type_row.prop(color_mix_node, "blend_type", text="")
+        blend_type_row.prop(active_layer, "blend_mode", text="")
         row = col.row(align=True)
         scale_content(context, row, scale_x=1.2, scale_y=1.5)
         row.enabled = not active_layer.lock_layer
@@ -347,7 +347,7 @@ def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
                 text="", icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
         blend_type_row = main_row.row(align=True)
         blend_type_row.enabled = not active_layer.lock_layer
-        blend_type_row.prop(color_mix_node, "blend_type", text="")
+        blend_type_row.prop(active_layer, "blend_mode", text="")
         opacity_row = split.row(align=True)
         opacity_row.enabled = not active_layer.lock_layer
         if not use_wide_ui:
