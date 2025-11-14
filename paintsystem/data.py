@@ -788,18 +788,7 @@ class Layer(BaseNestedListItem):
                         image_tex_node = self.find_node("image")
                         if image_tex_node and image_tex_node.extension != "CLIP":
                             image_tex_node.extension = "CLIP"
-                        ps_ctx = parse_context(context)
-                        empty_name = f"{self.layer_name} ({self.uid[:8]}) Empty"
-                        if empty_name in bpy.data.objects:
-                            empty_object = bpy.data.objects[empty_name]
-                            empty_object.parent = ps_ctx.ps_object
-                            add_empty_to_collection(context, empty_object)
-                        else:
-                            with bpy.context.temp_override():
-                                empty_object = bpy.data.objects.new(empty_name, None)
-                                empty_object.parent = ps_ctx.ps_object
-                                add_empty_to_collection(context, empty_object)
-                        self.empty_object = empty_object
+                        self.ensure_empty_object()
                         self.empty_object.empty_display_type = 'SINGLE_ARROW'
                     elif self.empty_object.name not in context.view_layer.objects:
                         add_empty_to_collection(context, self.empty_object)
@@ -815,18 +804,7 @@ class Layer(BaseNestedListItem):
             case "GRADIENT":
                 if self.gradient_type in ('LINEAR', 'RADIAL'):
                     if not self.empty_object:
-                        ps_ctx = parse_context(context)
-                        empty_name = f"{self.layer_name} ({self.uid[:8]}) Empty"
-                        if empty_name in bpy.data.objects:
-                            empty_object = bpy.data.objects[empty_name]
-                            empty_object.parent = ps_ctx.ps_object
-                            add_empty_to_collection(context, empty_object)
-                        else:
-                            with bpy.context.temp_override():
-                                empty_object = bpy.data.objects.new(empty_name, None)
-                                empty_object.parent = ps_ctx.ps_object
-                                add_empty_to_collection(context, empty_object)
-                        self.empty_object = empty_object
+                        self.ensure_empty_object()
                         if self.gradient_type == 'LINEAR':
                             self.empty_object.empty_display_type = 'SINGLE_ARROW'
                         elif self.gradient_type == 'RADIAL':
@@ -1094,7 +1072,23 @@ class Layer(BaseNestedListItem):
                 continue
             setattr(self, pid, value)
     
-    def copy_layer_data(self, layer: "Layer"):
+    def ensure_empty_object(self):
+        context = bpy.context
+        ps_ctx = parse_context(context)
+        empty_name = f"{self.layer_name} ({self.uid[:8]}) Empty"
+        if empty_name in bpy.data.objects:
+            empty_object = bpy.data.objects[empty_name]
+            empty_object.parent = ps_ctx.ps_object
+            add_empty_to_collection(context, empty_object)
+        else:
+            with bpy.context.temp_override():
+                empty_object = bpy.data.objects.new(empty_name, None)
+                empty_object.parent = ps_ctx.ps_object
+                add_empty_to_collection(context, empty_object)
+        self.empty_object = empty_object
+        return empty_object
+    
+    def duplicate_layer_data(self, layer: "Layer"):
         if layer.node_tree:
             self.node_tree = layer.node_tree.copy()
         if layer.image:
@@ -1106,6 +1100,13 @@ class Layer(BaseNestedListItem):
                 else:
                     image.pack()
             self.image = image.copy()
+        if layer.empty_object:
+            self.empty_object = layer.empty_object.copy()
+            self.empty_object.name = f"{self.layer_name} ({self.uid[:8]}) Empty"
+            self.ensure_empty_object()
+    
+    def copy_layer_data(self, layer: "Layer"):
+        self.duplicate_layer_data(layer)
         for prop in layer.bl_rna.properties:
             pid = getattr(prop, 'identifier', '')
             if not pid or getattr(prop, 'is_readonly', False):
@@ -1296,7 +1297,7 @@ class Channel(BaseNestedListManager):
                 node_builder.compile()
                 return
         
-        flattened_layers = self.flattened_layers
+        flattened_unlinked_layers = self.flattened_unlinked_layers
         @dataclass
         class PreviousLayer:
             color_name: str
@@ -1320,14 +1321,15 @@ class Channel(BaseNestedListManager):
         node_builder.link("alpha_clamp_end", "group_output", "Result", "Alpha")
         previous_dict[-1] = PreviousLayer(color_name="group_output", color_socket="Color", alpha_name="alpha_clamp_end", alpha_socket="Value")
             
-        if len(flattened_layers) > 0:
-            for layer in flattened_layers:
-                if not layer.node_tree:
+        if len(flattened_unlinked_layers) > 0:
+            for unlinked_layer in flattened_unlinked_layers:
+                layer = unlinked_layer.get_layer_data()
+                if layer is None or not layer.node_tree:
                     continue
-                previous_data = previous_dict.get(layer.parent_id, None)
+                previous_data = previous_dict.get(unlinked_layer.parent_id, None)
                 if previous_data and previous_data.add_command and previous_data.add_command.properties.get("mute", False):
                     previous_data.add_command.properties["mute"] = False
-                layer_identifier = layer.uid
+                layer_identifier = unlinked_layer.uid
                 add_command = node_builder.add_node(
                     layer_identifier, "ShaderNodeGroup",
                     {"node_tree": layer.node_tree, "mute": layer.type == "ADJUSTMENT"},
@@ -1374,7 +1376,7 @@ class Channel(BaseNestedListManager):
                     previous_data.alpha_name = layer_identifier
                     previous_data.alpha_socket = "Alpha"
                 if layer.type == "FOLDER":
-                    previous_dict[layer.id] = PreviousLayer(
+                    previous_dict[unlinked_layer.id] = PreviousLayer(
                         color_name=layer_identifier,
                         color_socket="Over Color",
                         alpha_name=layer_identifier,

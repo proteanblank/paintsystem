@@ -1,5 +1,5 @@
 import math
-
+import uuid
 import addon_utils
 import bpy
 import gpu
@@ -348,6 +348,12 @@ class PAINTSYSTEM_OT_DuplicatePaintSystemData(PSContextMixin, MultiMaterialOpera
             for channel in group.channels:
                 node_tree = bpy.data.node_groups.new(name=f"PS_Channel ({channel.name})", type='ShaderNodeTree')
                 channel.node_tree = node_tree
+                for layer in channel.layers:
+                    if layer.is_linked:
+                        continue
+                    layer.duplicate_layer_data(layer)
+                    layer.uid = str(uuid.uuid4())
+                    layer.update_node_tree(context)
                 channel.update_node_tree(context)
             group.update_node_tree(context)
             
