@@ -1106,6 +1106,17 @@ class Layer(BaseNestedListItem):
             self.empty_object.name = f"{self.layer_name} ({self.uid[:8]}) Empty"
             self.ensure_empty_object()
     
+    def unlink_layer_data(self):
+        layer = self.get_layer_data()
+        if is_layer_linked(self) and not self.is_linked:
+            # self owns the data
+            self.transfer_linked_data()
+            self.duplicate_layer_data(self)
+        else:
+            self.linked_layer_uid = ""
+            self.linked_material = None
+            self.copy_layer_data(layer)
+    
     def copy_layer_data(self, layer: "Layer"):
         self.duplicate_layer_data(layer)
         for prop in layer.bl_rna.properties:
@@ -1133,29 +1144,34 @@ class Layer(BaseNestedListItem):
             return uid_to_layer.get(self.linked_layer_uid)
         return self
     
+    def transfer_linked_data(self):
+        linked_layer_uid_map = {}
+        for material in bpy.data.materials:
+            if hasattr(material, 'ps_mat_data'):
+                for group in material.ps_mat_data.groups:
+                    for channel in group.channels:
+                        for layer in channel.layers:
+                            if layer.is_linked and layer.linked_layer_uid == self.uid:
+                                linked_layer_uid_map[layer.uid] = [layer, material]
+        # Migrate layer data to one of the linked layers
+        linked_layers = [layer for layer, _ in linked_layer_uid_map.values() if layer.is_linked and layer.linked_layer_uid == self.uid]
+        new_main_layer, new_material = list(linked_layer_uid_map.values())[0]
+        new_main_layer.link_layer_data(self)
+        
+        for linked_layer in linked_layers[1:]:
+            linked_layer.linked_layer_uid = new_main_layer.uid
+            linked_layer.linked_material = new_material
+        
+        return new_main_layer, new_material
+    
     def delete_layer_data(self):
         """
         Delete the layer data. Transfer to a linked layer if it is linked.
         """
-        active_layer = self.get_layer_data()
-        if is_layer_linked(active_layer) and not self.is_linked:
-            print(f"Transferring layer data for {active_layer.name} to linked layers")
-            linked_layer_uid_map = {}
-            for material in bpy.data.materials:
-                if hasattr(material, 'ps_mat_data'):
-                    for group in material.ps_mat_data.groups:
-                        for channel in group.channels:
-                            for layer in channel.layers:
-                                if layer.is_linked and layer.linked_layer_uid == self.uid:
-                                    linked_layer_uid_map[layer.uid] = [layer, material]
-            # Migrate layer data to one of the linked layers
-            linked_layers = [layer for layer, _ in linked_layer_uid_map.values() if layer.is_linked and layer.linked_layer_uid == self.uid]
-            new_main_layer, new_material = list(linked_layer_uid_map.values())[0]
-            new_main_layer.link_layer_data(self)
-            
-            for linked_layer in linked_layers[1:]:
-                linked_layer.linked_layer_uid = new_main_layer.uid
-                linked_layer.linked_material = new_material
+        layer = self.get_layer_data()
+        if is_layer_linked(layer) and not self.is_linked:
+            print(f"Transferring layer data for {layer.name} to linked layers")
+            self.transfer_linked_data()
         else:
             print(f"Deleting layer data for {self.name}")
             if self.empty_object:

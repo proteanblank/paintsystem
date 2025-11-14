@@ -910,6 +910,25 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_UnlinkLayer(PSContextMixin, Operator):
+    """Unlink the active layer"""
+    bl_idname = "paint_system.unlink_layer"
+    bl_label = "Unlink Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Unlink the active layer"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.active_layer is not None
+    
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        unlinked_layer = ps_ctx.unlinked_layer
+        unlinked_layer.unlink_layer_data()
+        ps_ctx.active_channel.update_node_tree(context)
+        return {'FINISHED'}
+
 class PAINTSYSTEM_OT_AddAction(PSContextMixin, Operator):
     """Add an action to the active layer"""
     bl_idname = "paint_system.add_action"
@@ -1017,6 +1036,7 @@ classes = (
     PAINTSYSTEM_OT_CopyLayer,
     PAINTSYSTEM_OT_CopyAllLayers,
     PAINTSYSTEM_OT_PasteLayer,
+    PAINTSYSTEM_OT_UnlinkLayer,
     PAINTSYSTEM_OT_AddAction,
     PAINTSYSTEM_OT_DeleteAction,
 )

@@ -799,6 +799,13 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
                 icon_value=get_icon('image')
             )
             layout.separator()
+        
+        if is_layer_linked(ps_ctx.unlinked_layer):
+            layout.operator(
+                "paint_system.unlink_layer",
+                text="Unlink Layer",
+                icon="UNLINKED"
+            )
 
         layout.operator(
             "paint_system.copy_layer",
