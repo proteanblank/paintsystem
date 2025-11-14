@@ -1082,6 +1082,18 @@ class Layer(BaseNestedListItem):
             
         return warnings
     
+    def link_layer_data(self, layer: "Layer"):
+        for prop in layer.bl_rna.properties:
+            pid = getattr(prop, 'identifier', '')
+            if not pid or getattr(prop, 'is_readonly', False):
+                continue
+            if pid in {"name", "uid", "id", "order", "parent_id", "layer_name"}:
+                continue
+            value = getattr(layer, pid)
+            if getattr(self, pid) == value:
+                continue
+            setattr(self, pid, value)
+    
     def copy_layer_data(self, layer: "Layer"):
         if layer.node_tree:
             self.node_tree = layer.node_tree.copy()
@@ -1118,6 +1130,37 @@ class Layer(BaseNestedListItem):
                 layer = _get_material_layer_uid_map(self.linked_material, force_refresh=True).get(self.linked_layer_uid)
             return uid_to_layer.get(self.linked_layer_uid)
         return self
+    
+    def delete_layer_data(self):
+        """
+        Delete the layer data. Transfer to a linked layer if it is linked.
+        """
+        active_layer = self.get_layer_data()
+        if is_layer_linked(active_layer) and not self.is_linked:
+            print(f"Transferring layer data for {active_layer.name} to linked layers")
+            linked_layer_uid_map = {}
+            for material in bpy.data.materials:
+                if hasattr(material, 'ps_mat_data'):
+                    for group in material.ps_mat_data.groups:
+                        for channel in group.channels:
+                            for layer in channel.layers:
+                                if layer.is_linked and layer.linked_layer_uid == self.uid:
+                                    linked_layer_uid_map[layer.uid] = [layer, material]
+            # Migrate layer data to one of the linked layers
+            linked_layers = [layer for layer, _ in linked_layer_uid_map.values() if layer.is_linked and layer.linked_layer_uid == self.uid]
+            new_main_layer, new_material = list(linked_layer_uid_map.values())[0]
+            new_main_layer.link_layer_data(self)
+            
+            for linked_layer in linked_layers[1:]:
+                linked_layer.linked_layer_uid = new_main_layer.uid
+                linked_layer.linked_material = new_material
+        else:
+            print(f"Deleting layer data for {self.name}")
+            if self.empty_object:
+                bpy.data.objects.remove(self.empty_object, do_unlink=True)
+            # TODO: The following causes some issue when undoing
+            if self.node_tree:
+                bpy.data.node_groups.remove(self.node_tree)
 
 def get_layer_by_uid(material: Material, uid: str) -> Layer | None:
     uid_to_layer = _get_material_layer_uid_map(material)
@@ -1370,7 +1413,7 @@ class Channel(BaseNestedListManager):
         self.updating_name_flag = False
         update_active_group(self, context)
     
-    def create_layer(self, layer_name: str = "Layer Name", layer_type: str = "IMAGE", update_active_index: bool = True, insert_at: Literal["TOP", "BOTTOM", "CURSOR"] = "CURSOR", handle_folder: bool = True) -> 'Layer':
+    def create_layer(self, layer_name: str = "Layer Name", layer_type: str = "IMAGE", update_active_index: bool = True, insert_at: Literal["TOP", "BOTTOM", "CURSOR", "BEFORE", "AFTER"] = "CURSOR", handle_folder: bool = True) -> 'Layer':
         parent_id, insert_order = self.get_insertion_data(handle_folder=handle_folder, insert_at=insert_at)
         # Adjust existing items' order
         self.adjust_sibling_orders(parent_id, insert_order)
@@ -1397,6 +1440,22 @@ class Channel(BaseNestedListManager):
         new_layer.linked_layer_uid = layer_uid
         new_layer.linked_material = material
         return new_layer
+    
+    def delete_layer(self, layer: "Layer"):
+        item_id = layer.id
+        order = int(layer.order)
+        parent_id = int(layer.parent_id)
+        def on_delete(item: "Layer"):
+            item.delete_layer_data()
+        if item_id != -1 and self.remove_item_and_children(item_id, on_delete):
+            # Update active_index
+            self.normalize_orders()
+            for i, item in enumerate(self.layers):
+                if item.order == order and item.parent_id == parent_id:
+                    self.active_index = i
+                    break
+        self.active_index = min(
+            self.active_index, len(self.layers) - 1)
     
     def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True):
         """Bake the channel
@@ -1526,7 +1585,7 @@ class Channel(BaseNestedListManager):
         return [layer.get_layer_data() for layer, _ in self.flatten_hierarchy()]
 
     @property
-    def flattened_layers_unprocessed(self):
+    def flattened_unlinked_layers(self):
         return [layer for layer, _ in self.flatten_hierarchy()]
     
     active_index: IntProperty(name="Active Material Layer Index", update=update_active_image)
@@ -1817,6 +1876,22 @@ class PaintSystemGlobalData(PropertyGroup):
         default="#000000",
         update=update_hex_color,
     )
+    
+    def add_layer_to_clipboard(self, layer: "Layer"):
+        ps_ctx = PSContextMixin.parse_context(bpy.context)
+        clipboard_layer = self.clipboard_layers.add()
+        if layer.is_linked:
+            clipboard_layer.uid = layer.linked_layer_uid
+            clipboard_layer.material = layer.linked_material
+            print(f"Linked layer: {layer.linked_layer_uid} {layer.linked_material}")
+        else:
+            clipboard_layer.uid = layer.uid
+            clipboard_layer.material = ps_ctx.active_material
+            print(f"Copy Unlinked layer: {layer.uid} {ps_ctx.active_material}")
+    
+    def clear_clipboard(self):
+        self.clipboard_layers.clear()
+        self.active_clipboard_index = 0
 
 class MaterialData(PropertyGroup):
     """Custom data for channels in the Paint System"""
@@ -1951,6 +2026,7 @@ class PSContext:
     active_group: Group | None = None
     active_channel: Channel | None = None
     active_layer: Layer | None = None
+    unlinked_layer: Layer | None = None
     active_global_layer: GlobalLayer | None = None
 
 def parse_context(context: bpy.types.Context) -> PSContext:
@@ -2002,13 +2078,13 @@ def parse_context(context: bpy.types.Context) -> PSContext:
             active_channel = channels[min(active_group.active_index, len(channels) - 1)]
 
     layers = None
-    active_layer = None
+    unlinked_layer = None
     if active_channel:
         layers = active_channel.layers
         if layers and active_channel.active_index >= 0:
-            active_layer = layers[min(active_channel.active_index, len(layers) - 1)]
-            if active_layer:
-                active_layer = active_layer.get_layer_data()
+            unlinked_layer = layers[min(active_channel.active_index, len(layers) - 1)]
+            if unlinked_layer:
+                unlinked_layer = unlinked_layer
     
     return PSContext(
         ps_settings=ps_settings,
@@ -2019,8 +2095,9 @@ def parse_context(context: bpy.types.Context) -> PSContext:
         ps_mat_data=mat_data,
         active_group=active_group,
         active_channel=active_channel,
-        active_layer=active_layer,
-        active_global_layer=get_global_layer(active_layer) if active_layer else None
+        active_layer=unlinked_layer.get_layer_data() if unlinked_layer else None,
+        unlinked_layer=unlinked_layer,
+        active_global_layer=get_global_layer(unlinked_layer) if unlinked_layer else None
     )
 
 class PSContextMixin:

@@ -475,7 +475,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
-        flattened_layers = active_channel.flattened_layers_unprocessed if unprocessed else active_channel.flattened_layers
+        flattened_layers = active_channel.flattened_unlinked_layers if unprocessed else active_channel.flattened_layers
         if active_layer and flattened_layers.index(active_layer) < len(flattened_layers) - 1:
             return flattened_layers[flattened_layers.index(active_layer) + 1]
         return None
@@ -597,7 +597,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
-        flattened_layers = active_channel.flattened_layers_unprocessed if unprocessed else active_channel.flattened_layers
+        flattened_layers = active_channel.flattened_unlinked_layers if unprocessed else active_channel.flattened_layers
         if active_layer and flattened_layers.index(active_layer) > 0:
             return flattened_layers[flattened_layers.index(active_layer) - 1]
         return None

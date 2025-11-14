@@ -613,52 +613,15 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.active_layer is not None
+        return ps_ctx.unlinked_layer is not None
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
-        active_layer = ps_ctx.active_layer
-        item_id = active_layer.id
-        order = int(active_layer.order)
-        parent_id = int(active_layer.parent_id)
-        
-        if is_layer_linked(active_layer):
-            if not active_layer.is_linked:
-                linked_layer_uid_map = {}
-                for material in bpy.data.materials:
-                    if hasattr(material, 'ps_mat_data'):
-                        for group in material.ps_mat_data.groups:
-                            for channel in group.channels:
-                                for layer in channel.layers:
-                                    if layer.is_linked and layer.linked_layer_uid == active_layer.uid:
-                                        linked_layer_uid_map[layer.uid] = [layer, material]
-                # Migrate layer data to one of the linked layers
-                linked_layers = [layer for layer, _ in linked_layer_uid_map.values() if layer.is_linked and layer.linked_layer_uid == active_layer.uid]
-                new_main_layer, new_material = list(linked_layer_uid_map.values())[0]
-                new_main_layer.copy_layer_data(active_layer)
-                
-                for linked_layer in linked_layers[1:]:
-                    linked_layer.linked_material = new_material
-        else:
-            print(f"Deleting layer data for {active_layer.name}")
-            if active_layer.empty_object:
-                bpy.data.objects.remove(active_layer.empty_object, do_unlink=True)
-            # TODO: The following causes some issue when undoing
-            if active_layer.node_tree:
-                bpy.data.node_groups.remove(active_layer.node_tree)
-                
-        if item_id != -1 and active_channel.remove_item_and_children(item_id):
-            # Update active_index
-            active_channel.normalize_orders()
-            for i, item in enumerate(active_channel.layers):
-                if item.order == order and item.parent_id == parent_id:
-                    active_channel.active_index = i
-                    break
-
-            active_channel.update_node_tree(context)
-        active_channel.active_index = min(
-            active_channel.active_index, len(active_channel.layers) - 1)
+        unlinked_layer = ps_ctx.unlinked_layer
+        # unlinked_layer.delete_layer_data()
+        active_channel.delete_layer(unlinked_layer)
+        active_channel.update_node_tree(context)
         
         redraw_panel(context)
         return {'FINISHED'}
@@ -669,9 +632,9 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
     def draw(self, context):
         ps_ctx = self.parse_context(context)
         layout = self.layout
-        active_layer = ps_ctx.active_layer
+        unlinked_layer = ps_ctx.unlinked_layer
         layout.label(
-            text=f"Delete '{active_layer.layer_name}' ?", icon='ERROR')
+            text=f"Delete '{unlinked_layer.layer_name}' ?", icon='ERROR')
         layout.label(
             text="Click OK to delete, or cancel to keep the layer")
 
@@ -860,15 +823,12 @@ class PAINTSYSTEM_OT_CopyLayer(PSContextMixin, Operator):
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
-        active_layer = ps_ctx.active_layer
+        unlinked_layer = ps_ctx.unlinked_layer
         ps_scene_data = ps_ctx.ps_scene_data
         if not ps_scene_data:
             return {'CANCELLED'}
-        clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
-        clipboard_layers.clear()
-        clipboard_layer = clipboard_layers.add()
-        clipboard_layer.uid = active_layer.uid
-        clipboard_layer.material = ps_ctx.active_material
+        ps_scene_data.clear_clipboard()
+        ps_scene_data.add_layer_to_clipboard(unlinked_layer)
         return {'FINISHED'}
 
 
@@ -887,12 +847,12 @@ class PAINTSYSTEM_OT_CopyAllLayers(PSContextMixin, Operator):
     def execute(self, context):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
-        clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
-        clipboard_layers.clear()
-        for layer in active_channel.flattened_layers:
-            clipboard_layer = clipboard_layers.add()
-            clipboard_layer.uid = layer.uid
-            clipboard_layer.material = ps_ctx.active_material
+        ps_scene_data = ps_ctx.ps_scene_data
+        if not ps_scene_data:
+            return {'CANCELLED'}
+        ps_scene_data.clear_clipboard()
+        for layer in active_channel.flattened_unlinked_layers:
+            ps_scene_data.add_layer_to_clipboard(layer)
         return {'FINISHED'}
 
 
@@ -919,22 +879,27 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
         active_layer = ps_ctx.active_layer
         clipboard_layers = bpy.context.scene.ps_scene_data.clipboard_layers
         new_layer_id_map = {}
-        is_folder = active_layer and active_layer.type == "FOLDER"
-        base_parent_id = active_layer.id if is_folder else -1
-        for clipboard_layer in clipboard_layers:
+        if active_layer:
+            is_folder = active_layer and active_layer.type == "FOLDER"
+            base_parent_id = active_layer.id if is_folder else active_layer.parent_id
+        else:
+            base_parent_id = -1
+        for idx, clipboard_layer in enumerate(clipboard_layers):
             layer = get_layer_by_uid(clipboard_layer.material, clipboard_layer.uid)
+            print(f"Layer: {layer}")
             if not layer:
                 continue
             if self.linked:
-                new_layer = ps_ctx.active_channel.create_layer(layer.layer_name, "BLANK", update_active_index=not is_folder, handle_folder=not is_folder)
+                new_layer = ps_ctx.active_channel.create_layer(layer.layer_name, layer.type, insert_at="BEFORE" if idx == 0 else "AFTER")
             else:
-                new_layer = ps_ctx.active_channel.create_layer(layer.layer_name, layer.type)
+                new_layer = ps_ctx.active_channel.create_layer(layer.layer_name, layer.type, insert_at="BEFORE" if idx == 0 else "AFTER")
             new_layer_id_map[layer.id] = new_layer
             if layer.parent_id != -1:
                 new_layer.parent_id = new_layer_id_map[layer.parent_id].id
             else:
                 new_layer.parent_id = base_parent_id
             if self.linked:
+                print(f"Linked layer: {clipboard_layer.uid} {clipboard_layer.material}")
                 new_layer.linked_layer_uid = clipboard_layer.uid
                 new_layer.linked_material = clipboard_layer.material
             else:

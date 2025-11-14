@@ -104,17 +104,16 @@ def draw_layer_icon(layer: Layer, layout: bpy.types.UILayout):
             layout.label(icon='BLANK1')
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
-        original_item = item
-        item = item.get_layer_data()
-        if not item:
+        linked_item = item.get_layer_data()
+        if not linked_item:
             return
         # The UIList passes channel as 'data'
         active_channel = data
         flattened = active_channel.flattened_layers
         if index < len(flattened):
-            level = active_channel.get_item_level_from_id(original_item.id)
+            level = active_channel.get_item_level_from_id(item.id)
             main_row = layout.row()
-            warnings = original_item.get_layer_warnings(context)
+            warnings = item.get_layer_warnings(context)
                 # main_row.label(text="\n".join(warnings), icon='ERROR')
             # Check if parent of the current item is enabled
             parent_item = active_channel.get_item_by_id(
@@ -128,23 +127,23 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                     row.label(icon_value=get_icon('folder_indent'))
                 else:
                     row.label(icon='BLANK1')
-            draw_layer_icon(item, row)
+            draw_layer_icon(linked_item, row)
 
             row = main_row.row(align=True)
-            row.prop(item, "layer_name", text="", emboss=False)
-            if item.is_clip:
+            row.prop(linked_item, "layer_name", text="", emboss=False)
+            if linked_item.is_clip:
                 row.label(icon="SELECT_INTERSECT")
-            if item.lock_layer:
+            if linked_item.lock_layer:
                 row.label(icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
-            if len(item.actions) > 0:
+            if len(linked_item.actions) > 0:
                 row.label(icon="KEYTYPE_KEYFRAME_VEC")
-            if is_layer_linked(item):
+            if is_layer_linked(linked_item):
                 row.label(icon="LINKED")
             if warnings:
                 row.label(icon='ERROR')
-            row.prop(item, "enabled", text="",
-                     icon="HIDE_OFF" if item.enabled else "HIDE_ON", emboss=False)
-            self.draw_custom_properties(row, item)
+            row.prop(linked_item, "enabled", text="",
+                     icon="HIDE_OFF" if linked_item.enabled else "HIDE_ON", emboss=False)
+            self.draw_custom_properties(row, linked_item)
 
     def filter_items(self, context, data, propname):
         # This function gets the collection property (as the usual tuple (data, propname)), and must return two lists:
@@ -158,7 +157,7 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
         # If you do not make filtering and/or ordering, return empty list(s) (this will be more efficient than
         # returning full lists doing nothing!).
         layers = getattr(data, propname).values()
-        flattened_layers = data.flattened_layers_unprocessed
+        flattened_layers = data.flattened_unlinked_layers
 
         # Default return values.
         flt_flags = []
