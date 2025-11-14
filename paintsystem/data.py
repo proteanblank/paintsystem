@@ -1746,18 +1746,23 @@ class Channel(BaseNestedListManager):
             connected_link = mat_output.inputs[0].links[0]
             ps_ctx.ps_mat_data.original_node_name = connected_link.from_node.name
             ps_ctx.ps_mat_data.original_socket_name = connected_link.from_socket.name
+            ps_ctx.ps_mat_data.original_view_transform = str(context.scene.view_settings.view_transform) # bpy.data.scenes["Scene"].view_settings.view_transform
             
             # Find channel node tree
             node = find_node(mat.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
             if node:
                 # Connect node tree to material output
                 connect_sockets(mat_output.inputs[0], node.outputs[active_channel.name])
+            
+            context.scene.view_settings.view_transform = "Standard"
         else:
             ps_mat_data.preview_channel = False
             # Find node by name
             node = mat.node_tree.nodes.get(ps_mat_data.original_node_name)
             if node:
                 connect_sockets(node.outputs[ps_mat_data.original_socket_name], mat_output.inputs[0])
+            
+            context.scene.view_settings.view_transform = ps_ctx.ps_mat_data.original_view_transform
 
 
 class Group(PropertyGroup):
@@ -2043,6 +2048,10 @@ class MaterialData(PropertyGroup):
     original_socket_name: StringProperty(
         name="Original Socket Name",
         description="Original socket name of the channel"
+    )
+    original_view_transform: StringProperty(
+        name="Original View Transform",
+        description="Original view transform of the channel"
     )
 
 
