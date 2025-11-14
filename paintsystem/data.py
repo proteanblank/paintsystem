@@ -165,6 +165,8 @@ FILTER_TYPE_ENUM = [
     ('SHARPEN', "Sharpen", "Sharpen"),
 ]
 
+
+
 def is_valid_uuidv4(uuid_string):
     """
     Checks if a given string is a valid UUIDv4.
@@ -749,6 +751,8 @@ class Layer(BaseNestedListItem):
     )
     
     def update_node_tree(self, context):
+        if not self.auto_update_node_tree:
+            return
         if self.is_linked:
             return
         if not is_valid_uuidv4(self.uid):
@@ -873,7 +877,7 @@ class Layer(BaseNestedListItem):
         description="Layer name",
         update=update_node_tree
     )
-    updating_name_flag: bpy.props.BoolProperty(
+    updating_name_flag: BoolProperty(
         default=False, 
         options={'SKIP_SAVE'} # Don't save this flag in the .blend file
     )
@@ -1019,6 +1023,13 @@ class Layer(BaseNestedListItem):
         update=update_brush_settings
     )
     
+    auto_update_node_tree: BoolProperty(
+        name="Update Node Tree",
+        description="Update the node tree",
+        default=True,
+        options={'SKIP_SAVE'}
+    )
+    
     # Linked layer data
     @property
     def is_linked(self) -> bool:
@@ -1035,6 +1046,13 @@ class Layer(BaseNestedListItem):
         name="Linked Material",
         type=Material,
         update=update_node_tree
+    )
+    
+    update_node_tree_flag: BoolProperty(
+        name="Update Node Tree Flag",
+        description="Update the node tree flag",
+        default=True,
+        options={'SKIP_SAVE'}
     )
     
     @property
@@ -1432,7 +1450,16 @@ class Channel(BaseNestedListManager):
         self.updating_name_flag = False
         update_active_group(self, context)
     
-    def create_layer(self, layer_name: str = "Layer Name", layer_type: str = "IMAGE", update_active_index: bool = True, insert_at: Literal["TOP", "BOTTOM", "CURSOR", "BEFORE", "AFTER"] = "CURSOR", handle_folder: bool = True) -> 'Layer':
+    def create_layer(
+        self, 
+        context,
+        layer_name: str = "Layer Name",
+        layer_type: str = "BLANK", # "BLANK" is a special type that creates a blank layer with no node tree
+        update_active_index: bool = True, 
+        insert_at: Literal["TOP", "BOTTOM", "CURSOR", "BEFORE", "AFTER"] = "CURSOR", 
+        handle_folder: bool = True,
+        **kwargs
+    ) -> 'Layer':
         parent_id, insert_order = self.get_insertion_data(handle_folder=handle_folder, insert_at=insert_at)
         # Adjust existing items' order
         self.adjust_sibling_orders(parent_id, insert_order)
@@ -1442,8 +1469,20 @@ class Channel(BaseNestedListManager):
                 parent_id=parent_id,
                 order=insert_order
             )
+        layer.auto_update_node_tree = False
         layer.layer_name = layer_name
         layer.uid = str(uuid.uuid4())
+        for key, value in kwargs.items():
+            setattr(layer, key, value)
+        
+        # Layer type specific setup
+        match layer.type:
+            case "IMAGE":
+                if "image" not in kwargs:
+                    layer.image = bpy.data.images.new(name=layer.layer_name, width=2048, height=2048, alpha=True)
+                    layer.image.generated_color = (0, 0, 0, 0)
+                    layer.image.pack()
+        
         # Update active index
         if update_active_index:
             new_id = layer.id
@@ -1452,15 +1491,12 @@ class Channel(BaseNestedListManager):
                     if item.id == new_id:
                         self.active_index = i
                         break
+        layer.auto_update_node_tree = True
+        layer.update_node_tree(context)
+        self.update_node_tree(context)
         return layer
     
-    def create_linked_layer(self, layer_uid: str, material: Material) -> 'Layer':
-        new_layer = self.create_layer()
-        new_layer.linked_layer_uid = layer_uid
-        new_layer.linked_material = material
-        return new_layer
-    
-    def delete_layer(self, layer: "Layer"):
+    def delete_layer(self, context, layer: "Layer"):
         item_id = layer.id
         order = int(layer.order)
         parent_id = int(layer.parent_id)
@@ -1475,6 +1511,7 @@ class Channel(BaseNestedListManager):
                     break
         self.active_index = min(
             self.active_index, len(self.layers) - 1)
+        self.update_node_tree(context)
     
     def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True):
         """Bake the channel
@@ -1695,6 +1732,32 @@ class Channel(BaseNestedListManager):
             ))
 
         return menu_items
+    
+    def isolate_channel(self, context):
+        ps_ctx = parse_context(context)
+        active_group = ps_ctx.active_group
+        active_channel = ps_ctx.active_channel
+        ps_mat_data = ps_ctx.ps_mat_data
+        mat = ps_ctx.active_material
+        mat_output = get_material_output(mat.node_tree)
+        if not ps_mat_data.preview_channel:
+            ps_mat_data.preview_channel = True
+            # Store the node connected to material output
+            connected_link = mat_output.inputs[0].links[0]
+            ps_ctx.ps_mat_data.original_node_name = connected_link.from_node.name
+            ps_ctx.ps_mat_data.original_socket_name = connected_link.from_socket.name
+            
+            # Find channel node tree
+            node = find_node(mat.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})
+            if node:
+                # Connect node tree to material output
+                connect_sockets(mat_output.inputs[0], node.outputs[active_channel.name])
+        else:
+            ps_mat_data.preview_channel = False
+            # Find node by name
+            node = mat.node_tree.nodes.get(ps_mat_data.original_node_name)
+            if node:
+                connect_sockets(node.outputs[ps_mat_data.original_socket_name], mat_output.inputs[0])
 
 
 class Group(PropertyGroup):
@@ -1783,8 +1846,8 @@ class Group(PropertyGroup):
         ps_mat_data = ps_ctx.ps_mat_data
         if ps_mat_data.preview_channel:
             # Call paint_system.isolate_active_channel twice to ensure it's updated
-            bpy.ops.paint_system.isolate_active_channel('EXEC_DEFAULT')
-            bpy.ops.paint_system.isolate_active_channel('EXEC_DEFAULT')
+            ps_ctx.active_channel.isolate_channel(context)
+            ps_ctx.active_channel.isolate_channel(context)
         if ps_ctx.active_channel.use_bake_image:
             # Force to object mode
             bpy.ops.object.mode_set(mode="OBJECT")
@@ -1795,6 +1858,49 @@ class Group(PropertyGroup):
         name="Node Tree",
         type=NodeTree
     )
+    
+    def create_channel(
+        self, 
+        context, 
+        channel_name: str = "New Channel",
+        channel_type: str = "COLOR",
+        color_space: str = "COLOR",
+        use_alpha: bool = False,
+        use_normalize: bool = False,
+        world_to_object_normal: bool = False,
+        use_max_min: bool = False,
+        factor_min: float = 0,
+        factor_max: float = 1
+    ):
+        channels = self.channels
+        node_tree = bpy.data.node_groups.new(name=f"Temp Channel Name", type='ShaderNodeTree')
+        new_channel = channels.add()
+        self.active_index = len(channels) - 1
+        unique_name = get_next_unique_name(channel_name, [channel.name for channel in channels])
+        new_channel.name = unique_name
+        new_channel.type = channel_type
+        new_channel.use_alpha = use_alpha
+        new_channel.use_normalize = use_normalize
+        new_channel.color_space = color_space
+        new_channel.use_max_min = use_max_min
+        new_channel.world_to_object_normal = world_to_object_normal
+        if channel_type == "FLOAT" and new_channel.use_max_min:
+            new_channel.factor_min = factor_min
+            new_channel.factor_max = factor_max
+        new_channel.node_tree = node_tree
+        new_channel.update_node_tree(context)
+        self.update_node_tree(context)
+        return new_channel
+    
+    def delete_channel(self, context, channel: "Channel"):
+        active_index = self.channels.find(channel.name)
+        if active_index < 0 or active_index >= len(self.channels):
+            self.report({'ERROR'}, "No valid channel selected")
+            return {'CANCELLED'}
+        
+        self.channels.remove(active_index)
+        self.active_index = max(0, active_index - 1)
+        self.update_node_tree(context)
 
 
 class ClipboardLayer(PropertyGroup):

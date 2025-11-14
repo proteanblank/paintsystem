@@ -64,11 +64,13 @@ class BaseNestedListManager(PropertyGroup):
             case "BOTTOM":
                 insert_order = len(getattr(self, self.collection_name)) + 1
             case "BEFORE":
-                parent_id = active_item.parent_id
-                insert_order = active_item.order
+                if active_item:
+                    parent_id = active_item.parent_id
+                    insert_order = active_item.order
             case "AFTER":
-                parent_id = active_item.parent_id
-                insert_order = active_item.order + 1
+                if active_item:
+                    parent_id = active_item.parent_id
+                    insert_order = active_item.order + 1
             case "CURSOR":
                 # CURSOR
                 if active_item:

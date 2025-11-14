@@ -104,12 +104,14 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMix
                 self.report({'ERROR'}, "Image not found")
                 return False
         img.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
-        layer = ps_ctx.active_channel.create_layer(self.image_name, "IMAGE")
-        layer.image = img
-        layer.coord_type = self.coord_type
-        layer.uv_map_name = self.uv_map_name
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(
+            context, 
+            layer_name=self.image_name, 
+            layer_type="IMAGE", 
+            image=img,
+            coord_type=self.coord_type,
+            uv_map_name=self.uv_map_name
+        )
         return {'FINISHED'}
     
     def invoke(self, context, event):
@@ -157,9 +159,7 @@ class PAINTSYSTEM_OT_NewFolder(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        layer = ps_ctx.active_channel.create_layer(self.layer_name, "FOLDER")
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(context, self.layer_name, "FOLDER")
         return {'FINISHED'}
 
 
@@ -182,9 +182,7 @@ class PAINTSYSTEM_OT_NewSolidColor(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        layer = ps_ctx.active_channel.create_layer(self.layer_name, "SOLID_COLOR")
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(context, self.layer_name, "SOLID_COLOR")
         return {'FINISHED'}
 
 
@@ -217,9 +215,7 @@ class PAINTSYSTEM_OT_NewAttribute(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        layer = ps_ctx.active_channel.create_layer(self.layer_name, "ATTRIBUTE")
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(context, self.layer_name, "ATTRIBUTE")
         return {'FINISHED'}
 
 
@@ -242,10 +238,7 @@ class PAINTSYSTEM_OT_NewAdjustment(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         layer_name = next(name for adjustment_type, name, description in ADJUSTMENT_TYPE_ENUM if adjustment_type == self.adjustment_type)
-        layer = ps_ctx.active_channel.create_layer(layer_name, "ADJUSTMENT")
-        layer.adjustment_type = self.adjustment_type
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(context, layer_name, "ADJUSTMENT", adjustment_type=self.adjustment_type)
         return {'FINISHED'}
 
 
@@ -268,9 +261,7 @@ class PAINTSYSTEM_OT_NewShader(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        layer = ps_ctx.active_channel.create_layer(self.layer_name, "SHADER")
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(context, self.layer_name, "SHADER")
         return {'FINISHED'}
 
 
@@ -299,10 +290,7 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        layer = ps_ctx.active_channel.create_layer(self.gradient_type.title(), "GRADIENT")
-        layer.gradient_type = self.gradient_type
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(context, self.gradient_type.title(), "GRADIENT", gradient_type=self.gradient_type)
         return {'FINISHED'}
 
 
@@ -332,11 +320,13 @@ class PAINTSYSTEM_OT_NewGeometry(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
         layer_name = next(name for geometry_type, name, description in GEOMETRY_TYPE_ENUM if geometry_type == self.geometry_type)
-        layer = ps_ctx.active_channel.create_layer(layer_name, "GEOMETRY")
-        layer.geometry_type = self.geometry_type
-        layer.normalize_normal = self.normalize_normal
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(
+            context,
+            layer_name,
+            layer_type="GEOMETRY",
+            geometry_type=self.geometry_type,
+            normalize_normal=self.normalize_normal
+        )
         return {'FINISHED'}
 
 
@@ -391,9 +381,7 @@ class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
     
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        layer = ps_ctx.active_channel.create_layer(self.layer_name, "RANDOM")
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(context, self.layer_name, "RANDOM")
         return {'FINISHED'}
 
 
@@ -513,14 +501,16 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
             return {'CANCELLED'}
         ps_ctx = self.parse_context(context)
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        layer = ps_ctx.active_channel.create_layer(self.node_tree_name, "NODE_GROUP")
-        layer.custom_node_tree = custom_node_tree
-        layer.custom_color_input = int(self.custom_color_input)
-        layer.custom_alpha_input = int(self.custom_alpha_input if self.custom_alpha_input != "" else "-1")
-        layer.custom_color_output = int(self.custom_color_output)
-        layer.custom_alpha_output = int(self.custom_alpha_output if self.custom_alpha_output != "" else "-1")
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(
+            context,
+            layer_name=self.node_tree_name,
+            layer_type="NODE_GROUP",
+            custom_node_tree=custom_node_tree,
+            custom_color_input=int(self.custom_color_input),
+            custom_alpha_input=int(self.custom_alpha_input if self.custom_alpha_input != "" else "-1"),
+            custom_color_output=int(self.custom_color_output),
+            custom_alpha_output=int(self.custom_alpha_output if self.custom_alpha_output != "" else "-1")
+        )
         return {'FINISHED'}
     
     def invoke(self, context, event):
@@ -595,12 +585,14 @@ class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialO
         ps_ctx = self.parse_context(context)
         self.store_coord_type(context)
         layer_name = next(name for texture_type, name, description in TEXTURE_TYPE_ENUM if texture_type == self.texture_type)
-        layer = ps_ctx.active_channel.create_layer(layer_name, "TEXTURE")
-        layer.texture_type = self.texture_type
-        layer.coord_type = self.coord_type
-        layer.uv_map_name = self.uv_map_name
-        layer.update_node_tree(context)
-        ps_ctx.active_channel.update_node_tree(context)
+        ps_ctx.active_channel.create_layer(
+            context,
+            layer_name=layer_name,
+            layer_type="TEXTURE",
+            texture_type=self.texture_type,
+            coord_type=self.coord_type,
+            uv_map_name=self.uv_map_name
+        )
         return {'FINISHED'}
 
 class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
@@ -619,9 +611,7 @@ class PAINTSYSTEM_OT_DeleteItem(PSContextMixin, MultiMaterialOperator):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         unlinked_layer = ps_ctx.unlinked_layer
-        # unlinked_layer.delete_layer_data()
-        active_channel.delete_layer(unlinked_layer)
-        active_channel.update_node_tree(context)
+        active_channel.delete_layer(context, unlinked_layer)
         
         redraw_panel(context)
         return {'FINISHED'}
@@ -890,9 +880,9 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
             if not layer:
                 continue
             if self.linked:
-                new_layer = ps_ctx.active_channel.create_layer(layer.layer_name, layer.type, insert_at="BEFORE" if idx == 0 else "AFTER")
+                new_layer = ps_ctx.active_channel.create_layer(context, layer.layer_name, layer.type, insert_at="BEFORE" if idx == 0 else "AFTER")
             else:
-                new_layer = ps_ctx.active_channel.create_layer(layer.layer_name, layer.type, insert_at="BEFORE" if idx == 0 else "AFTER")
+                new_layer = ps_ctx.active_channel.create_layer(context, layer.layer_name, layer.type, insert_at="BEFORE" if idx == 0 else "AFTER")
             new_layer_id_map[layer.id] = new_layer
             if layer.parent_id != -1:
                 new_layer.parent_id = new_layer_id_map[layer.parent_id].id

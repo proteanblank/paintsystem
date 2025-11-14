@@ -74,13 +74,16 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         if self.as_layer:
             bake_image = self.create_image()
             bake_image.colorspace_settings.name = 'sRGB'
-            layer = active_channel.create_layer(self.image_name, "IMAGE", insert_at="START")
-            layer.image = bake_image
-            layer.coord_type = 'UV'
-            layer.uv_map_name = self.uv_map
-            layer.update_node_tree(context)
+            active_channel.create_layer(
+                context, 
+                layer_name=self.image_name, 
+                layer_type="IMAGE", 
+                insert_at="START",
+                image=bake_image,
+                coord_type='UV',
+                uv_map_name=self.uv_map
+            )
             active_channel.bake(context, mat, bake_image, self.uv_map)
-            active_channel.update_node_tree(context)
         else:
             bake_image = active_channel.bake_image
             if not bake_image:
@@ -474,7 +477,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
     def get_below_layer(self, context, unprocessed: bool = False):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
-        active_layer = ps_ctx.active_layer
+        active_layer = ps_ctx.unlinked_layer
         flattened_layers = active_channel.flattened_unlinked_layers if unprocessed else active_channel.flattened_layers
         if active_layer and flattened_layers.index(active_layer) < len(flattened_layers) - 1:
             return flattened_layers[flattened_layers.index(active_layer) + 1]
@@ -576,7 +579,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
             layer.enabled = True
         
         # Remove the current layer since it's been merged
-        bpy.ops.paint_system.delete_item('EXEC_DEFAULT')
+        active_channel.delete_layer(context, active_layer)
         
         return {'FINISHED'}
 
@@ -698,7 +701,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
             layer.enabled = True
 
         # Remove the current layer since it's been merged into the layer above
-        bpy.ops.paint_system.delete_item('EXEC_DEFAULT')
+        active_channel.delete_layer(context, active_layer)
 
         return {'FINISHED'}
 

@@ -801,7 +801,7 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
                 icon_value=get_icon('image')
             )
         
-        if is_layer_linked(ps_ctx.unlinked_layer):
+        if ps_ctx.unlinked_layer and is_layer_linked(ps_ctx.unlinked_layer):
             special_actions = True
             layout.operator(
                 "paint_system.unlink_layer",
