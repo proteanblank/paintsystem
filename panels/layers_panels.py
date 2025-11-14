@@ -690,7 +690,8 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
         col = layout.column()
         row = col.row(align=True)
         row.prop(active_layer, "coord_type", text="Coord Type")
-        row.operator("paint_system.transfer_image_layer_uv", text="", icon='UV_DATA')
+        if active_layer.coord_type in ['AUTO', 'UV'] and active_layer.type == 'IMAGE':
+            row.operator("paint_system.transfer_image_layer_uv", text="", icon='UV_DATA')
         if active_layer.coord_type == 'UV':
             col.prop_search(active_layer, "uv_map_name", text="UV Map",
                                 search_data=ps_ctx.ps_object.data, search_property="uv_layers", icon='GROUP_UVS')

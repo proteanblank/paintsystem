@@ -129,7 +129,7 @@ def create_coord_graph(builder: NodeTreeBuilder, coord_type: str, uv_map_name: s
         builder.link("geometry", "mapping", "Position", "Vector")
         builder.link("mapping", node_name, "Vector", socket_name)
     elif coord_type == "DECAL":
-        builder.add_node("tex_coord", "ShaderNodeTexCoord", {"object": empty_object})
+        builder.add_node("tex_coord", "ShaderNodeTexCoord", {"object": empty_object}, force_properties=True)
         builder.link("tex_coord", "mapping", "Object", "Vector")
         builder.link("mapping", node_name, "Vector", socket_name)
     return builder

@@ -783,19 +783,20 @@ class Layer(BaseNestedListItem):
         if self.coord_type == 'AUTO':
             ensure_paint_system_uv_map(context)
         
+        if self.coord_type == "DECAL":
+            if not self.empty_object:
+                image_tex_node = self.find_node("image")
+                if image_tex_node and image_tex_node.extension != "CLIP":
+                    image_tex_node.extension = "CLIP"
+                self.ensure_empty_object()
+                self.empty_object.empty_display_type = 'SINGLE_ARROW'
+            elif self.empty_object.name not in context.view_layer.objects:
+                add_empty_to_collection(context, self.empty_object)
+        
         match self.type:
             case "IMAGE":
                 if self.image:
                     self.image.name = self.layer_name
-                if self.coord_type == "DECAL":
-                    if not self.empty_object:
-                        image_tex_node = self.find_node("image")
-                        if image_tex_node and image_tex_node.extension != "CLIP":
-                            image_tex_node.extension = "CLIP"
-                        self.ensure_empty_object()
-                        self.empty_object.empty_display_type = 'SINGLE_ARROW'
-                    elif self.empty_object.name not in context.view_layer.objects:
-                        add_empty_to_collection(context, self.empty_object)
                 layer_graph = create_image_graph(self)
             case "FOLDER":
                 layer_graph = create_folder_graph(self)
@@ -828,7 +829,7 @@ class Layer(BaseNestedListItem):
                 raise ValueError(f"Invalid layer type: {self.type}")
         
         # Clean up
-        if self.empty_object and self.type not in ("GRADIENT", "IMAGE"):
+        if self.empty_object and self.type not in ("GRADIENT", "IMAGE", "TEXTURE"):
             collection = get_paint_system_collection(context)
             if self.empty_object.name in collection.objects:
                 collection.objects.unlink(self.empty_object)

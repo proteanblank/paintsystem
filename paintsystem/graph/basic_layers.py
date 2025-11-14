@@ -233,10 +233,11 @@ def create_texture_graph(layer: "Layer"):
     texture_type = get_texture_identifier(layer.texture_type)
     coord_type = layer.coord_type
     uv_map_name = layer.uv_map_name
+    empty_object = layer.empty_object
     builder = NodeTreeBuilder(node_tree, "Layer", version=TEXTURE_LAYER_VERSION)
     create_mixing_graph(builder, "texture", "Color")
     builder.add_node("texture", texture_type)
-    create_coord_graph(builder, coord_type, uv_map_name, 'texture', 'Vector')
+    create_coord_graph(builder, coord_type, uv_map_name, 'texture', 'Vector', empty_object=empty_object)
     return builder
 
 def create_geometry_graph(layer: "Layer"):
