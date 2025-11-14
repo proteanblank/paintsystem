@@ -477,7 +477,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
     def get_below_layer(self, context, unprocessed: bool = False):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
-        active_layer = ps_ctx.unlinked_layer
+        active_layer = ps_ctx.unlinked_layer if unprocessed else ps_ctx.active_layer
         flattened_layers = active_channel.flattened_unlinked_layers if unprocessed else active_channel.flattened_layers
         if active_layer and flattened_layers.index(active_layer) < len(flattened_layers) - 1:
             return flattened_layers[flattened_layers.index(active_layer) + 1]
@@ -531,6 +531,8 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
         below_layer = self.get_below_layer(context)
+        unlinked_layer = ps_ctx.unlinked_layer
+        below_unlinked_layer = self.get_below_layer(context, unprocessed=True)
         
         if not active_channel:
             return {'CANCELLED'}
@@ -539,7 +541,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         
         to_be_enabled_layers = []
         # Enable both active layer and below layer, disable all others
-        for layer in active_channel.layers:
+        for layer in active_channel.flattened_layers:
             if layer.type != "FOLDER" and layer.enabled and layer != active_layer and layer != below_layer:
                 to_be_enabled_layers.append(layer)
                 layer.enabled = False
@@ -563,23 +565,15 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         set_layer_blend_type(active_layer, original_active_blend_mode)
         set_layer_blend_type(below_layer, original_below_blend_mode)
         
-        below_layer = self.get_below_layer(context, unprocessed=True)
-        # Replace the below layer with the merged result
-        below_layer.type = 'IMAGE'
-        below_layer.coord_type = 'UV'
-        below_layer.uv_map_name = self.uv_map
-        below_layer.image = image
-        
-        # Unlink layer if linked
-        below_layer.linked_layer_uid = ""
-        below_layer.linked_material = None
-        
         # Restore other layers
         for layer in to_be_enabled_layers:
             layer.enabled = True
         
         # Remove the current layer since it's been merged
-        active_channel.delete_layer(context, active_layer)
+        active_channel.delete_layer(context, unlinked_layer)
+        active_channel.delete_layer(context, below_unlinked_layer)
+        
+        active_channel.create_layer(context, "Merged Layer", "IMAGE", coord_type="UV", uv_map_name=self.uv_map, image=image)
         
         return {'FINISHED'}
 
@@ -599,7 +593,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
     def get_above_layer(self, context, unprocessed: bool = False):
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
-        active_layer = ps_ctx.active_layer
+        active_layer = ps_ctx.unlinked_layer if unprocessed else ps_ctx.active_layer
         flattened_layers = active_channel.flattened_unlinked_layers if unprocessed else active_channel.flattened_layers
         if active_layer and flattened_layers.index(active_layer) > 0:
             return flattened_layers[flattened_layers.index(active_layer) - 1]
@@ -653,6 +647,8 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
         above_layer = self.get_above_layer(context)
+        unlinked_layer = ps_ctx.unlinked_layer
+        above_unlinked_layer = self.get_above_layer(context, unprocessed=True)
 
         if not active_channel:
             return {'CANCELLED'}
@@ -661,7 +657,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
 
         to_be_enabled_layers = []
         # Enable both active layer and above layer, disable all others
-        for layer in active_channel.layers:
+        for layer in active_channel.flattened_layers:
             if layer.type != "FOLDER" and layer.enabled and layer != active_layer and layer != above_layer:
                 to_be_enabled_layers.append(layer)
                 layer.enabled = False
@@ -685,27 +681,16 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         set_layer_blend_type(active_layer, original_active_blend_mode)
         set_layer_blend_type(above_layer, original_above_blend_mode)
 
-        above_layer = self.get_above_layer(context, unprocessed=True)
-        # Replace the above layer with the merged result
-        above_layer.type = 'IMAGE'
-        above_layer.coord_type = 'UV'
-        above_layer.uv_map_name = self.uv_map
-        above_layer.image = image
-        
-        # Unlink layer if linked
-        above_layer.linked_layer_uid = ""
-        above_layer.linked_material = None
-
         # Restore other layers
         for layer in to_be_enabled_layers:
             layer.enabled = True
 
         # Remove the current layer since it's been merged into the layer above
-        active_channel.delete_layer(context, active_layer)
-
+        active_channel.delete_layer(context, unlinked_layer)
+        active_channel.delete_layer(context, above_unlinked_layer)
+        
+        active_channel.create_layer(context, "Merged Layer", "IMAGE", coord_type="UV", uv_map_name=self.uv_map, image=image)
         return {'FINISHED'}
-
-
 
 classes = (
     PAINTSYSTEM_OT_BakeChannel,
