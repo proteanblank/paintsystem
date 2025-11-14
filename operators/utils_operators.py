@@ -352,7 +352,6 @@ class PAINTSYSTEM_OT_DuplicatePaintSystemData(PSContextMixin, MultiMaterialOpera
                     if layer.is_linked:
                         continue
                     layer.duplicate_layer_data(layer)
-                    layer.uid = str(uuid.uuid4())
                     layer.update_node_tree(context)
                 channel.update_node_tree(context)
             group.update_node_tree(context)

@@ -1089,6 +1089,7 @@ class Layer(BaseNestedListItem):
         return empty_object
     
     def duplicate_layer_data(self, layer: "Layer"):
+        self.uid = str(uuid.uuid4())
         if layer.node_tree:
             self.node_tree = layer.node_tree.copy()
         if layer.image:
