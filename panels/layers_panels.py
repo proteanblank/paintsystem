@@ -792,20 +792,25 @@ class MAT_MT_LayerMenu(PSContextMixin, Menu):
         ps_ctx = self.parse_context(context)
         layout = self.layout
 
+        special_actions = False
         if ps_ctx.active_layer and ps_ctx.active_layer.type not in ('IMAGE', 'ADJUSTMENT'):
+            special_actions = True
             layout.operator(
                 "paint_system.convert_to_image_layer",
                 text="Convert to Image Layer",
                 icon_value=get_icon('image')
             )
-            layout.separator()
         
         if is_layer_linked(ps_ctx.unlinked_layer):
+            special_actions = True
             layout.operator(
                 "paint_system.unlink_layer",
                 text="Unlink Layer",
                 icon="UNLINKED"
             )
+        
+        if special_actions:
+            layout.separator()
 
         layout.operator(
             "paint_system.copy_layer",
