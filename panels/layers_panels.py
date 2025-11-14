@@ -140,7 +140,8 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
             if is_layer_linked(linked_item):
                 row.label(icon="LINKED")
             if warnings:
-                row.label(icon='ERROR')
+                op = row.operator("paint_system.show_layer_warnings", text="", icon='ERROR', emboss=False)
+                op.layer_id = item.id
             row.prop(linked_item, "enabled", text="",
                      icon="HIDE_OFF" if linked_item.enabled else "HIDE_ON", emboss=False)
             self.draw_custom_properties(row, linked_item)

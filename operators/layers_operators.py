@@ -1006,6 +1006,41 @@ class PAINTSYSTEM_OT_DeleteAction(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_ShowLayerWarnings(PSContextMixin, Operator):
+    """Show layer warnings"""
+    bl_idname = "paint_system.show_layer_warnings"
+    bl_label = "Layer Warnings"
+    bl_options = {'REGISTER'}
+    bl_description = "Show layer warnings"
+    
+    layer_id: IntProperty(
+        name="Warnings",
+        description="Layer ID to display warnings for",
+        default=-1
+    )
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=200)
+    
+    def draw(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        active_channel = ps_ctx.active_channel
+        layer = active_channel.get_item_by_id(self.layer_id)
+        warnings = layer.get_layer_data().get_layer_warnings(context)
+        warnings_box = layout.box()
+        warnings_col = warnings_box.column(align=True)
+        for warning in warnings:
+            # Split warning into chunks of 6 words
+            words = warning.split()
+            chunks = [' '.join(words[j:j+6]) for j in range(0, len(words), 6)]
+            for i, chunk in enumerate(chunks):
+                warnings_col.label(text=chunk, icon='ERROR' if not i else 'BLANK1')
+    
+    def execute(self, context):
+        return {'FINISHED'}
+
+
 classes = (
     PAINTSYSTEM_OT_NewImage,
     PAINTSYSTEM_OT_NewFolder,
@@ -1029,6 +1064,7 @@ classes = (
     PAINTSYSTEM_OT_UnlinkLayer,
     PAINTSYSTEM_OT_AddAction,
     PAINTSYSTEM_OT_DeleteAction,
+    PAINTSYSTEM_OT_ShowLayerWarnings,
 )
 
 register, unregister = register_classes_factory(classes)
