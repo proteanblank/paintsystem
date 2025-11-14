@@ -147,7 +147,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         if self.disable_show_backface:
             mat.show_transparent_back = False
             mat.use_backface_culling = True
-        if self.set_view_transform:
+        if self.template == 'BASIC' and self.set_view_transform:
             context.scene.view_settings.view_transform = 'Standard'
         
         node_tree = bpy.data.node_groups.new(name=f"Temp Group Name", type='ShaderNodeTree')
@@ -344,7 +344,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
                 col.label(text="may cause sorting artifacts.")
             box.prop(self, "disable_show_backface",
                      text="Use Backface Culling")
-        if context.scene.view_settings.view_transform != 'Standard':
+        if self.template == 'BASIC' and context.scene.view_settings.view_transform != 'Standard':
             box.prop(self, "set_view_transform",
                      text="Use Standard View Transform")
 
