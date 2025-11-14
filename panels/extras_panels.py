@@ -241,10 +241,17 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
                 # Bforartists/Blender variants may not expose color_jitter_panel; fail gracefully
                 try:
                     from bl_ui.properties_paint_common import color_jitter_panel
-                except Exception:
-                    color_jitter_panel = None
-                if color_jitter_panel:
                     color_jitter_panel(col, context, brush)
+                except Exception:
+                    pass
+                try:
+                    header, panel = col.panel("paintsystem_color_palette", default_closed=True)
+                    header.label(text="Color Palette")
+                    panel.template_ID(settings, "palette", new="palette.new")
+                    if settings.palette:
+                        panel.template_palette(settings, "palette", color=True)
+                except Exception:
+                    pass
             # draw_color_settings(context, col, brush)
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             row = col.row()
