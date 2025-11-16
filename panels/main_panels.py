@@ -132,14 +132,8 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
     
     def draw_header_preset(self, context):
         layout = self.layout
-        ps_ctx = self.parse_context(context)
-        mat = ps_ctx.active_material
         row = layout.row(align=True)
-        if mat:
-            scale_content(context, row, 1.1, 1)
-            row.popover("MAT_PT_PaintSystemMaterialSettings", text="", icon="MATERIAL")
-        else:
-            row.popover("MAT_PT_Support", icon="FUND", text="Wah!")
+        row.popover("MAT_PT_Support", icon="FUND", text="Wah!")
     
     @classmethod
     def poll(cls, context):
