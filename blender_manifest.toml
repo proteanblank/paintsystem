@@ -65,6 +65,7 @@ wheels = [
 #
 [permissions]
 files = "Loading and saving images"
+network = "Update donation information"
 # files = "Import/export FBX from/to disk"
 # clipboard = "Copy and paste brush colors"
 

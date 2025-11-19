@@ -354,3 +354,9 @@ def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
             opacity_row.scale_y = 0.8
         opacity_row.prop(active_layer.pre_mix_node.inputs['Opacity'], "default_value",
                 text="" if use_wide_ui else "Opacity", slider=True)
+
+def is_online() -> bool:
+    """Check if the internet is connected."""
+    if not hasattr(bpy.app, 'online_access'):
+        return False
+    return bpy.app.online_access

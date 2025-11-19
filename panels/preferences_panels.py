@@ -56,6 +56,13 @@ class PaintSystemPreferences(AddonPreferences):
         description="Use the legacy UI",
         default=False
     )
+    
+    loading_donations: BoolProperty(
+        name="Loading Donations",
+        description="Loading donations",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
 
     def draw_shortcut(self, layout, kmi, text):
         row = layout.row(align=True)

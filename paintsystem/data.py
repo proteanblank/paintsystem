@@ -2218,7 +2218,7 @@ def parse_context(context: bpy.types.Context) -> PSContext:
     ps_scene_data = context.scene.ps_scene_data
     
     ps_object = None
-    obj = context.active_object
+    obj = hasattr(context, 'active_object') and context.active_object
     if obj:
         match obj.type:
             case 'EMPTY':

@@ -4,6 +4,7 @@ from .graph.basic_layers import get_layer_version_for_type
 import time
 from .graph.nodetree_builder import get_nodetree_version
 import uuid
+from .donations import get_donation_info
 
 @bpy.app.handlers.persistent
 def frame_change_pre(scene):
@@ -36,8 +37,7 @@ def frame_change_pre(scene):
             layer.enabled = enabled
 
 
-@bpy.app.handlers.persistent
-def load_post(scene):
+def load_paint_system_data():
     print(f"Loading Paint System data...")
     start_time = time.time()
     ps_ctx = parse_context(bpy.context)
@@ -113,6 +113,16 @@ def load_post(scene):
         ps_scene_data.last_selected_material = None
             
     print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers) if ps_ctx.ps_scene_data else 0} layers in {round((time.time() - start_time) * 1000, 2)} ms")
+
+
+@bpy.app.handlers.persistent
+def load_post(scene):
+    
+    load_paint_system_data()
+    # Check for donation info
+    get_donation_info()
+    # if donation_info:
+    #     print(f"Donation info: {donation_info}")
 
 @bpy.app.handlers.persistent
 def save_handler(scene: bpy.types.Scene):
