@@ -128,11 +128,6 @@ def load_post(scene):
 def save_handler(scene: bpy.types.Scene):
     print("Saving Paint System data...")
     images = set()
-    ps_ctx = parse_context(bpy.context)
-    for layer in ps_ctx.ps_scene_data.layers:
-        image = layer.image
-        if image and image.is_dirty:
-            images.add(image)
     
     for mat in bpy.data.materials:
         if hasattr(mat, 'ps_mat_data'):
@@ -141,6 +136,10 @@ def save_handler(scene: bpy.types.Scene):
                     image = channel.bake_image
                     if image and image.is_dirty:
                         images.add(image)
+                    for layer in channel.layers:
+                        image = layer.image
+                        if image:
+                            images.add(image)
             
     for image in images:
         if not image.is_dirty:
