@@ -570,8 +570,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
             layer.enabled = True
         
         # Remove the current layer since it's been merged
-        active_channel.delete_layer(context, unlinked_layer)
-        active_channel.delete_layer(context, below_unlinked_layer)
+        active_channel.delete_layers(context, [unlinked_layer, below_unlinked_layer])
         
         active_channel.create_layer(context, "Merged Layer", "IMAGE", coord_type="UV", uv_map_name=self.uv_map, image=image)
         
@@ -686,8 +685,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
             layer.enabled = True
 
         # Remove the current layer since it's been merged into the layer above
-        active_channel.delete_layer(context, unlinked_layer)
-        active_channel.delete_layer(context, above_unlinked_layer)
+        active_channel.delete_layers(context, [unlinked_layer, above_unlinked_layer])
         
         active_channel.create_layer(context, "Merged Layer", "IMAGE", coord_type="UV", uv_map_name=self.uv_map, image=image)
         return {'FINISHED'}

@@ -1572,6 +1572,12 @@ class Channel(BaseNestedListManager):
             self.active_index, len(self.layers) - 1)
         self.update_node_tree(context)
     
+    def delete_layers(self, context, layers: list["Layer"]):
+        # Sort layer by index in descending order
+        layers.sort(key=lambda x: self.get_collection_index_from_id(x.id), reverse=True)
+        for layer in layers:
+            self.delete_layer(context, layer)
+    
     def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True):
         """Bake the channel
 
