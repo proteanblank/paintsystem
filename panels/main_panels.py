@@ -3,14 +3,15 @@ from datetime import datetime
 from bpy.utils import register_classes_factory
 from bpy.types import Panel, Menu, UIList
 
+from ..utils.version import is_newer_than, is_online
+
 from ..paintsystem.donations import get_donation_info
 from .common import (
     PSContextMixin,
     get_icon,
     scale_content,
     check_group_multiuser,
-    toggle_paint_mode_ui,
-    is_online
+    toggle_paint_mode_ui
 )
 
 from ..paintsystem.data import LegacyPaintSystemContextParser
@@ -58,7 +59,10 @@ class MAT_PT_Support(PSContextMixin, Panel):
             if donation_info:
                 align_center(col).label(text=f"*~~   ${str(donation_info['totalSales'])}   ~~*")
                 if donation_info['recentDonations'] and len(donation_info['recentDonations']) > 0:
-                    col.separator(type='LINE')
+                    if is_newer_than(4, 2):
+                        col.separator(type = 'LINE')
+                    else:
+                        col.separator()
                     date_format = '%d-%m-%y %H:%M'
                     # year is current year
                     current_year = datetime.now().year

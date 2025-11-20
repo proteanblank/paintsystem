@@ -74,7 +74,8 @@ def draw_layer_icon(layer: Layer, layout: bpy.types.UILayout):
                     layout.label(
                         icon_value=layer.image.preview.icon_id)
                 else:
-                    layer.image.asset_generate_preview()
+                    if layer.image.is_dirty:
+                        layer.image.asset_generate_preview()
                     layout.label(icon_value=get_icon('image'))
         case 'FOLDER':
             layout.prop(layer, "is_expanded", text="", icon_only=True, icon_value=get_icon(
@@ -361,10 +362,16 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                      icon_value=get_icon('folder'), text="")
                 col.menu("MAT_MT_LayerMenu",
                         text="", icon='COLLAPSEMENU')
-                col.separator(type = 'LINE')
+                if is_newer_than(4, 2):
+                    col.separator(type = 'LINE')
+                else:
+                    col.separator()
                 col.operator("paint_system.delete_item",
                                 text="", icon="TRASH")
-                col.separator(type = 'LINE')
+                if is_newer_than(4, 2):
+                    col.separator(type = 'LINE')
+                else:
+                    col.separator()
                 col.operator("paint_system.move_up", icon="TRIA_UP", text="")
                 col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 

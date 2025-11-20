@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from .data import parse_context
 import threading
-
+from ..utils.version import is_online
 try:
     import requests
     REQUESTS_AVAILABLE = True
@@ -96,7 +96,7 @@ def get_donation_info(base_url: str = "https://paintsystem-backend.vercel.app") 
         Dictionary containing recentDonations and totalSales, or None if error
     """
     ps_ctx = parse_context(bpy.context)
-    if not bpy.app.online_access:
+    if not is_online():
         return None
     
     if ps_ctx.ps_settings is None or ps_ctx.ps_settings.loading_donations:
