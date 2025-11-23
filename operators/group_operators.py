@@ -304,6 +304,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         self.get_coord_type(context)
         if ps_ctx.active_material and node_tree_has_complex_setup(ps_ctx.active_material.node_tree):
             self.template = 'PAINT_OVER'
+        bpy.ops.object.mode_set(mode='OBJECT')
         return context.window_manager.invoke_props_dialog(self, width=300)
     
     def draw(self, context):
