@@ -63,6 +63,8 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
     
     def execute(self, context):
+        # Set cursor to wait
+        context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         mat = ps_ctx.active_material
@@ -99,6 +101,8 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
             active_channel.use_bake_image = True
         # Return to object mode
         bpy.ops.object.mode_set(mode="OBJECT")
+        # Set cursor to default
+        context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
 
 
@@ -128,6 +132,8 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
         box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
     
     def execute(self, context):
+        # Set cursor to wait
+        context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
         active_group = ps_ctx.active_group
         
@@ -152,6 +158,8 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
             channel.use_bake_image = True
         # Return to object mode
         bpy.ops.object.mode_set(mode="OBJECT")
+        # Set cursor to default
+        context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
 
 
@@ -370,6 +378,8 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
         box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
+        # Set cursor to wait
+        context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
@@ -395,6 +405,8 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
         # Restore the layers
         for layer in to_be_enabled_layers:
             layer.enabled = True
+        # Set cursor back to default
+        context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
 
 
@@ -432,6 +444,8 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
         box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
+        # Set cursor to wait
+        context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
@@ -459,6 +473,8 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSUVOptionsMixin, PSIma
         for layer in to_be_enabled_layers:
             layer.enabled = True
         active_channel.remove_children(active_layer.id)
+        # Set cursor back to default
+        context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
 
 
@@ -501,6 +517,8 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
             )
     
     def invoke(self, context, event):
+        # Set cursor to wait
+        context.window.cursor_set('WAIT')
         self.get_coord_type(context)
         below_layer = self.get_below_layer(context)
         if below_layer:
@@ -516,6 +534,8 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
             self.image_width = below_layer.image.size[0]
             self.image_height = below_layer.image.size[1]
             return self.execute(context)
+        # Set cursor back to default
+        context.window.cursor_set('DEFAULT')
         return context.window_manager.invoke_props_dialog(self)
     
     def draw(self, context):
@@ -527,6 +547,8 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
+        # Set cursor to wait
+        context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
@@ -573,7 +595,8 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSUVOptionsMixin, PSImageCreateMi
         active_channel.delete_layers(context, [unlinked_layer, below_unlinked_layer])
         
         active_channel.create_layer(context, "Merged Layer", "IMAGE", coord_type="UV", uv_map_name=self.uv_map, image=image)
-        
+        # Set cursor back to default
+        context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
 
 
@@ -642,6 +665,8 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         box.prop_search(self, "uv_map", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
+        # Set cursor to wait
+        context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
         active_layer = ps_ctx.active_layer
@@ -688,6 +713,8 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixi
         active_channel.delete_layers(context, [unlinked_layer, above_unlinked_layer])
         
         active_channel.create_layer(context, "Merged Layer", "IMAGE", coord_type="UV", uv_map_name=self.uv_map, image=image)
+        # Set cursor back to default
+        context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
 
 classes = (
