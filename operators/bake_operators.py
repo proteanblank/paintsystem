@@ -36,6 +36,13 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         options={'SKIP_SAVE'}
     )
     
+    as_tangent_normal: BoolProperty(
+        name="As Tangent Normal",
+        description="Bake the channel as a tangent normal",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
+    
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
@@ -48,6 +55,14 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         box = layout.box()
         box.label(text="UV Map", icon='UV')
         box.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
+        if ps_ctx.active_channel.type == "VECTOR":
+            box = layout.box()
+            box.prop(self, "as_tangent_normal")
+    
+    def invoke(self, context, event):
+        ps_ctx = self.parse_context(context)
+        self.as_tangent_normal = ps_ctx.active_channel.bake_vector_space == 'TANGENT'
+        return super().invoke(context, event)
     
     def execute(self, context):
         # Set cursor to wait
@@ -63,7 +78,7 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         if self.as_layer:
             bake_image = self.create_image(context)
             bake_image.colorspace_settings.name = 'sRGB'
-            active_channel.bake(context, mat, bake_image, self.uv_map_name, force_alpha=True)
+            active_channel.bake(context, mat, bake_image, self.uv_map_name, force_alpha=True, as_tangent_normal=self.as_tangent_normal)
             active_channel.create_layer(
                 context, 
                 layer_name=self.image_name, 
@@ -84,7 +99,11 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
             active_channel.bake_uv_map = self.uv_map_name
                 
             active_channel.use_bake_image = False
-            active_channel.bake(context, mat, bake_image, self.uv_map_name)
+            active_channel.bake(context, mat, bake_image, self.uv_map_name, as_tangent_normal=self.as_tangent_normal)
+            if self.as_tangent_normal:
+                active_channel.bake_vector_space = 'TANGENT'
+            else:
+                active_channel.bake_vector_space = active_channel.vector_space
             active_channel.use_bake_image = True
         # Return to object mode
         bpy.ops.object.mode_set(mode="OBJECT")

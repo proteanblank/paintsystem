@@ -42,18 +42,18 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         default=False,
         options={'SKIP_SAVE'}
     )
-    use_normalize: bpy.props.BoolProperty(
+    normalize_input: bpy.props.BoolProperty(
         name="Normalize Channel",
         description="Normalize the channel",
         default=False,
         options={'SKIP_SAVE'}
     )
-    world_to_object_normal: bpy.props.BoolProperty(
-        name="World to Object Normal",
-        description="World to object normal",
-        default=False,
-        options={'SKIP_SAVE'}
-    )
+    # world_to_object_normal: bpy.props.BoolProperty(
+    #     name="World to Object Normal",
+    #     description="World to object normal",
+    #     default=False,
+    #     options={'SKIP_SAVE'}
+    # )
     use_max_min: bpy.props.BoolProperty(
         name="Use Max Min",
         description="Use max min for the channel",
@@ -81,11 +81,12 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
             channel_type=self.channel_type, 
             color_space=self.color_space, 
             use_alpha=self.use_alpha, 
-            use_normalize=self.use_normalize, 
-            world_to_object_normal=self.world_to_object_normal, 
+            normalize_input=self.normalize_input, 
+            # world_to_object_normal=self.world_to_object_normal, 
             use_max_min=self.use_max_min,
             factor_min=self.factor_min,
-            factor_max=self.factor_max
+            factor_max=self.factor_max,
+            vector_space="OBJECT" if self.channel_type == "VECTOR" else "NONE"
             )
         redraw_panel(context)
         return {'FINISHED'}
@@ -102,7 +103,7 @@ class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
         layout.prop(self, "color_space", text="Color Space")
         layout.prop(self, "use_alpha", text="Expose Alpha Socket")
         if self.channel_type == "VECTOR":
-            layout.prop(self, "use_normalize", text="Normalize")
+            layout.prop(self, "normalize_input", text="Normalize")
         unique_name = self.get_unique_channel_name(context)
         if unique_name != self.channel_name:
             box = layout.box()

@@ -163,18 +163,24 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
             row.prop(active_channel, "use_bake_image", text="Use Baked Image", icon="TEXTURE_DATA")
             row.operator("paint_system.delete_bake_image", text="", icon="TRASH")
         col = layout.column(align=True)
-        col.enabled = not active_channel.use_bake_image
+        if active_channel.use_bake_image:
+            if active_channel.type == "VECTOR":
+                col.prop(active_channel, "bake_vector_space", text="")
+            return
+        box = col.box()
+        col = box.column()
+        col.label(text="Channel Settings:", icon="SETTINGS")
         col.use_property_split = True
         col.use_property_decorate = False
         col.prop(active_channel, "type", text="Type")
-        col.prop(active_channel, "use_alpha", text="Alpha Socket")
+        col.prop(active_channel, "use_alpha", text="Use Alpha")
         if active_channel.type == "VECTOR":
-            vec_box = col.box()
-            col = vec_box.column()
-            col.label(text="Vector Input Settings:", icon="SETTINGS")
+            box = col.box()
+            col = box.column()
             col.use_property_split = False
-            col.prop(active_channel, "world_to_object_normal", text="World to Object Normal")
-            col.prop(active_channel, "use_normalize", text="Normalize Input")
+            col.prop(active_channel, "vector_space", text="")
+            # col.prop(active_channel, "world_to_object_normal", text="World to Object Input")
+            col.prop(active_channel, "normalize_input", text="Normalize Input")
         if active_channel.type == "FLOAT":
             float_box = col.box()
             col = float_box.column()

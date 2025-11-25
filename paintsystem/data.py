@@ -56,7 +56,7 @@ from .graph import (
     get_layer_blend_type,
     set_layer_blend_type,
 )
-from .graph.common import get_library_object, DEFAULT_PS_UV_MAP_NAME
+from .graph.common import get_library_nodetree, get_library_object, DEFAULT_PS_UV_MAP_NAME
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 
 BLEND_MODES = []
@@ -1407,7 +1407,6 @@ class Channel(BaseNestedListManager):
     def update_node_tree(self, context:Context):
         if not self.node_tree:
             return
-        
         _invalidate_material_layer_cache(parse_context(context).active_material)
         
         self.node_tree.name = f"PS {self.name}"
@@ -1445,10 +1444,10 @@ class Channel(BaseNestedListManager):
             clip_alpha_socket: Optional[str] = None
             
         previous_dict: Dict[int, PreviousLayer] = {}
-        if self.type == "VECTOR" and self.use_normalize:
+        if self.type == "VECTOR" and self.normalize_input:
             node_builder.add_node("normalize", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD", "hide": True}, {1: (0.5, 0.5, 0.5), 2: (0.5, 0.5, 0.5)})
-        if self.type == "VECTOR" and self.world_to_object_normal:
-            node_builder.add_node("world_to_object_normal", "ShaderNodeVectorTransform")
+        if self.type == "VECTOR" and self.vector_space != "NONE" and self.vector_space != "TANGENT":
+            node_builder.add_node("vector_transform", "ShaderNodeVectorTransform", {"convert_to": self.vector_space}, force_properties=True)
         
         node_builder.add_node("alpha_clamp_end", "ShaderNodeClamp", {"hide": True})
         node_builder.link("alpha_clamp_end", "group_output", "Result", "Alpha")
@@ -1523,13 +1522,13 @@ class Channel(BaseNestedListManager):
                 if previous_data.clip_mode and not layer.is_clip:
                     previous_data.clip_mode = False
         prev_layer = previous_dict[-1]
-        if self.type == "VECTOR" and self.use_normalize:
+        if self.type == "VECTOR" and self.normalize_input:
             node_builder.link("normalize", prev_layer.color_name, "Vector", prev_layer.color_socket)
             prev_layer.color_name = "normalize"
             prev_layer.color_socket = "Vector"
-        if self.type == "VECTOR" and self.world_to_object_normal:
-            node_builder.link("world_to_object_normal", prev_layer.color_name, "Vector", prev_layer.color_socket)
-            prev_layer.color_name = "world_to_object_normal"
+        if self.type == "VECTOR" and self.vector_space != "NONE" and self.vector_space != "TANGENT":
+            node_builder.link("vector_transform", prev_layer.color_name, "Vector", prev_layer.color_socket)
+            prev_layer.color_name = "vector_transform"
             prev_layer.color_socket = "Vector"
         node_builder.link("group_input", prev_layer.color_name, "Color", prev_layer.color_socket)
         node_builder.add_node("alpha_clamp_start", "ShaderNodeClamp", {"hide": True})
@@ -1623,7 +1622,7 @@ class Channel(BaseNestedListManager):
         for layer in layers:
             self.delete_layer(context, layer)
     
-    def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True, force_alpha: bool = False):
+    def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True, force_alpha: bool = False, as_tangent_normal: bool = False):
         """Bake the channel
 
         Args:
@@ -1688,6 +1687,19 @@ class Channel(BaseNestedListManager):
                 alpha_output = bake_node.outputs['Alpha']
             to_be_deleted_nodes.append(bake_node)
         
+        if as_tangent_normal:
+            tangent_node = node_tree.nodes.new(type='ShaderNodeTangent')
+            tangent_node.direction_type = "UV_MAP"
+            tangent_node.uv_map = self.bake_uv_map
+            to_be_deleted_nodes.append(tangent_node)
+            tangent_norm_nt = get_library_nodetree(".PS Tangent Normal")
+            tangent_group = node_tree.nodes.new(type='ShaderNodeGroup')
+            tangent_group.node_tree = tangent_norm_nt
+            to_be_deleted_nodes.append(tangent_group)
+            connect_sockets(tangent_group.inputs['Custom Normal'], color_output)
+            connect_sockets(tangent_group.inputs['Tangent'], tangent_node.outputs['Tangent'])
+            color_output = tangent_group.outputs['Tangent Normal']
+        
         # Bake image
         connect_sockets(surface_socket, color_output)
         temp_alpha_image = bake_image.copy()
@@ -1717,12 +1729,6 @@ class Channel(BaseNestedListManager):
         
         if force_alpha:
             self.use_alpha = orig_use_alpha
-
-    def update_bake_image(self, context):
-        if self.use_bake_image:
-            # Force to object mode
-            bpy.ops.object.mode_set(mode="OBJECT")
-        self.update_node_tree(context)
         
     @property
     def item_type(self):
@@ -1798,18 +1804,51 @@ class Channel(BaseNestedListManager):
         default=1,
         update=update_active_group
     )
-    use_normalize: BoolProperty(
+    normalize_input: BoolProperty(
         name="Normalize",
         description="Normalize the channel",
         default=False,
         update=update_node_tree
     )
-    world_to_object_normal: BoolProperty(
-        name="World to Object Normal",
-        description="World to object normal",
-        default=False,
-        update=update_node_tree
+    # world_to_object_normal: BoolProperty(
+    #     name="World to Object Normal",
+    #     description="World to object normal",
+    #     default=False,
+    #     update=update_node_tree
+    # )
+    def update_vector_space(self, context):
+        ps_ctx = parse_context(context)
+        if self.vector_space != "NONE":
+            mat = ps_ctx.active_material
+            if mat and mat.node_tree:
+                group_node = find_node(mat.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': ps_ctx.active_group.node_tree})
+                if group_node and group_node.outputs[self.name]:
+                    for link in group_node.outputs[self.name].links:
+                        to_node = link.to_node
+                        if to_node.bl_idname == 'ShaderNodeNormalMap':
+                            to_node.space = self.bake_vector_space if self.use_bake_image else self.vector_space
+                            to_node.uv_map = self.bake_uv_map if self.use_bake_image else ""
+        self.update_node_tree(context)
+    vector_space: EnumProperty(
+        items=[
+            ('WORLD', "World Space", "World Space"),
+            ('OBJECT', "Object Space", "Object Space"),
+            ('TANGENT', "Tangent Space", "Tangent Space"),
+            ('NONE', "None", "None")
+        ],
+        name="Vector Space",
+        description="Space of the vector",
+        default='OBJECT',
+        update=update_vector_space
     )
+    
+    def update_bake_image(self, context):
+        if self.use_bake_image:
+            # Force to object mode
+            bpy.ops.object.mode_set(mode="OBJECT")
+        self.update_vector_space(context)
+        self.update_node_tree(context)
+    # Bake settings
     bake_image: PointerProperty(
         name="Bake Image",
         type=Image,
@@ -1823,6 +1862,17 @@ class Channel(BaseNestedListManager):
     use_bake_image: BoolProperty(
         name="Use Bake Image",
         default=False,
+        update=update_bake_image
+    )
+    bake_vector_space: EnumProperty(
+        items=[
+            ('WORLD', "World Space", "World Space"),
+            ('OBJECT', "Object Space", "Object Space"),
+            ('TANGENT', "Tangent Space", "Tangent Space")
+        ],
+        name="Bake Vector Space",
+        description="Space of the vector",
+        default='OBJECT',
         update=update_bake_image
     )
     
@@ -1987,11 +2037,12 @@ class Group(PropertyGroup):
         channel_type: str = "COLOR",
         color_space: str = "COLOR",
         use_alpha: bool = False,
-        use_normalize: bool = False,
-        world_to_object_normal: bool = False,
+        normalize_input: bool = False,
+        # world_to_object_normal: bool = False,
         use_max_min: bool = False,
         factor_min: float = 0,
-        factor_max: float = 1
+        factor_max: float = 1,
+        vector_space: str = "OBJECT"
     ):
         channels = self.channels
         node_tree = bpy.data.node_groups.new(name=f"Temp Channel Name", type='ShaderNodeTree')
@@ -2001,10 +2052,11 @@ class Group(PropertyGroup):
         new_channel.name = unique_name
         new_channel.type = channel_type
         new_channel.use_alpha = use_alpha
-        new_channel.use_normalize = use_normalize
+        new_channel.normalize_input = normalize_input
         new_channel.color_space = color_space
         new_channel.use_max_min = use_max_min
-        new_channel.world_to_object_normal = world_to_object_normal
+        # new_channel.world_to_object_normal = world_to_object_normal
+        new_channel.vector_space = vector_space
         if channel_type == "FLOAT" and new_channel.use_max_min:
             new_channel.factor_min = factor_min
             new_channel.factor_max = factor_max
