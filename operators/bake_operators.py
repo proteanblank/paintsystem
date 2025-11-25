@@ -372,7 +372,12 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
         
         original_blend_mode = get_layer_blend_type(active_layer)
         set_layer_blend_type(active_layer, 'MIX')
+        orig_is_clip = bool(active_layer.is_clip)
+        if active_layer.is_clip:
+            active_layer.is_clip = False
         active_channel.bake(context, ps_ctx.active_material, transferred_image, self.uv_map_name, use_group_tree=False, force_alpha=True)
+        if active_layer.is_clip != orig_is_clip:
+            active_layer.is_clip = orig_is_clip
         set_layer_blend_type(active_layer, original_blend_mode)
         active_layer.coord_type = 'UV'
         active_layer.uv_map_name = self.uv_map_name
@@ -431,7 +436,12 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSImageCreateMixin, Ope
                 layer.enabled = False
         original_blend_mode = get_layer_blend_type(active_layer)
         set_layer_blend_type(active_layer, 'MIX')
+        orig_is_clip = bool(active_layer.is_clip)
+        if active_layer.is_clip:
+            active_layer.is_clip = False
         active_channel.bake(context, ps_ctx.active_material, image, self.uv_map_name, use_group_tree=False, force_alpha=True)
+        if active_layer.is_clip != orig_is_clip:
+            active_layer.is_clip = orig_is_clip
         set_layer_blend_type(active_layer, original_blend_mode)
         active_layer.coord_type = 'UV'
         active_layer.uv_map_name = self.uv_map_name
