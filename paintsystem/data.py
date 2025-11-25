@@ -1282,6 +1282,10 @@ class Layer(BaseNestedListItem):
             # TODO: The following causes some issue when undoing
             if self.node_tree:
                 bpy.data.node_groups.remove(self.node_tree)
+    
+    @property
+    def modifies_color_data(self) -> bool:
+        return self.type == "ATTRIBUTE" or (self.type == "GRADIENT" and self.gradient_type == "GRADIENT_MAP") or self.blend_mode != "MIX"
 
 def get_layer_by_uid(material: Material, uid: str) -> Layer | None:
     uid_to_layer = _get_material_layer_uid_map(material)

@@ -478,13 +478,14 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSImageCreateMixin, Operator):
         if not below_layer:
             return False
         return (
-            active_layer and 
-            below_layer and 
-            active_layer.type != "FOLDER" and 
-            below_layer.type != "FOLDER" and
-            active_layer.parent_id == below_layer.parent_id and
-            active_layer.enabled and
-            below_layer.enabled
+            active_layer
+            and below_layer
+            and active_layer.type != "FOLDER"
+            and below_layer.type != "FOLDER"
+            and active_layer.parent_id == below_layer.parent_id
+            and active_layer.enabled
+            and below_layer.enabled
+            and not below_layer.modifies_color_data
             )
     
     def invoke(self, context, event):
@@ -510,6 +511,11 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSImageCreateMixin, Operator):
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
+        box = layout.box()
+        box.alert = True
+        col = box.column(align=True)
+        col.label(text="This operation will convert the current layer", icon='INFO')
+        col.label(text="into an image layer.", icon='BLANK1')
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
@@ -599,6 +605,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSImageCreateMixin, Operator):
             and active_layer.parent_id == above_layer.parent_id
             and active_layer.enabled
             and above_layer.enabled
+            and not active_layer.modifies_color_data
         )
 
     def invoke(self, context, event):
@@ -620,6 +627,11 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSImageCreateMixin, Operator):
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
+        box = layout.box()
+        box.alert = True
+        col = box.column(align=True)
+        col.label(text="This operation will convert the current layer", icon='INFO')
+        col.label(text="into an image layer.", icon='BLANK1')
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
