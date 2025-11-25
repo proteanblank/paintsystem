@@ -53,16 +53,17 @@ class BrushPainterCore:
                 return self.create_circular_brush(50)
                 
             brush_pil = Image.open(path)
-            if brush_pil.mode != 'RGBA':
-                brush_pil = brush_pil.convert('RGBA')
             
-            brush_array = np.array(brush_pil, dtype=np.float64) / 255.0
-            
+            # Use PIL's optimized methods for alpha extraction or grayscale conversion
             if brush_pil.mode == 'RGBA':
-                brush_mask = brush_array[..., 3]
+                # Extract alpha channel directly using PIL
+                brush_mask_pil = brush_pil.split()[3]  # Get alpha channel
             else:
-                rgb = brush_array[..., :3]
-                brush_mask = 0.299 * rgb[..., 0] + 0.587 * rgb[..., 1] + 0.114 * rgb[..., 2]
+                # Convert to grayscale using PIL's optimized conversion (directly to L mode)
+                brush_mask_pil = brush_pil.convert('L')
+            
+            # Convert to numpy array
+            brush_mask = np.array(brush_mask_pil, dtype=np.float64) / 255.0
             
             # Handle non-square brush textures
             original_h, original_w = brush_mask.shape
@@ -150,17 +151,22 @@ class BrushPainterCore:
         """Calculates Sobel filter for the image using PIL.ImageFilter.Kernel."""
         if not PIL_AVAILABLE:
             raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
+        
+        # Use PIL's optimized grayscale conversion instead of manual numpy calculation
+        img_uint8 = (np.clip(img_float, 0, 1) * 255).astype(np.uint8)
+        
         if len(img_float.shape) == 3:
             if img_float.shape[2] == 4:
-                img_gray = img_float[..., :3]
+                img_pil = Image.fromarray(img_uint8, mode='RGBA')
             else:
-                img_gray = img_float
-            img_gray = 0.299 * img_gray[..., 0] + 0.587 * img_gray[..., 1] + 0.114 * img_gray[..., 2]
+                img_pil = Image.fromarray(img_uint8, mode='RGB')
+            # Use PIL's optimized grayscale conversion
+            img_pil = img_pil.convert('L')
         else:
-            img_gray = img_float
+            img_pil = Image.fromarray(img_uint8, mode='L')
         
-        img_uint8 = (img_gray * 255).astype(np.uint32)
-        img_pil = Image.fromarray(img_uint8, mode='I')
+        # Convert to 'I' mode (32-bit integer) for kernel filtering
+        img_pil = img_pil.convert('I')
         
         # Sobel kernels
         sobel_x_pos = [0, 0, 1, 0, 0, 2, 0, 0, 1]
@@ -185,14 +191,19 @@ class BrushPainterCore:
     
     def calculate_gradients(self, img_float):
         """Calculates gradient magnitude and orientation for brush stroke direction."""
-        img_rgb_for_gray = img_float[..., :3] if img_float.shape[-1] == 4 else img_float
-        if len(img_rgb_for_gray.shape) == 3:
-            img_gray = 0.299 * img_rgb_for_gray[..., 0] + 0.587 * img_rgb_for_gray[..., 1] + 0.114 * img_rgb_for_gray[..., 2]
-        else:
-            img_gray = img_rgb_for_gray
+        # Use PIL's optimized grayscale conversion instead of manual numpy calculation
+        img_uint8 = (np.clip(img_float, 0, 1) * 255).astype(np.uint8)
         
-        img_gray_uint8 = (img_gray * 255).astype(np.uint8)
-        img_pil = Image.fromarray(img_gray_uint8, mode='L')
+        if len(img_float.shape) == 3:
+            if img_float.shape[2] == 4:
+                img_pil = Image.fromarray(img_uint8, mode='RGBA')
+            else:
+                img_pil = Image.fromarray(img_uint8, mode='RGB')
+            # Use PIL's optimized grayscale conversion
+            img_pil = img_pil.convert('L')
+        else:
+            img_pil = Image.fromarray(img_uint8, mode='L')
+        
         radius = int(self.gaussian_sigma * 2)
         blurred_pil = img_pil.filter(ImageFilter.GaussianBlur(radius=radius))
         img_smoothed = np.array(blurred_pil, dtype=np.float64) / 255.0
