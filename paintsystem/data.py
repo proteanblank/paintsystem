@@ -464,6 +464,38 @@ def ensure_sockets(node_tree: NodeTree, expected_sockets: List[ExpectedSocket], 
                 socket.min_value = -1e39
                 socket.max_value = 1e39
 
+def get_udim_tiles(uv_layer: bpy.types.MeshUVLoopLayer):
+    udim_tiles = set()
+    uv_data = np.empty((len(uv_layer.uv), 2), dtype=np.float32)
+    for idx, uv_loop in enumerate(uv_layer.uv):
+        uv_data[idx] = uv_loop.vector
+    for coord in uv_data:
+        row = max(1, math.ceil(coord[1])) - 1
+        col = max(1, math.ceil(coord[0]))
+        udim_tiles.add(1000 + row * 10 + col)
+    return udim_tiles
+
+def ensure_udim_tiles(image: bpy.types.Image, uv_layer: bpy.types.MeshUVLoopLayer):
+    # Check position the data in uv_layer, create a list of number for UDIM tiles
+    udim_tiles = get_udim_tiles(uv_layer)
+    width, height = image.size
+    for tile in udim_tiles:
+        with bpy.context.temp_override(edit_image=image):
+            bpy.ops.image.tile_add(number=tile, color=(0, 0, 0, 0), width=width, height=height)
+    return udim_tiles
+
+def create_ps_image(name: str, width: int = 2048, height: int = 2048, use_udim_tiles: bool = False, uv_layer: bpy.types.MeshUVLoopLayer = None):
+    img = bpy.data.images.new(
+        name=name, width=width, height=height, alpha=True)
+    img.generated_color = (0, 0, 0, 0)
+    img.pack()
+    if use_udim_tiles:
+        img.source = "TILED"
+        if uv_layer:
+            ensure_udim_tiles(img, uv_layer)
+        else:
+            raise ValueError("UV layer is required for UDIM tiles")
+    return img
 
 def ensure_paint_system_uv_map(context: bpy.types.Context):
     selection = context.selected_objects
@@ -826,8 +858,15 @@ class Layer(BaseNestedListItem):
         
         match self.type:
             case "IMAGE":
-                if self.image:
-                    self.image.name = self.layer_name
+                if not self.image:
+                    if self.coord_type == 'UV':
+                        ps_ctx = PSContextMixin.parse_context(context)
+                        uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
+                        use_udim_tiles = get_udim_tiles(uv_layer) != {1001}
+                        self.image = create_ps_image(self.layer_name, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer)
+                    else:
+                        self.image = create_ps_image(self.layer_name)
+                self.image.name = self.layer_name
                 layer_graph = create_image_graph(self)
             case "FOLDER":
                 layer_graph = create_folder_graph(self)
@@ -1013,7 +1052,8 @@ class Layer(BaseNestedListItem):
     )
     type: EnumProperty(
         items=LAYER_TYPE_ENUM,
-        default='IMAGE'
+        default='IMAGE',
+        update=update_node_tree
     )
     lock_layer: BoolProperty(
         name="Lock Layer",
@@ -1524,23 +1564,24 @@ class Channel(BaseNestedListManager):
         self.adjust_sibling_orders(parent_id, insert_order)
         layer = self.add_item(
                 layer_name,
-                layer_type,
+                "BLANK",
                 parent_id=parent_id,
                 order=insert_order
             )
         layer.auto_update_node_tree = False
+        layer.type = layer_type
         layer.layer_name = layer_name
         layer.uid = str(uuid.uuid4())
         for key, value in kwargs.items():
             setattr(layer, key, value)
         
         # Layer type specific setup
-        match layer.type:
-            case "IMAGE":
-                if "image" not in kwargs:
-                    layer.image = bpy.data.images.new(name=layer.layer_name, width=2048, height=2048, alpha=True)
-                    layer.image.generated_color = (0, 0, 0, 0)
-                    layer.image.pack()
+        # match layer.type:
+        #     case "IMAGE":
+        #         if "image" not in kwargs:
+        #             layer.image = bpy.data.images.new(name=layer.layer_name, width=2048, height=2048, alpha=True)
+        #             layer.image.generated_color = (0, 0, 0, 0)
+        #             layer.image.pack()
         
         # Update active index
         if update_active_index:
@@ -1578,7 +1619,7 @@ class Channel(BaseNestedListManager):
         for layer in layers:
             self.delete_layer(context, layer)
     
-    def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True):
+    def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True, force_alpha: bool = False):
         """Bake the channel
 
         Args:
@@ -1598,6 +1639,9 @@ class Channel(BaseNestedListManager):
             raise ValueError("Node tree not found")
         ps_context = parse_context(context)
         obj = ps_context.ps_object
+        if force_alpha:
+            orig_use_alpha = bool(self.use_alpha)
+            self.use_alpha = True
         
         # Ensure ps_object is the only object selected
         bpy.ops.object.mode_set(mode="OBJECT")
@@ -1642,9 +1686,9 @@ class Channel(BaseNestedListManager):
         
         # Bake image
         connect_sockets(surface_socket, color_output)
+        temp_alpha_image = bake_image.copy()
         bake_image = ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu)
         
-        temp_alpha_image = bake_image.copy()
         temp_alpha_image.colorspace_settings.name = 'Non-Color'
         connect_sockets(surface_socket, alpha_output)
         temp_alpha_image = ps_bake(context, obj, mat, uv_layer, temp_alpha_image, use_gpu)
@@ -1666,6 +1710,9 @@ class Channel(BaseNestedListManager):
         # Restore surface socket
         if from_socket:
             connect_sockets(surface_socket, from_socket)
+        
+        if force_alpha:
+            self.use_alpha = orig_use_alpha
 
     def update_bake_image(self, context):
         if self.use_bake_image:

@@ -1,6 +1,6 @@
 import bpy
 from bpy.props import IntProperty
-from ..paintsystem.data import PSContextMixin, COORDINATE_TYPE_ENUM
+from ..paintsystem.data import PSContextMixin, COORDINATE_TYPE_ENUM, create_ps_image, get_udim_tiles
 from ..custom_icons import get_icon
 from ..preferences import get_preferences
 from ..utils.unified_brushes import get_unified_settings
@@ -133,6 +133,7 @@ class PSUVOptionsMixin():
             self.get_coord_type(context)
         if self.use_paint_system_uv:
             self.coord_type = 'AUTO'
+            self.uv_map_name = DEFAULT_PS_UV_MAP_NAME
         if ps_ctx.active_group:
             ps_ctx.active_group.coord_type = self.coord_type
             ps_ctx.active_group.uv_map_name = self.uv_map_name
@@ -179,7 +180,7 @@ class PSUVOptionsMixin():
                 row.alert = True
 
 
-class PSImageCreateMixin():
+class PSImageCreateMixin(PSUVOptionsMixin):
     image_name: StringProperty(
         name="Image Name",
         description="Name of the new image",
@@ -210,6 +211,11 @@ class PSImageCreateMixin():
         description="Height of the image in pixels",
         subtype='PIXEL'
     )
+    use_udim_tiles: BoolProperty(
+        name="Use UDIM Tiles",
+        description="Use UDIM tiles for the image layer",
+        default=False
+    )
     
     def image_create_ui(self, layout, context, show_name=True):
         if show_name:
@@ -224,16 +230,38 @@ class PSImageCreateMixin():
             col = box.column(align=True)
             col.prop(self, "image_width", text="Width")
             col.prop(self, "image_height", text="Height")
+        if self.coord_type == 'UV':
+            ps_ctx = PSContextMixin.parse_context(context)
+            uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
+            udim_tiles = get_udim_tiles(uv_layer)
+            use_udim_tiles = udim_tiles != {1001}
+            if udim_tiles and use_udim_tiles:
+                box.prop(self, "use_udim_tiles")
             
-    def create_image(self):
+    def create_image(self, context):
         if self.image_resolution != 'CUSTOM':
             self.image_width = int(self.image_resolution)
             self.image_height = int(self.image_resolution)
-        img = bpy.data.images.new(
-            name=self.image_name, width=self.image_width, height=self.image_height, alpha=True)
-        img.generated_color = (0, 0, 0, 0)
-        img.pack()
+        if self.coord_type == 'UV':
+            ps_ctx = PSContextMixin.parse_context(context)
+            uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
+            use_udim_tiles = get_udim_tiles(uv_layer) != {1001} and self.use_udim_tiles
+            img = create_ps_image(self.image_name, self.image_width, self.image_height, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer)
+        else:
+            img = create_ps_image(self.image_name, self.image_width, self.image_height)
         return img
+    
+    def get_coord_type(self, context):
+        """Get the coord_type from the active channel and set it on the operator"""
+        super().get_coord_type(context)
+        ps_ctx = PSContextMixin.parse_context(context)
+        if ps_ctx.ps_object.mode == 'EDIT':
+            bpy.ops.object.mode_set(mode="OBJECT")
+        uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
+        if uv_layer:
+            self.use_udim_tiles = get_udim_tiles(uv_layer) != {1001}
+        else:
+            self.use_udim_tiles = False
 
 
 class PSImageFilterMixin():

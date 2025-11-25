@@ -42,7 +42,7 @@ def get_icon_from_type(type: str) -> int:
     }
     return get_icon(type_to_icon.get(type, 'color_socket'))
 
-class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMixin, MultiMaterialOperator):
+class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSImageCreateMixin, MultiMaterialOperator):
     """Create a new image layer"""
     bl_idname = "paint_system.new_image_layer"
     bl_label = "New Image Layer"
@@ -87,7 +87,7 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSUVOptionsMixin, PSImageCreateMix
         self.store_coord_type(context)
         ps_ctx = self.parse_context(context)
         if self.image_add_type == 'NEW':
-            img = self.create_image()
+            img = self.create_image(context)
         elif self.image_add_type == 'IMPORT':
             img = bpy.data.images.load(self.filepath, check_existing=True)
             if not img:
