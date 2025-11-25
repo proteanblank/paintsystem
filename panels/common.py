@@ -213,7 +213,7 @@ def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, 
     col.use_property_decorate = False
     if image_node.image:
         row = col.row(align=True)
-        row.operator("paint_system.export_image", text="Save As...", icon="EXPORT").image_name = image_node.image.name
+        row.operator("paint_system.export_image", text="Export As...", icon="EXPORT").image_name = image_node.image.name
         row.menu("MAT_MT_ImageMenu",
                 text="", icon='COLLAPSEMENU')
         col.separator()

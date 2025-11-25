@@ -185,7 +185,7 @@ class PAINTSYSTEM_OT_ExportImage(PSContextMixin, Operator):
             return {'CANCELLED'}
 
         with bpy.context.temp_override(**{'edit_image': image}):
-            bpy.ops.image.save_as('INVOKE_DEFAULT', copy=True)
+            bpy.ops.image.save_as('INVOKE_DEFAULT')
         return {'FINISHED'}
 
 
