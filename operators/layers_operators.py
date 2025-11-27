@@ -5,6 +5,8 @@ from bpy.props import (
 )
 from bpy.types import Operator, Context, NodeTree
 from bpy.utils import register_classes_factory
+import math
+import mathutils
 
 from ..paintsystem.data import (
     ACTION_BIND_ENUM,
@@ -1041,6 +1043,62 @@ class PAINTSYSTEM_OT_ShowLayerWarnings(PSContextMixin, Operator):
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_SetProjectionView(PSContextMixin, Operator):
+    """Set the projection view"""
+    bl_idname = "paint_system.set_projection_view"
+    bl_label = "Set Projection View"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Set the projection view"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        return ps_ctx.active_layer is not None and ps_ctx.active_layer.coord_type == 'PROJECTED'
+    
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        active_layer = ps_ctx.active_layer
+        active_space = context.area.spaces.active
+        if active_space.type == 'VIEW_3D':
+            region_3d = active_space.region_3d
+            if region_3d:
+                view_mat = region_3d.view_matrix.copy()
+                view_mat.invert()
+                loc, rot, sca = view_mat.decompose()
+                active_layer.projection_position = loc
+                active_layer.projection_rotation = rot.to_euler()
+                active_layer.projection_fov = 2*math.atan(36/active_space.lens)
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_ProjectionViewReset(PSContextMixin, Operator):
+    """Reset the projection to the stored view"""
+    bl_idname = "paint_system.projection_view_reset"
+    bl_label = "Projection View Reset"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Reset the projection to the stored view"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        
+        return ps_ctx.active_layer is not None and ps_ctx.active_layer.coord_type == 'PROJECTED'
+    
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        active_layer = ps_ctx.active_layer
+        active_space = context.area.spaces.active
+        if active_space.type == 'VIEW_3D':
+            region_3d = active_space.region_3d
+            if region_3d:
+                location = mathutils.Vector(active_layer.projection_position)
+                rotation = mathutils.Euler(active_layer.projection_rotation, 'XYZ').to_quaternion()
+                scale = mathutils.Vector((1.0, 1.0, 1.0))
+                view_matrix = mathutils.Matrix.LocRotScale(location, rotation, scale)
+                view_matrix.invert()
+                region_3d.view_matrix = view_matrix
+        return {'FINISHED'}
+
 classes = (
     PAINTSYSTEM_OT_NewImage,
     PAINTSYSTEM_OT_NewFolder,
@@ -1065,6 +1123,8 @@ classes = (
     PAINTSYSTEM_OT_AddAction,
     PAINTSYSTEM_OT_DeleteAction,
     PAINTSYSTEM_OT_ShowLayerWarnings,
+    PAINTSYSTEM_OT_SetProjectionView,
+    PAINTSYSTEM_OT_ProjectionViewReset,
 )
 
 register, unregister = register_classes_factory(classes)

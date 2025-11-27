@@ -698,33 +698,44 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
         col = layout.column()
         row = col.row(align=True)
         row.prop(active_layer, "coord_type", text="Coord Type")
-        if active_layer.coord_type in ['AUTO', 'UV'] and active_layer.type == 'IMAGE':
-            row.operator("paint_system.transfer_image_layer_uv", text="", icon='UV_DATA')
+        if active_layer.type == 'IMAGE':
+            if active_layer.coord_type not in ['UV', 'AUTO']:
+                info_box = col.box()
+                info_box.alert = True
+                info_col = info_box.column(align=True)
+                info_col.label(text="Painting may not work", icon='ERROR')
+            else:
+                row.operator("paint_system.transfer_image_layer_uv", text="", icon='UV_DATA')
         if active_layer.coord_type == 'UV':
             col.prop_search(active_layer, "uv_map_name", text="UV Map",
                                 search_data=ps_ctx.ps_object.data, search_property="uv_layers", icon='GROUP_UVS')
         elif active_layer.coord_type == 'DECAL':
-            decal_clip = active_layer.find_node("decal_depth_clip")
-            if decal_clip:
-                decal_clip_col = col.column(align=True)
-                decal_clip_col.prop(decal_clip.inputs[2], "default_value", text="Depth Clip")
-            empty_col = col.column(align=True)
-            empty_col.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
-            empty_col.prop(active_layer, "empty_object", text="")
-        if active_layer.coord_type not in ['UV', 'AUTO'] and active_layer.type == 'IMAGE':
-            info_box = col.box()
-            info_box.alert = True
-            info_col = info_box.column(align=True)
-            info_col.label(text="Painting may not work", icon='ERROR')
-            info_col.label(text="as expected.", icon='BLANK1')
+            box = col.box()
+            header, panel = box.panel("decal_panel")
+            header.label(text="Decal Settings:")
+            if panel:
+                panel.use_property_split = False
+                panel.prop(active_layer, "use_decal_depth_clip", text="Use Clip")
+                decal_clip = active_layer.find_node("decal_depth_clip")
+                if decal_clip:
+                    decal_clip_col = panel.column(align=True)
+                    decal_clip_col.prop(decal_clip.inputs[2], "default_value", text="Depth Clip")
+                empty_col = panel.column(align=True)
+                empty_col.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
+                empty_col.prop(active_layer, "empty_object", text="")
+        elif active_layer.coord_type == 'PROJECTED':
+            col.operator("paint_system.set_projection_view", text="Set Projection View", icon='CAMERA_DATA')
+            col.operator("paint_system.projection_view_reset", text="Reset Projection View", icon='CAMERA_DATA')
         
         mapping_node = active_layer.find_node("mapping")
         if mapping_node:
             box = col.box()
-            box.use_property_split = False
-            col = box.column()
-            col.label(text="Mapping Settings:", icon="EMPTY_ARROWS")
-            col.template_node_inputs(mapping_node)
+            header, panel = box.panel("mapping_panel")
+            header.label(text="Mapping Settings:")
+            if panel:
+                panel.use_property_split = False
+                col = panel.column()
+                col.template_node_inputs(mapping_node)
 
 
 
@@ -780,15 +791,17 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
-        row = layout.row()
+        layout.enabled = not active_layer.lock_layer
+        box = layout.box()
+        col = box.column()
+        row = col.row()
         row.use_property_split = False
         row.prop(active_layer, "correct_image_aspect", text="Correct Aspect")
         if not active_layer.external_image:
-            layout.operator("paint_system.quick_edit", text="Edit Externally (View Capture)")
+            col.operator("paint_system.quick_edit", text="Edit Externally (View Capture)")
         else:
-            layout.operator("paint_system.project_apply",
+            col.operator("paint_system.project_apply",
                         text="Apply")
-        layout.enabled = not active_layer.lock_layer
 
         image_node = active_layer.find_node("image")
         image_node_settings(layout, image_node, active_layer, "image")

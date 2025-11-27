@@ -135,6 +135,7 @@ COORDINATE_TYPE_ENUM = [
     ('POSITION', "Position", "Use a position output of Geometry node"),
     ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
     ('DECAL', "Decal", "Use a decal output of Geometry node"),
+    ('PROJECTED', "Projected", "Define a projected coordinate"),
 ]
 
 ATTRIBUTE_TYPE_ENUM = [
@@ -275,6 +276,8 @@ def find_channels_containing_layer(check_layer: "Layer") -> list["Channel"]:
     return channels
 
 def get_node_from_nodetree(node_tree: NodeTree, identifier: str) -> Node | None:
+    if not node_tree or not node_tree.nodes:
+        return None
     for node in node_tree.nodes:
         if node.label == identifier:
             return node
@@ -1002,12 +1005,42 @@ class Layer(BaseNestedListItem):
         default=-1,
         update=update_node_tree
     )
+    def update_coord_type(self, context: Context):
+        if self.coord_type in ['DECAL', 'PROJECTED']:
+            image_node = self.find_node("image")
+            if image_node:
+                image_node.extension = "CLIP"
+        if self.coord_type == "PROJECTED" and not self.find_node("proj_node"):
+            # Capture the camera position
+            active_space = context.area.spaces.active
+            if active_space.type == 'VIEW_3D':
+                region_3d = active_space.region_3d
+                if region_3d:
+                    match region_3d.view_perspective:
+                        case 'PERSP':
+                            view_mat = region_3d.view_matrix.copy()
+                            view_mat.invert()
+                            loc, rot, sca = view_mat.decompose()
+                            self.projection_position = loc
+                            self.projection_rotation = rot.to_euler()
+                            self.projection_fov = 2*math.atan(0.5*72/active_space.lens)
+                        case 'ORTHO':
+                            # TODO: Implement orthographic projection
+                            pass
+                        case "CAMERA":
+                            active_camera = bpy.context.scene.camera
+                            self.projection_position = active_camera.location
+                            self.projection_rotation = active_camera.rotation_euler
+                            self.projection_fov = active_camera.data.angle
+                        case _:
+                            pass
+        self.update_node_tree(context)
     coord_type: EnumProperty(
         items=COORDINATE_TYPE_ENUM,
         name="Coordinate Type",
         description="Coordinate type",
         default='UV',
-        update=update_node_tree,
+        update=update_coord_type,
     )
     uv_map_name: StringProperty(
         name="UV Map",
@@ -1094,6 +1127,38 @@ class Layer(BaseNestedListItem):
         default=False,
         update=update_brush_settings
     )
+    
+    # Decal properties
+    use_decal_depth_clip: BoolProperty(
+        name="Use Decal Depth Clip",
+        description="Use the decal depth clip",
+        default=True,
+        update=update_node_tree
+    )
+    
+    # Projection properties
+    projection_position: FloatVectorProperty(
+        name="Projection Position",
+        description="Projection position",
+        default=(0, 0, 0),
+        update=update_node_tree,
+        subtype='TRANSLATION'
+    )
+    projection_rotation: FloatVectorProperty(
+        name="Projection Rotation",
+        description="Projection rotation",
+        default=(0, 0, 0),
+        update=update_node_tree,
+        subtype='EULER'
+    )
+    projection_fov: FloatProperty(
+        name="Projection FOV",
+        description="Projection FOV",
+        default=40/180*math.pi,
+        update=update_node_tree,
+        subtype='ANGLE'
+    )
+    
     def update_blend_mode(self, context: Context):
         layer_data = self.get_layer_data()
         layer_data.update_node_tree(context)
