@@ -135,7 +135,7 @@ COORDINATE_TYPE_ENUM = [
     ('POSITION', "Position", "Use a position output of Geometry node"),
     ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
     ('DECAL', "Decal", "Use a decal output of Geometry node"),
-    ('PROJECTED', "Projected", "Define a projected coordinate"),
+    ('PROJECT', "Projection", "Define a projection coordinate"),
 ]
 
 ATTRIBUTE_TYPE_ENUM = [
@@ -1033,11 +1033,11 @@ class Layer(BaseNestedListItem):
                     case _:
                         pass
     def update_coord_type(self, context: Context):
-        if self.coord_type in ['DECAL', 'PROJECTED']:
+        if self.coord_type in ['DECAL', 'PROJECT']:
             image_node = self.find_node("image")
             if image_node:
                 image_node.extension = "CLIP"
-        if self.coord_type == "PROJECTED" and not self.find_node("proj_node"):
+        if self.coord_type == "PROJECT" and not self.find_node("proj_node"):
             # Capture the camera position
             self.set_projection_view(context)
         self.update_node_tree(context)

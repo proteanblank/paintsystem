@@ -1052,7 +1052,7 @@ class PAINTSYSTEM_OT_SetProjectionView(PSContextMixin, Operator):
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
-        return ps_ctx.active_layer is not None and ps_ctx.active_layer.coord_type == 'PROJECTED'
+        return ps_ctx.active_layer is not None and ps_ctx.active_layer.coord_type == 'PROJECT'
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
@@ -1071,7 +1071,7 @@ class PAINTSYSTEM_OT_ProjectionViewReset(PSContextMixin, Operator):
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
         
-        return ps_ctx.active_layer is not None and ps_ctx.active_layer.coord_type == 'PROJECTED'
+        return ps_ctx.active_layer is not None and ps_ctx.active_layer.coord_type == 'PROJECT'
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)

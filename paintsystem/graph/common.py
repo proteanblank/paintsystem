@@ -164,7 +164,7 @@ def create_coord_graph(builder: NodeTreeBuilder, layer: "Layer", coord_type: str
             else:
                 alpha_node_name = "decal_depth_clip"
                 alpha_socket = 0
-    elif coord_type == "PROJECTED":
+    elif coord_type == "PROJECT":
         proj_nt = get_library_nodetree(".PS Projection")
         builder.add_node(
             "proj_node",

@@ -259,7 +259,7 @@ def toggle_paint_mode_ui(layout: bpy.types.UILayout, context: bpy.types.Context)
     row.scale_x = 1.7
     paint_row = row.row(align=True)
     paint_row.operator("paint_system.toggle_paint_mode",
-        text="Toggle Paint Mode", depress=current_mode != 'OBJECT', icon_value=get_icon('paintbrush'))
+        text="Toggle Paint Mode", depress=current_mode == 'PAINT_TEXTURE', icon_value=get_icon('paintbrush'))
     
     group_node = find_node(mat.node_tree, {
                                 'bl_idname': 'ShaderNodeGroup', 'node_tree': active_group.node_tree})

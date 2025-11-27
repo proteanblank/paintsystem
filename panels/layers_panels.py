@@ -716,7 +716,7 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
             if decal_clip:
                 decal_clip_col = col.column(align=True)
                 decal_clip_col.prop(decal_clip.inputs[2], "default_value", text="Depth Clip")
-        elif active_layer.coord_type == 'PROJECTED':
+        elif active_layer.coord_type == 'PROJECT':
             proj_col = col.column(align=True)
             proj_col.scale_y = 2
             proj_col.operator("paint_system.projection_view_reset", text="View Current Projection", icon='CAMERA_DATA')

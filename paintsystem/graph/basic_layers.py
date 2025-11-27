@@ -159,7 +159,7 @@ class PSNodeTreeBuilder:
                 else:
                     self._alpha_source_node = "decal_depth_clip"
                     self._alpha_source_socket = 0
-        elif coord_type == "PROJECTED":
+        elif coord_type == "PROJECT":
             proj_nt = get_library_nodetree(".PS Projection")
             self._builder.add_node(
                 "proj_node",
@@ -198,7 +198,7 @@ class PSNodeTreeBuilder:
             self._builder.link("multiply_vector", "mapping", 0, "Vector")
         else:
             self._builder.link(node_name, "mapping", socket_name, "Vector")
-        if self._layer.coord_type in {"PROJECTED", "DECAL"}:
+        if self._layer.coord_type in {"PROJECT", "DECAL"}:
             self._builder.add_node("center_image", "ShaderNodeVectorMath", {"operation": "ADD"}, default_values={1: (0.5, 0.5, 0)}, force_default_values=True)
             self._builder.link("mapping", "center_image", "Vector", 0)
             output_node_name = "center_image"
