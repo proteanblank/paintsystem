@@ -468,6 +468,8 @@ def ensure_sockets(node_tree: NodeTree, expected_sockets: List[ExpectedSocket], 
                 socket.max_value = 1e39
 
 def get_udim_tiles(uv_layer: bpy.types.MeshUVLoopLayer):
+    if not uv_layer:
+        return {1001}
     udim_tiles = set()
     uv_data = np.empty((len(uv_layer.uv), 2), dtype=np.float32)
     for idx, uv_loop in enumerate(uv_layer.uv):
@@ -482,9 +484,11 @@ def ensure_udim_tiles(image: bpy.types.Image, uv_layer: bpy.types.MeshUVLoopLaye
     # Check position the data in uv_layer, create a list of number for UDIM tiles
     udim_tiles = get_udim_tiles(uv_layer)
     width, height = image.size
-    for tile in udim_tiles:
+    for tile_number in udim_tiles:
+        if any(tile_number == tile.number for tile in image.tiles):
+            continue
         with bpy.context.temp_override(edit_image=image):
-            bpy.ops.image.tile_add(number=tile, color=(0, 0, 0, 0), width=width, height=height)
+            bpy.ops.image.tile_add(number=tile_number, color=(0, 0, 0, 0), width=width, height=height)
     return udim_tiles
 
 def create_ps_image(name: str, width: int = 2048, height: int = 2048, use_udim_tiles: bool = False, uv_layer: bpy.types.MeshUVLoopLayer = None):
@@ -1005,6 +1009,29 @@ class Layer(BaseNestedListItem):
         default=-1,
         update=update_node_tree
     )
+    def set_projection_view(self, context: Context):
+        active_space = context.area.spaces.active
+        if active_space.type == 'VIEW_3D':
+            region_3d = active_space.region_3d
+            if region_3d:
+                match region_3d.view_perspective:
+                    case 'PERSP':
+                        view_mat = region_3d.view_matrix.copy()
+                        view_mat.invert()
+                        loc, rot, sca = view_mat.decompose()
+                        self.projection_position = loc
+                        self.projection_rotation = rot.to_euler()
+                        self.projection_fov = 2*math.atan(0.5*72/active_space.lens)
+                    case 'ORTHO':
+                        # TODO: Implement orthographic projection
+                        pass
+                    case "CAMERA":
+                        active_camera = bpy.context.scene.camera
+                        self.projection_position = active_camera.location
+                        self.projection_rotation = active_camera.rotation_euler
+                        self.projection_fov = active_camera.data.angle
+                    case _:
+                        pass
     def update_coord_type(self, context: Context):
         if self.coord_type in ['DECAL', 'PROJECTED']:
             image_node = self.find_node("image")
@@ -1012,28 +1039,7 @@ class Layer(BaseNestedListItem):
                 image_node.extension = "CLIP"
         if self.coord_type == "PROJECTED" and not self.find_node("proj_node"):
             # Capture the camera position
-            active_space = context.area.spaces.active
-            if active_space.type == 'VIEW_3D':
-                region_3d = active_space.region_3d
-                if region_3d:
-                    match region_3d.view_perspective:
-                        case 'PERSP':
-                            view_mat = region_3d.view_matrix.copy()
-                            view_mat.invert()
-                            loc, rot, sca = view_mat.decompose()
-                            self.projection_position = loc
-                            self.projection_rotation = rot.to_euler()
-                            self.projection_fov = 2*math.atan(0.5*72/active_space.lens)
-                        case 'ORTHO':
-                            # TODO: Implement orthographic projection
-                            pass
-                        case "CAMERA":
-                            active_camera = bpy.context.scene.camera
-                            self.projection_position = active_camera.location
-                            self.projection_rotation = active_camera.rotation_euler
-                            self.projection_fov = active_camera.data.angle
-                        case _:
-                            pass
+            self.set_projection_view(context)
         self.update_node_tree(context)
     coord_type: EnumProperty(
         items=COORDINATE_TYPE_ENUM,
