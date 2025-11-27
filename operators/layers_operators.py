@@ -1057,17 +1057,7 @@ class PAINTSYSTEM_OT_SetProjectionView(PSContextMixin, Operator):
     
     def execute(self, context):
         ps_ctx = self.parse_context(context)
-        active_layer = ps_ctx.active_layer
-        active_space = context.area.spaces.active
-        if active_space.type == 'VIEW_3D':
-            region_3d = active_space.region_3d
-            if region_3d:
-                view_mat = region_3d.view_matrix.copy()
-                view_mat.invert()
-                loc, rot, sca = view_mat.decompose()
-                active_layer.projection_position = loc
-                active_layer.projection_rotation = rot.to_euler()
-                active_layer.projection_fov = 2*math.atan(36/active_space.lens)
+        ps_ctx.active_layer.set_projection_view(context)
         return {'FINISHED'}
 
 

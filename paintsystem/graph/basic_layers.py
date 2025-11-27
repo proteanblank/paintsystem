@@ -122,32 +122,31 @@ class PSNodeTreeBuilder:
             node_name (str): The name of the node to link the coordinate graph to.
             socket_name (str): The socket name to link the coordinate graph to.
         """
-        uv_map_name = self._layer.uv_map_name
         coord_type = self._layer.coord_type
-        self._builder.add_node("mapping", "ShaderNodeMapping")
         if coord_type == "AUTO":
             self._builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": DEFAULT_PS_UV_MAP_NAME}, force_properties=True)
-            self._builder.link("uvmap", "mapping", "UV", "Vector")
-            self._builder.link("mapping", node_name, "Vector", socket_name)
+            output_node_name, output_socket_name = self._create_mapping_setup("uvmap", "UV")
+            self._builder.link(output_node_name, node_name, output_socket_name, socket_name)
         elif coord_type == "UV":
+            uv_map_name = self._layer.uv_map_name
             self._builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": uv_map_name}, force_properties=True)
-            self._builder.link("uvmap", "mapping", "UV", "Vector")
-            self._builder.link("mapping", node_name, "Vector", socket_name)
+            output_node_name, output_socket_name = self._create_mapping_setup("uvmap", "UV")
+            self._builder.link(output_node_name, node_name, output_socket_name, socket_name)
         elif coord_type in ["OBJECT", "CAMERA", "WINDOW", "REFLECTION", "GENERATED"]:
             empty_object = self._layer.empty_object
             self._builder.add_node("tex_coord", "ShaderNodeTexCoord", {"object": empty_object})
-            self._builder.link("tex_coord", "mapping", coord_type.title(), "Vector")
-            self._builder.link("mapping", node_name, "Vector", socket_name)
+            output_node_name, output_socket_name = self._create_mapping_setup("tex_coord", coord_type.title())
+            self._builder.link(output_node_name, node_name, output_socket_name, socket_name)
         elif coord_type == "POSITION":
-            self._builder.add_node("geometry", "ShaderNodeGeometry")
-            self._builder.link("geometry", "mapping", "Position", "Vector")
-            self._builder.link("mapping", node_name, "Vector", socket_name)
+            self._builder.add_node("geometry", "ShaderNodeNewGeometry")
+            output_node_name, output_socket_name = self._create_mapping_setup("geometry", "Position")
+            self._builder.link(output_node_name, node_name, output_socket_name, socket_name)
         elif coord_type == "DECAL":
             empty_object = self._layer.empty_object
             use_decal_depth_clip = self._layer.use_decal_depth_clip
             self._builder.add_node("tex_coord", "ShaderNodeTexCoord", {"object": empty_object}, force_properties=True)
-            self._builder.link("tex_coord", "mapping", "Object", "Vector")
-            self._builder.link("mapping", node_name, "Vector", socket_name)
+            output_node_name, output_socket_name = self._create_mapping_setup("tex_coord", "Object")
+            self._builder.link(output_node_name, node_name, output_socket_name, socket_name)
             if use_decal_depth_clip:
                 self._builder.add_node("decal_depth_separate_xyz", "ShaderNodeSeparateXYZ")
                 self._builder.add_node("decal_depth_clip", "ShaderNodeMath", {"operation": "COMPARE"}, default_values={1: 0, 2: 0.5}, force_default_values=True)
@@ -165,13 +164,13 @@ class PSNodeTreeBuilder:
             self._builder.add_node(
                 "proj_node",
                 "ShaderNodeGroup",
-                {"node_tree": proj_nt},
+                {"node_tree": proj_nt, "hide": True},
                 {"Vector": self._layer.projection_position, "Rotation": self._layer.projection_rotation, "FOV": self._layer.projection_fov},
                 force_properties=True,
                 force_default_values=True
             )
-            self._builder.link("proj_node", "mapping", "Vector", "Vector")
-            self._builder.link("mapping", node_name, "Vector", socket_name)
+            output_node_name, output_socket_name = self._create_mapping_setup("proj_node", "Vector")
+            self._builder.link(output_node_name, node_name, output_socket_name, socket_name)
             if self._alpha_source_node is not None and self._alpha_source_socket is not None:
                 self._builder.add_node("projcetion_alpha_multiply", "ShaderNodeMath", {"operation": "MULTIPLY"}, default_values={0: 1, 1: 1} , force_default_values=True)
                 self._builder.link("proj_node", "projcetion_alpha_multiply", "Mask", 0)
@@ -179,6 +178,32 @@ class PSNodeTreeBuilder:
             else:
                 self._alpha_source_node = "proj_node"
                 self._alpha_source_socket = "Mask"
+    
+    def _create_mapping_setup(self, node_name: str, socket_name: str):
+        self._builder.add_node("mapping", "ShaderNodeMapping")
+        output_node_name = "mapping"
+        output_socket_name = "Vector"
+        if self._layer.correct_image_aspect and self._layer.type == "IMAGE":
+            resolution_x = 0
+            resolution_y = 0
+            img = self._layer.image
+            if img:
+                resolution_x = img.size[0]
+                resolution_y = img.size[1]
+            aspect_correct = get_library_nodetree(".PS Correct Aspect")
+            self._builder.add_node("multiply_vector", "ShaderNodeVectorMath", {"operation": "MULTIPLY"})
+            self._builder.add_node("aspect_correct", "ShaderNodeGroup", {"node_tree": aspect_correct}, default_values={0: resolution_x, 1: resolution_y}, force_default_values=True)
+            self._builder.link("aspect_correct", "multiply_vector", "Vector", 0)
+            self._builder.link(node_name, "multiply_vector", socket_name, 1)
+            self._builder.link("multiply_vector", "mapping", 0, "Vector")
+        else:
+            self._builder.link(node_name, "mapping", socket_name, "Vector")
+        if self._layer.coord_type in {"PROJECTED", "DECAL"}:
+            self._builder.add_node("center_image", "ShaderNodeVectorMath", {"operation": "ADD"}, default_values={1: (0.5, 0.5, 0)}, force_default_values=True)
+            self._builder.link("mapping", "center_image", "Vector", 0)
+            output_node_name = "center_image"
+            output_socket_name = 0
+        return output_node_name, output_socket_name
     
     def add_color_modifier(self, node_name: str, input_socket: str, output_socket: str):
         """
@@ -294,15 +319,15 @@ class PSNodeTreeBuilder:
 
 
 IMAGE_LAYER_VERSION = 4
-FOLDER_LAYER_VERSION = 1
-SOLID_COLOR_LAYER_VERSION = 1
-ATTRIBUTE_LAYER_VERSION = 1
-ADJUSTMENT_LAYER_VERSION = 1
-GRADIENT_LAYER_VERSION = 1
-RANDOM_LAYER_VERSION = 2
-CUSTOM_LAYER_VERSION = 1
+FOLDER_LAYER_VERSION = 2
+SOLID_COLOR_LAYER_VERSION = 2
+ATTRIBUTE_LAYER_VERSION = 2
+ADJUSTMENT_LAYER_VERSION = 2
+GRADIENT_LAYER_VERSION = 2
+RANDOM_LAYER_VERSION = 3
+CUSTOM_LAYER_VERSION = 2
 TEXTURE_LAYER_VERSION = 2
-GEOMETRY_LAYER_VERSION = 1
+GEOMETRY_LAYER_VERSION = 2
 
 ALPHA_OVER_LAYER_VERSION = 1
 
@@ -358,32 +383,10 @@ def get_adjustment_identifier(adjustment_type: str) -> str:
 
 def create_image_graph(layer: "Layer"):
     img = layer.image
-    correct_image_aspect = layer.correct_image_aspect
-    resolution_x = 0
-    resolution_y = 0
-    if img:
-        resolution_x = img.size[0]
-        resolution_y = img.size[1]
-    coord_type = layer.coord_type
-    uv_map_name = layer.uv_map_name
     # Create builder with mixing graph - alpha will be determined later
     builder = PSNodeTreeBuilder(layer, IMAGE_LAYER_VERSION, "image", "Color", "image", "Alpha")
     builder.add_node("image", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest"})
-    image_node_name = "image"
-    image_vector_socket = "Vector"
-    if correct_image_aspect:
-        aspect_correct = get_library_nodetree(".PS Correct Aspect")
-        builder.add_node("multiply_vector", "ShaderNodeVectorMath", {"operation": "MULTIPLY_ADD"}, default_values={2: (0.5, 0.5, 0) if coord_type == "DECAL" else (0, 0, 0)})
-        builder.add_node("aspect_correct", "ShaderNodeGroup", {"node_tree": aspect_correct}, default_values={0: resolution_x, 1: resolution_y}, force_default_values=True)
-        builder.link("aspect_correct", "multiply_vector", "Vector", 1)
-        builder.link("multiply_vector", "image", "Vector", "Vector")
-        image_node_name = "multiply_vector"
-        image_vector_socket = 0
-    # alpha_node_name, alpha_socket = create_coord_graph(builder, layer, coord_type, uv_map_name, image_node_name, image_vector_socket, "image", "Alpha")
-    builder.create_coord_graph(image_node_name, image_vector_socket)
-    # Link the alpha to the pre_mix node (created by create_mixing_graph)
-    # if alpha_node_name is not None and alpha_socket is not None:
-    #     builder.link(alpha_node_name, "pre_mix", alpha_socket, "Over Alpha")
+    builder.create_coord_graph("image", "Vector")
     return builder
 
 def create_folder_graph(layer: "Layer"):

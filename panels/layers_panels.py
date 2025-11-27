@@ -6,6 +6,7 @@ import numpy as np
 from ..utils.version import is_newer_than
 from .common import (
     PSContextMixin,
+    line_separator,
     scale_content,
     icon_parser,
     get_icon,
@@ -362,16 +363,10 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                      icon_value=get_icon('folder'), text="")
                 col.menu("MAT_MT_LayerMenu",
                         text="", icon='COLLAPSEMENU')
-                if is_newer_than(4, 2):
-                    col.separator(type = 'LINE')
-                else:
-                    col.separator()
+                line_separator(col)
                 col.operator("paint_system.delete_item",
                                 text="", icon="TRASH")
-                if is_newer_than(4, 2):
-                    col.separator(type = 'LINE')
-                else:
-                    col.separator()
+                line_separator(col)
                 col.operator("paint_system.move_up", icon="TRIA_UP", text="")
                 col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 
@@ -695,41 +690,49 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
         ps_ctx = self.parse_context(context)
         active_layer = ps_ctx.active_layer
         layout.enabled = not active_layer.lock_layer
-        col = layout.column()
-        row = col.row(align=True)
-        row.prop(active_layer, "coord_type", text="Coord Type")
+        box = layout.box()
+        col = box.column()
         if active_layer.type == 'IMAGE':
             if active_layer.coord_type not in ['UV', 'AUTO']:
                 info_box = col.box()
                 info_box.alert = True
                 info_col = info_box.column(align=True)
                 info_col.label(text="Painting may not work", icon='ERROR')
-            else:
+        row = col.row(align=True)
+        row.prop(active_layer, "coord_type", text="Coord Type")
+        if active_layer.coord_type in ['UV', 'AUTO']:
                 row.operator("paint_system.transfer_image_layer_uv", text="", icon='UV_DATA')
         if active_layer.coord_type == 'UV':
             col.prop_search(active_layer, "uv_map_name", text="UV Map",
                                 search_data=ps_ctx.ps_object.data, search_property="uv_layers", icon='GROUP_UVS')
         elif active_layer.coord_type == 'DECAL':
-            box = col.box()
-            header, panel = box.panel("decal_panel")
-            header.label(text="Decal Settings:")
-            if panel:
-                panel.use_property_split = False
-                panel.prop(active_layer, "use_decal_depth_clip", text="Use Clip")
-                decal_clip = active_layer.find_node("decal_depth_clip")
-                if decal_clip:
-                    decal_clip_col = panel.column(align=True)
-                    decal_clip_col.prop(decal_clip.inputs[2], "default_value", text="Depth Clip")
-                empty_col = panel.column(align=True)
-                empty_col.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
-                empty_col.prop(active_layer, "empty_object", text="")
+            empty_col = col.column(align=True)
+            empty_col.prop(active_layer, "empty_object", text="Empty")
+            split = empty_col.split(factor=0.4)
+            split.label(text="")
+            split.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
+            col.prop(active_layer, "use_decal_depth_clip", text="Use Clip")
+            decal_clip = active_layer.find_node("decal_depth_clip")
+            if decal_clip:
+                decal_clip_col = col.column(align=True)
+                decal_clip_col.prop(decal_clip.inputs[2], "default_value", text="Depth Clip")
         elif active_layer.coord_type == 'PROJECTED':
-            col.operator("paint_system.set_projection_view", text="Set Projection View", icon='CAMERA_DATA')
-            col.operator("paint_system.projection_view_reset", text="Reset Projection View", icon='CAMERA_DATA')
+            proj_col = col.column(align=True)
+            proj_col.scale_y = 2
+            proj_col.operator("paint_system.projection_view_reset", text="View Current Projection", icon='CAMERA_DATA')
+            col.operator("paint_system.set_projection_view", text="Set New Projection View", icon='FILE_REFRESH')
+            proj_node = active_layer.find_node("proj_node")
+            if proj_node:
+                col.prop(proj_node.inputs["Scale"], "default_value", text="Scale")
+                col.use_property_split = False
+                header, panel = col.panel("proj_node_panel", default_closed=True)
+                header.prop(proj_node.inputs["Enable"], "default_value", text="Normal Falloff")
+                if panel:
+                    panel.prop(proj_node.inputs["Falloff"], "default_value", text="Degree")
         
         mapping_node = active_layer.find_node("mapping")
         if mapping_node:
-            box = col.box()
+            box = layout.box()
             header, panel = box.panel("mapping_panel")
             header.label(text="Mapping Settings:")
             if panel:
