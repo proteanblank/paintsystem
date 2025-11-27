@@ -891,7 +891,6 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
             else:
                 new_layer.parent_id = base_parent_id
             if self.linked:
-                print(f"Linked layer: {clipboard_layer.uid} {clipboard_layer.material}")
                 new_layer.linked_layer_uid = clipboard_layer.uid
                 new_layer.linked_material = clipboard_layer.material
             else:
