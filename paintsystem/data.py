@@ -1420,16 +1420,22 @@ def restore_cycles_settings(settings):
     scene.cycles.use_denoising = settings['use_denoising']
     scene.cycles.use_adaptive_sampling = settings['use_adaptive_sampling']
 
-def ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu=True):
+def ps_bake(context, objects: list[Object], mat: Material, uv_layer, bake_image, use_gpu=True, use_clear=True):
+    bake_objects = []
+    
+    for obj in objects:
+        if mat.name in obj.data.materials:
+            bake_objects.append(obj)
+    
+    cycles_settings = save_cycles_settings()
+    # Switch to Cycles if needed
+    
     node_tree = mat.node_tree
     
     image_node = node_tree.nodes.new(type='ShaderNodeTexImage')
     image_node.image = bake_image
     
-    cycles_settings = save_cycles_settings()
-    # Switch to Cycles if needed
-    
-    with context.temp_override(active_object=obj, selected_objects=[obj]):
+    with context.temp_override(active_object=bake_objects[0], selected_objects=bake_objects):
         bake_params = {
             "type": 'EMIT',
         }
@@ -1446,12 +1452,12 @@ def ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu=True):
         image_node.select = True
         node_tree.nodes.active = image_node
         try:
-            bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
+            bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=use_clear)
         except Exception as e:
             # Try baking with CPU if GPU fails
             print(f"GPU baking failed, trying CPU")
             cycles.device = 'CPU'
-            bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=True)
+            bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=use_clear)
 
     # Delete bake nodes
     node_tree.nodes.remove(image_node)
@@ -1712,16 +1718,18 @@ class Channel(BaseNestedListManager):
         if not node_tree:
             raise ValueError("Node tree not found")
         ps_context = parse_context(context)
-        obj = ps_context.ps_object
+        
+        if context.active_object and ps_context.active_object.type != "MESH" and ps_context.ps_object.type == "MESH":
+            # Change the active object to the ps_object
+            ps_context.active_object.select_set(False)
+            ps_context.ps_object.select_set(True)
+        
+        ps_context = parse_context(context)
         if force_alpha:
             orig_use_alpha = bool(self.use_alpha)
             self.use_alpha = True
         
-        # Ensure ps_object is the only object selected
-        bpy.ops.object.mode_set(mode="OBJECT")
-        bpy.ops.object.select_all(action='DESELECT')
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
+        ps_objects = ps_context.ps_objects
         
         material_output = get_material_output(node_tree)
         surface_socket = material_output.inputs['Surface']
@@ -1774,11 +1782,11 @@ class Channel(BaseNestedListManager):
         # Bake image
         connect_sockets(surface_socket, color_output)
         temp_alpha_image = bake_image.copy()
-        bake_image = ps_bake(context, obj, mat, uv_layer, bake_image, use_gpu)
+        bake_image = ps_bake(context, ps_objects, mat, uv_layer, bake_image, use_gpu)
         
         temp_alpha_image.colorspace_settings.name = 'Non-Color'
         connect_sockets(surface_socket, alpha_output)
-        temp_alpha_image = ps_bake(context, obj, mat, uv_layer, temp_alpha_image, use_gpu)
+        temp_alpha_image = ps_bake(context, ps_objects, mat, uv_layer, temp_alpha_image, use_gpu)
 
         if bake_image and temp_alpha_image:
             pixels_bake = np.empty(len(bake_image.pixels), dtype=np.float32)
@@ -2159,6 +2167,18 @@ class ClipboardLayer(PropertyGroup):
         type=Material
     )
 
+
+class TempMaterial(PropertyGroup):
+    material: PointerProperty(
+        name="Material",
+        type=Material
+    )
+    enabled: BoolProperty(
+        name="Enabled",
+        description="Enabled",
+        default=False
+    )
+
 class PaintSystemGlobalData(PropertyGroup):
     """Custom data for the Paint System"""
     
@@ -2244,6 +2264,12 @@ class PaintSystemGlobalData(PropertyGroup):
         description="Hex color of the brush",
         default="#000000",
         update=update_hex_color,
+    )
+    temp_material_collection: CollectionProperty(
+        type=TempMaterial,
+        name="Temp Materials",
+        description="Collection of materials in the temporary collection",
+        options={'SKIP_SAVE'}
     )
     
     def add_layer_to_clipboard(self, layer: "Layer"):
@@ -2378,6 +2404,7 @@ class PSContext:
     ps_scene_data: PaintSystemGlobalData | None = None
     active_object: bpy.types.Object | None = None
     ps_object: bpy.types.Object | None = None
+    ps_objects: list[bpy.types.Object] | None = None
     active_material: bpy.types.Material | None = None
     ps_mat_data: MaterialData | None = None
     active_group: Group | None = None
@@ -2386,19 +2413,8 @@ class PSContext:
     unlinked_layer: Layer | None = None
     active_global_layer: GlobalLayer | None = None
 
-def parse_context(context: bpy.types.Context) -> PSContext:
-    """Parse the context and return a PSContext object."""
-    if not context:
-        raise ValueError("Context cannot be None")
-    if not isinstance(context, bpy.types.Context):
-        raise TypeError("context must be of type bpy.types.Context")
-    
-    ps_settings = get_preferences(context)
-    
-    ps_scene_data = context.scene.ps_scene_data
-    
+def get_ps_object(obj) -> bpy.types.Object:
     ps_object = None
-    obj = hasattr(context, 'active_object') and context.active_object
     if obj:
         match obj.type:
             case 'EMPTY':
@@ -2412,9 +2428,26 @@ def parse_context(context: bpy.types.Context) -> PSContext:
             case _:
                 obj = None
                 ps_object = None
-        if obj and obj.name == "PS Camera Plane":
-            obj = ps_scene_data.last_selected_ps_object
-            ps_object = obj
+    return ps_object
+
+def parse_context(context: bpy.types.Context) -> PSContext:
+    """Parse the context and return a PSContext object."""
+    if not context:
+        raise ValueError("Context cannot be None")
+    if not isinstance(context, bpy.types.Context):
+        raise TypeError("context must be of type bpy.types.Context")
+    
+    ps_settings = get_preferences(context)
+    ps_scene_data = context.scene.ps_scene_data
+    obj = hasattr(context, 'active_object') and context.active_object
+    ps_object = get_ps_object(obj)
+    
+    ps_objects = []
+    if hasattr(context, 'selected_objects'):
+        for obj in context.selected_objects:
+            ps_obj = get_ps_object(obj)
+            if ps_obj and ps_obj not in ps_objects:
+                ps_objects.append(ps_obj)
 
     mat = ps_object.active_material if ps_object else None
     
@@ -2448,6 +2481,7 @@ def parse_context(context: bpy.types.Context) -> PSContext:
         ps_scene_data=ps_scene_data,
         active_object=obj,
         ps_object=ps_object,
+        ps_objects=ps_objects,
         active_material=mat,
         ps_mat_data=mat_data,
         active_group=active_group,
@@ -2723,6 +2757,7 @@ classes = (
     Channel,
     Group,
     ClipboardLayer,
+    TempMaterial,
     PaintSystemGlobalData,
     MaterialData,
     LegacyPaintSystemLayer,

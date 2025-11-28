@@ -1,5 +1,5 @@
 import bpy
-from bpy.types import Operator
+from bpy.types import Context, Operator
 from bpy.utils import register_classes_factory
 from bpy.props import StringProperty, BoolProperty
 
@@ -13,14 +13,33 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
     """Bake the active channel"""
     bl_options = {'REGISTER', 'UNDO'}
     
+    multiple_objects: BoolProperty(
+        name="Multiple Objects",
+        description="Run the operator on multiple objects",
+        default=True,
+    )
+    
+    def find_objects_with_material(self, context: Context) -> list[bpy.types.Object]:
+        ps_ctx = self.parse_context(context)
+        mat = ps_ctx.active_material
+        objects = []
+        for obj in context.scene.objects:
+            if mat.name in obj.data.materials:
+                objects.append(obj)
+        return objects
+    
     def invoke(self, context, event):
         """Invoke the operator to create a new channel."""
         ps_ctx = self.parse_context(context)
+        
         self.get_coord_type(context)
         if self.use_paint_system_uv:
             self.uv_map_name = DEFAULT_PS_UV_MAP_NAME
         self.image_name = f"{ps_ctx.active_group.name}_{ps_ctx.active_channel.name}"
         return context.window_manager.invoke_props_dialog(self)
+    
+    def multi_object_panel(self, context):
+        ps_ctx = self.parse_context(context)
 
 class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
     """Bake the active channel"""
