@@ -103,7 +103,7 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
         ob = context.object
         if ps_ctx.active_group and check_group_multiuser(ps_ctx.active_group.node_tree):
             return False
-        return ps_ctx.ps_mat_data and ps_ctx.active_group is not None and ob.mode == 'OBJECT'
+        return ps_ctx.ps_mat_data and ps_ctx.active_group is not None
     
     def draw_header(self, context):
         layout = self.layout

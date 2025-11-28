@@ -491,9 +491,9 @@ def ensure_udim_tiles(image: bpy.types.Image, uv_layer: bpy.types.MeshUVLoopLaye
             bpy.ops.image.tile_add(number=tile_number, color=(0, 0, 0, 0), width=width, height=height)
     return udim_tiles
 
-def create_ps_image(name: str, width: int = 2048, height: int = 2048, use_udim_tiles: bool = False, uv_layer: bpy.types.MeshUVLoopLayer = None):
+def create_ps_image(name: str, width: int = 2048, height: int = 2048, use_udim_tiles: bool = False, uv_layer: bpy.types.MeshUVLoopLayer = None, use_float: bool = False):
     img = bpy.data.images.new(
-        name=name, width=width, height=height, alpha=True)
+        name=name, width=width, height=height, alpha=True, float_buffer=use_float)
     img.generated_color = (0, 0, 0, 0)
     img.pack()
     if use_udim_tiles:
@@ -1420,7 +1420,7 @@ def restore_cycles_settings(settings):
     scene.cycles.use_denoising = settings['use_denoising']
     scene.cycles.use_adaptive_sampling = settings['use_adaptive_sampling']
 
-def ps_bake(context, objects: list[Object], mat: Material, uv_layer, bake_image, use_gpu=True, use_clear=True):
+def ps_bake(context, objects: list[Object], mat: Material, uv_layer, bake_image, use_gpu=True, use_clear=True, margin=8, margin_type='ADJACENT_FACES'):
     bake_objects = []
     
     for obj in objects:
@@ -1438,6 +1438,8 @@ def ps_bake(context, objects: list[Object], mat: Material, uv_layer, bake_image,
     with context.temp_override(active_object=bake_objects[0], selected_objects=bake_objects):
         bake_params = {
             "type": 'EMIT',
+            "margin": margin,
+            "margin_type": margin_type,
         }
         if context.scene.render.engine != 'CYCLES':
             context.scene.render.engine = 'CYCLES'
@@ -1699,7 +1701,19 @@ class Channel(BaseNestedListManager):
         for layer in layers:
             self.delete_layer(context, layer)
     
-    def bake(self, context: Context, mat: Material, bake_image: Image, uv_layer: str, use_gpu: bool = True, use_group_tree: bool = True, force_alpha: bool = False, as_tangent_normal: bool = False):
+    def bake(
+            self,
+            context: Context,
+            mat: Material,
+            bake_image: Image,
+            uv_layer: str,
+            use_gpu: bool = True,
+            use_group_tree: bool = True,
+            force_alpha: bool = False, # Force to use alpha
+            as_tangent_normal: bool = False, # Bake as tangent normal
+            margin: int = 8, # Margin
+            margin_type: Literal['ADJACENT_FACES', 'EXTEND'] = "ADJACENT_FACES" # Margin type
+            ):
         """Bake the channel
 
         Args:
@@ -1782,11 +1796,11 @@ class Channel(BaseNestedListManager):
         # Bake image
         connect_sockets(surface_socket, color_output)
         temp_alpha_image = bake_image.copy()
-        bake_image = ps_bake(context, ps_objects, mat, uv_layer, bake_image, use_gpu)
+        bake_image = ps_bake(context, ps_objects, mat, uv_layer, bake_image, use_gpu, margin=margin, margin_type=margin_type)
         
         temp_alpha_image.colorspace_settings.name = 'Non-Color'
         connect_sockets(surface_socket, alpha_output)
-        temp_alpha_image = ps_bake(context, ps_objects, mat, uv_layer, temp_alpha_image, use_gpu)
+        temp_alpha_image = ps_bake(context, ps_objects, mat, uv_layer, temp_alpha_image, use_gpu, margin=margin, margin_type=margin_type)
 
         if bake_image and temp_alpha_image:
             pixels_bake = np.empty(len(bake_image.pixels), dtype=np.float32)
@@ -2265,7 +2279,7 @@ class PaintSystemGlobalData(PropertyGroup):
         default="#000000",
         update=update_hex_color,
     )
-    temp_material_collection: CollectionProperty(
+    temp_materials: CollectionProperty(
         type=TempMaterial,
         name="Temp Materials",
         description="Collection of materials in the temporary collection",
@@ -2444,13 +2458,11 @@ def parse_context(context: bpy.types.Context) -> PSContext:
     
     ps_objects = []
     if hasattr(context, 'selected_objects'):
-        for obj in context.selected_objects:
+        for obj in [*context.selected_objects, context.active_object]:
             ps_obj = get_ps_object(obj)
             if ps_obj and ps_obj not in ps_objects:
                 ps_objects.append(ps_obj)
-
     mat = ps_object.active_material if ps_object else None
-    
     mat_data = None
     groups = None
     active_group = None

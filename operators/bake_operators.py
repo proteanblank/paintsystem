@@ -1,7 +1,7 @@
 import bpy
-from bpy.types import Context, Operator
+from bpy.types import Context, Material, Operator, UILayout
 from bpy.utils import register_classes_factory
-from bpy.props import StringProperty, BoolProperty
+from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty
 
 from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin, DEFAULT_PS_UV_MAP_NAME
 
@@ -13,10 +13,52 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
     """Bake the active channel"""
     bl_options = {'REGISTER', 'UNDO'}
     
-    multiple_objects: BoolProperty(
-        name="Multiple Objects",
+    def update_bake_multiple_objects(self, context: Context):
+        ps_ctx = PSContextMixin.parse_context(context)
+        seen_materials = set()
+        check_objects = ps_ctx.ps_objects if self.bake_multiple_objects else [ps_ctx.ps_object]
+        if context.scene and hasattr(context.scene, 'ps_scene_data'):
+            temp_materials = context.scene.ps_scene_data.temp_materials
+            temp_materials.clear()
+            for obj in check_objects:
+                for mat in obj.data.materials:
+                    if hasattr(mat, "ps_mat_data") and len(mat.ps_mat_data.groups) != 0 and mat.name not in seen_materials:
+                        seen_materials.add(mat.name)
+                        temp_material = temp_materials.add()
+                        temp_material.material = mat
+                        temp_material.enabled = mat == ps_ctx.active_material
+    
+    bake_multiple_objects: BoolProperty(
+        name="Bake Multiple Objects",
         description="Run the operator on multiple objects",
         default=True,
+        update=update_bake_multiple_objects
+    )
+    
+    use_gpu: BoolProperty(
+        name="Use GPU",
+        description="Use the GPU to bake the image",
+        default=True,
+        options={'SKIP_SAVE'}
+    )
+    
+    margin: IntProperty(
+        name="Margin",
+        description="Margin to use for baking",
+        default=8,
+        min=0,
+        max=100,
+        options={'SKIP_SAVE'}
+    )
+    margin_type: EnumProperty(
+        name="Margin Type",
+        description="Margin type to use for baking",
+        items=[
+            ('ADJACENT_FACES', "Adjacent Faces", "Adjacent Faces"),
+            ('EXTEND', "Extend", "Extend")
+        ],
+        default='ADJACENT_FACES',
+        options={'SKIP_SAVE'}
     )
     
     def find_objects_with_material(self, context: Context) -> list[bpy.types.Object]:
@@ -31,15 +73,50 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
     def invoke(self, context, event):
         """Invoke the operator to create a new channel."""
         ps_ctx = self.parse_context(context)
-        
+        self.update_bake_multiple_objects(context)
         self.get_coord_type(context)
         if self.use_paint_system_uv:
             self.uv_map_name = DEFAULT_PS_UV_MAP_NAME
         self.image_name = f"{ps_ctx.active_group.name}_{ps_ctx.active_channel.name}"
         return context.window_manager.invoke_props_dialog(self)
     
-    def multi_object_panel(self, context):
+    def advanced_bake_settings_ui(self, layout: UILayout, context: Context):
+        header, panel = layout.panel("advanced_bake_settings_panel", default_closed=True)
+        header.label(text="Advanced Settings", icon='IMAGE_DATA')
+        if panel:
+            panel.prop(self, "use_gpu", text="Use GPU")
+            split = panel.split(factor=0.4, align=True)
+            split.prop(self, "margin", text="Margin")
+            split.prop(self, "margin_type", text="")
+    
+    def multi_object_ui(self, layout: UILayout, context: Context):
         ps_ctx = self.parse_context(context)
+        if [ps_ctx.ps_object] != ps_ctx.ps_objects:
+            layout.prop(self, "bake_multiple_objects", text="Bake Multiple Objects")
+        box = layout.box()
+        temp_materials = ps_ctx.ps_scene_data.temp_materials
+        box.label(text=f"Materials to Bake ({len(self.get_enabled_materials(context))})", icon='MATERIAL')
+        col = box.column(align=True)
+        for temp_material in temp_materials:
+            row = col.row(align=True)
+            row.prop(temp_material, "enabled",
+                     text=f"{temp_material.material.name} (Current Material)" if temp_material.material == ps_ctx.active_material else temp_material.material.name,
+                     toggle=1,
+                     icon="CHECKBOX_HLT" if temp_material.enabled else "CHECKBOX_DEHLT")
+    
+    def get_enabled_materials(self, context: Context) -> list[Material]:
+        ps_ctx = self.parse_context(context)
+        return [temp_material.material for temp_material in ps_ctx.ps_scene_data.temp_materials if temp_material.enabled]
+    
+    def bake_image_ui(self, layout: UILayout, context: Context):
+        ps_ctx = self.parse_context(context)
+        self.image_create_ui(layout, context, show_name=False, show_float=True)
+        box = layout.box()
+        box.label(text="UV Map", icon='UV')
+        box.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
+        if ps_ctx.active_channel.type == "VECTOR":
+            box = layout.box()
+            box.prop(self, "as_tangent_normal")
 
 class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
     """Bake the active channel"""
@@ -69,14 +146,9 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
     
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.parse_context(context)
-        self.image_create_ui(layout, context)
-        box = layout.box()
-        box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
-        if ps_ctx.active_channel.type == "VECTOR":
-            box = layout.box()
-            box.prop(self, "as_tangent_normal")
+        self.multi_object_ui(layout, context)
+        self.bake_image_ui(layout, context)
+        self.advanced_bake_settings_ui(layout, context)
     
     def invoke(self, context, event):
         ps_ctx = self.parse_context(context)
@@ -84,46 +156,72 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         return super().invoke(context, event)
     
     def execute(self, context):
+        bake_materials = self.get_enabled_materials(context)
+        if not bake_materials:
+            self.report({'ERROR'}, "No materials to bake.")
+            return {'CANCELLED'}
         # Set cursor to wait
         context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
         active_channel = ps_ctx.active_channel
-        mat = ps_ctx.active_material
+        # mat = ps_ctx.active_material
         self.image_name = f"{active_channel.name}_Baked"
         self.image_width = int(self.image_resolution)
         self.image_height = int(self.image_resolution)
         
-        bake_image = None
-        if self.as_layer:
-            bake_image = self.create_image(context)
-            bake_image.colorspace_settings.name = 'sRGB'
-            active_channel.bake(context, mat, bake_image, self.uv_map_name, force_alpha=True, as_tangent_normal=self.as_tangent_normal)
-            active_channel.create_layer(
-                context, 
-                layer_name=self.image_name, 
-                layer_type="IMAGE", 
-                insert_at="START",
-                image=bake_image,
-                coord_type='UV',
-                uv_map_name=self.uv_map_name
-            )
-        else:
-            bake_image = active_channel.bake_image
-            if not bake_image:
+        for mat in bake_materials:
+            bake_image = None
+            if self.as_layer:
+                bake_image = self.create_image(context)
+                bake_image.colorspace_settings.name = 'sRGB'
+                active_channel.bake(
+                    context,
+                    mat,
+                    bake_image,
+                    self.uv_map_name,
+                    force_alpha=True,
+                    as_tangent_normal=self.as_tangent_normal,
+                    use_gpu=self.use_gpu,
+                    margin=self.margin,
+                    margin_type=self.margin_type
+                )
+                active_channel.create_layer(
+                    context, 
+                    layer_name=self.image_name, 
+                    layer_type="IMAGE", 
+                    insert_at="START",
+                    image=bake_image,
+                    coord_type='UV',
+                    uv_map_name=self.uv_map_name
+                )
+            else:
+                bake_image = active_channel.bake_image
+                if bake_image:
+                    # Bake image already exists, so we need to delete it
+                    bpy.data.images.remove(bake_image)
                 bake_image = self.create_image(context)
                 bake_image.colorspace_settings.name = 'sRGB'
                 active_channel.bake_image = bake_image
-            elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
-                bake_image.scale(self.image_width, self.image_height)
-            active_channel.bake_uv_map = self.uv_map_name
-                
-            active_channel.use_bake_image = False
-            active_channel.bake(context, mat, bake_image, self.uv_map_name, as_tangent_normal=self.as_tangent_normal)
-            if self.as_tangent_normal:
-                active_channel.bake_vector_space = 'TANGENT'
-            else:
-                active_channel.bake_vector_space = active_channel.vector_space
-            active_channel.use_bake_image = True
+                # elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
+                #     bake_image.scale(self.image_width, self.image_height)
+                active_channel.bake_uv_map = self.uv_map_name
+                    
+                active_channel.use_bake_image = False
+                active_channel.bake(
+                    context,
+                    mat,
+                    bake_image,
+                    self.uv_map_name,
+                    as_tangent_normal=self.as_tangent_normal,
+                    use_gpu=self.use_gpu,
+                    margin=self.margin,
+                    margin_type=self.margin_type
+                )
+                if self.as_tangent_normal:
+                    active_channel.bake_vector_space = 'TANGENT'
+                else:
+                    active_channel.bake_vector_space = active_channel.vector_space
+                active_channel.use_bake_image = True
         # Return to object mode
         bpy.ops.object.mode_set(mode="OBJECT")
         # Set cursor to default
@@ -144,11 +242,8 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
     
     def draw(self, context):
         layout = self.layout
-        ps_ctx = self.parse_context(context)
-        self.image_create_ui(layout, context, show_name=False)
-        box = layout.box()
-        box.label(text="UV Map", icon='UV')
-        box.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
+        self.bake_image_ui(layout, context)
+        self.advanced_bake_settings_ui(layout, context)
     
     def execute(self, context):
         # Set cursor to wait

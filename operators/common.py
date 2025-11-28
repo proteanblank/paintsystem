@@ -216,8 +216,14 @@ class PSImageCreateMixin(PSUVOptionsMixin):
         description="Use UDIM tiles for the image layer",
         default=False
     )
+    use_float: BoolProperty(
+        name="Use Float",
+        description="Use float to bake the image",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
     
-    def image_create_ui(self, layout, context, show_name=True):
+    def image_create_ui(self, layout, context, show_name=True, show_float=False):
         if show_name:
             row = layout.row(align=True)
             scale_content(context, row)
@@ -237,6 +243,8 @@ class PSImageCreateMixin(PSUVOptionsMixin):
             use_udim_tiles = udim_tiles != {1001}
             if udim_tiles and use_udim_tiles:
                 box.prop(self, "use_udim_tiles")
+        if show_float:
+            box.prop(self, "use_float", text="Use Float")
             
     def create_image(self, context):
         if self.image_resolution != 'CUSTOM':
@@ -246,9 +254,9 @@ class PSImageCreateMixin(PSUVOptionsMixin):
             ps_ctx = PSContextMixin.parse_context(context)
             uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
             use_udim_tiles = get_udim_tiles(uv_layer) != {1001} and self.use_udim_tiles
-            img = create_ps_image(self.image_name, self.image_width, self.image_height, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer)
+            img = create_ps_image(self.image_name, self.image_width, self.image_height, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer, use_float=self.use_float)
         else:
-            img = create_ps_image(self.image_name, self.image_width, self.image_height)
+            img = create_ps_image(self.image_name, self.image_width, self.image_height, use_float=self.use_float)
         return img
     
     def get_coord_type(self, context):

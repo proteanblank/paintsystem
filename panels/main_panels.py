@@ -185,7 +185,6 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
         ps_ctx = self.parse_context(context)
         row = layout.row(align=True)
         if ps_ctx.ps_object and ps_ctx.ps_object.material_slots and len(ps_ctx.ps_object.material_slots) > 1:
-            row.operator("w,.call")
             row.popover("MAT_PT_PaintSystemMaterialSettings", text="Material", icon="MATERIAL")
         else:
             row.popover("MAT_PT_Support", icon="FUND", text="Wah!")
