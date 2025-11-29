@@ -82,7 +82,7 @@ def draw_layer_icon(layer: Layer, layout: bpy.types.UILayout):
             layout.prop(layer, "is_expanded", text="", icon_only=True, icon_value=get_icon(
                 'folder_open') if layer.is_expanded else get_icon('folder'), emboss=False)
         case 'SOLID_COLOR':
-            rgb_node = layer.find_node("rgb")
+            rgb_node = layer.source_node
             if rgb_node:
                 layout.prop(
                     rgb_node.outputs[0], "default_value", text="", icon='IMAGE_RGB_ALPHA')
@@ -490,14 +490,14 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 case 'ADJUSTMENT':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
-                    adjustment_node = active_layer.find_node("adjustment")
+                    adjustment_node = active_layer.source_node
                     if adjustment_node:
                         col.label(text="Adjustment Settings:", icon='SHADERFX')
                         col.template_node_inputs(adjustment_node)
                 case 'NODE_GROUP':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
-                    node_group = active_layer.find_node('custom_node_tree')
+                    node_group = active_layer.source_node
                     inputs = [i for i in node_group.inputs if not i.is_linked and i.name not in (
                         'Color', 'Alpha')]
                     if not inputs:
@@ -510,14 +510,14 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 case 'ATTRIBUTE':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
-                    attribute_node = active_layer.find_node("attribute")
+                    attribute_node = active_layer.source_node
                     if attribute_node:
                         col.label(text="Attribute Settings:", icon='MESH_DATA')
                         col.template_node_inputs(attribute_node)
                 case 'GRADIENT':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
-                    gradient_node = active_layer.find_node("gradient")
+                    gradient_node = active_layer.source_node
                     map_range_node = active_layer.find_node("map_range")
                     if gradient_node and map_range_node:
                         col.use_property_split = True
@@ -545,7 +545,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                 case 'SOLID_COLOR':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
-                    rgb_node = active_layer.find_node("rgb")
+                    rgb_node = active_layer.source_node
                     if rgb_node:
                         col.prop(rgb_node.outputs[0], "default_value", text="Color",
                                 icon='IMAGE_RGB_ALPHA')
@@ -582,7 +582,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     box = col.box()
                     col = box.column()
                     col.use_property_split = False
-                    texture_node = active_layer.find_node("texture")
+                    texture_node = active_layer.source_node
                     if texture_node:
                         col.label(text="Texture Settings:", icon='TEXTURE')
                         col.template_node_inputs(texture_node)
@@ -591,7 +591,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     col.enabled = not active_layer.lock_layer
                     geometry_type = active_layer.geometry_type
                     if geometry_type == 'VECTOR_TRANSFORM':
-                        geometry_node = active_layer.find_node("geometry")
+                        geometry_node = active_layer.source_node
                         if geometry_node:
                             col.label(text="Vector Transform:", icon='MESH_DATA')
                             col.template_node_inputs(geometry_node)
@@ -806,7 +806,7 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
             col.operator("paint_system.project_apply",
                         text="Apply")
 
-        image_node = active_layer.find_node("image")
+        image_node = active_layer.source_node
         image_node_settings(layout, image_node, active_layer, "image")
 
 class MAT_MT_LayerMenu(PSContextMixin, Menu):

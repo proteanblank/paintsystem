@@ -278,10 +278,11 @@ def find_channels_containing_layer(check_layer: "Layer") -> list["Channel"]:
 def get_node_from_nodetree(node_tree: NodeTree, identifier: str) -> Node | None:
     if not node_tree or not node_tree.nodes:
         return None
-    for node in node_tree.nodes:
-        if node.label == identifier:
-            return node
-    return None
+    # for node in node_tree.nodes:
+    #     if node.label == identifier:
+    #         return node
+    return find_node(node_tree, {'label': identifier})
+    # return None
 
 def is_valid_ps_nodetree(node_tree: NodeTree) -> bool:
         # check if the node tree has both Color and Alpha inputs and outputs
@@ -797,7 +798,31 @@ class GlobalLayer(PropertyGroup):
         update=update_brush_settings
     )
 
-
+class LayerMask(PropertyGroup):
+    uid: StringProperty()
+    name: StringProperty(
+        name="Name",
+        description="Name of the mask",
+        default="Mask",
+    )
+    type: EnumProperty(
+        items=[
+            ('IMAGE', "Image", "Image mask"),
+            ('GEOMETRY', "Geometry", "Geometry mask"),
+        ],
+        name="Mask Type",
+        description="Mask type",
+        default='IMAGE',
+    )
+    mask_image: PointerProperty(
+        name="Mask Image",
+        type=Image,
+    )
+    mask_uv_map: StringProperty(
+        name="Mask UV Map",
+        description="Mask UV map",
+        default="",
+    )
 
 def add_empty_to_collection(context: bpy.types.Context, empty_object: bpy.types.Object):
     collection = get_paint_system_collection(context)
@@ -855,7 +880,7 @@ class Layer(BaseNestedListItem):
         
         if self.coord_type == "DECAL":
             if not self.empty_object:
-                image_tex_node = self.find_node("image")
+                image_tex_node = self.source_node
                 if image_tex_node and image_tex_node.extension != "CLIP":
                     image_tex_node.extension = "CLIP"
                 self.ensure_empty_object()
@@ -944,6 +969,35 @@ class Layer(BaseNestedListItem):
         return self.find_node("post_mix")
     
     @property
+    def source_node(self) -> Node | None:
+        source_node = self.node_tree.nodes.get("source")
+        if source_node:
+            return source_node
+        # Backup
+        source_node = self.find_node("source")
+        if source_node:
+            return source_node
+        # Legacy source node
+        match self.type:
+            case "IMAGE":
+                return self.find_node("image")
+            case "TEXTURE":
+                return self.find_node("texture")
+            case "ATTRIBUTE":
+                return self.find_node("attribute")
+            case "ADJUSTMENT":
+                return self.find_node("adjustment")
+            case "GRADIENT":
+                return self.find_node("gradient")
+            case "NODE_GROUP":
+                return self.find_node("custom_node_tree")
+            case "SOLID_COLOR":
+                return self.find_node("rgb")
+            case _:
+                return None
+        return None
+    
+    @property
     def pre_mix_node(self) -> Node | None:
         self = self.get_layer_data()
         return self.find_node("pre_mix")
@@ -970,6 +1024,8 @@ class Layer(BaseNestedListItem):
         default=True,
         update=update_node_tree
     )
+    
+    # Layer actions
     actions: CollectionProperty(
         type=MarkerAction,
         name="Actions",
@@ -1065,7 +1121,7 @@ class Layer(BaseNestedListItem):
                         pass
     def update_coord_type(self, context: Context):
         if self.coord_type in ['DECAL', 'PROJECT']:
-            image_node = self.find_node("image")
+            image_node = self.source_node
             if image_node:
                 image_node.extension = "CLIP"
         if self.coord_type == "PROJECT" and not self.find_node("proj_node"):

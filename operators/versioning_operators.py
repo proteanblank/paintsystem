@@ -111,13 +111,13 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                 if legacy_layer.type == "SOLID_COLOR":
                     rgb_node = find_node_by_name(legacy_layer.node_tree, 'RGB')
                     if rgb_node:
-                        new_layer.find_node('rgb').outputs[0].default_value = rgb_node.outputs[0].default_value
+                        new_layer.source_node.outputs[0].default_value = rgb_node.outputs[0].default_value
                 if legacy_layer.type == "ADJUSTMENT":
                     state = capture_node_state(legacy_ps_ctx.find_node(legacy_layer.node_tree, {'label': 'Adjustment'}))
-                    apply_node_state(new_layer.find_node('adjustment'), state)
+                    apply_node_state(new_layer.source_node, state)
                 if legacy_layer.type == "GRADIENT":
                     state = capture_node_state(legacy_ps_ctx.find_node(legacy_layer.node_tree, {'label': 'Gradient Color Ramp'}))
-                    apply_node_state(new_layer.find_node('gradient'), state)
+                    apply_node_state(new_layer.source_node, state)
                 
                 # Copy opacity node value
                 opacity_node = find_node_by_name(legacy_layer.node_tree, 'Opacity')

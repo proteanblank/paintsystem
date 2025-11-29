@@ -386,9 +386,9 @@ def get_adjustment_identifier(adjustment_type: str) -> str:
 def create_image_graph(layer: "Layer"):
     img = layer.image
     # Create builder with mixing graph - alpha will be determined later
-    builder = PSNodeTreeBuilder(layer, IMAGE_LAYER_VERSION, "image", "Color", "image", "Alpha")
-    builder.add_node("image", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest"})
-    builder.create_coord_graph("image", "Vector")
+    builder = PSNodeTreeBuilder(layer, IMAGE_LAYER_VERSION, "source", "Color", "source", "Alpha")
+    builder.add_node("source", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest", "name": "source"})
+    builder.create_coord_graph("source", "Vector")
     return builder
 
 def create_folder_graph(layer: "Layer"):
@@ -396,13 +396,13 @@ def create_folder_graph(layer: "Layer"):
     return builder
 
 def create_solid_graph(layer: "Layer"):
-    builder = PSNodeTreeBuilder(layer, SOLID_COLOR_LAYER_VERSION, "rgb", "Color")
-    builder.add_node("rgb", "ShaderNodeRGB", default_outputs={0: (1, 1, 1, 1)})
+    builder = PSNodeTreeBuilder(layer, SOLID_COLOR_LAYER_VERSION, "source", "Color")
+    builder.add_node("source", "ShaderNodeRGB", {"name": "source"}, default_outputs={0: (1, 1, 1, 1)})
     return builder
 
 def create_attribute_graph(layer: "Layer"):
-    builder = PSNodeTreeBuilder(layer, ATTRIBUTE_LAYER_VERSION, "attribute", "Color")
-    builder.add_node("attribute", "ShaderNodeAttribute")
+    builder = PSNodeTreeBuilder(layer, ATTRIBUTE_LAYER_VERSION, "source", "Color")
+    builder.add_node("source", "ShaderNodeAttribute", {"name": "source"})
     return builder
 
 def create_adjustment_graph(layer: "Layer"):
@@ -415,8 +415,8 @@ def create_adjustment_graph(layer: "Layer"):
         case "ShaderNodeMapRange":
             input_socket_name = "Value"
             output_socket_name = "Result"
-    builder = PSNodeTreeBuilder(layer, ADJUSTMENT_LAYER_VERSION, "adjustment", output_socket_name)
-    builder.add_node("adjustment", adjustment_type)
+    builder = PSNodeTreeBuilder(layer, ADJUSTMENT_LAYER_VERSION, "source", output_socket_name)
+    builder.add_node("source", adjustment_type, {"name": "source"})
     match adjustment_type:
         case "ShaderNodeRGBToBW":
             pass  # Already handled above
@@ -426,15 +426,15 @@ def create_adjustment_graph(layer: "Layer"):
             if adjustment_type in {"ShaderNodeHueSaturation", "ShaderNodeInvert", "ShaderNodeRGBCurve"}:
                 # Remove factor input if it exists
                 builder.add_node("value", "ShaderNodeValue", default_outputs={0:1})
-                builder.link("value", "adjustment", "Value", "Fac")
-    builder.link("group_input", "adjustment", "Color", input_socket_name)
+                builder.link("value", "source", "Value", "Fac")
+    builder.link("group_input", "source", "Color", input_socket_name)
     return builder
 
 def create_gradient_graph(layer: "Layer"):
     gradient_type = layer.gradient_type
     empty_object = layer.empty_object
-    builder = PSNodeTreeBuilder(layer, GRADIENT_LAYER_VERSION, "gradient", "Color", "gradient", "Alpha")
-    builder.add_node("gradient", "ShaderNodeValToRGB")
+    builder = PSNodeTreeBuilder(layer, GRADIENT_LAYER_VERSION, "source", "Color", "source", "Alpha")
+    builder.add_node("source", "ShaderNodeValToRGB", {"name": "source"})
     match gradient_type:
         case "LINEAR":
             builder.add_node("map_range", "ShaderNodeMapRange")
@@ -457,7 +457,7 @@ def create_gradient_graph(layer: "Layer"):
             builder.link("group_input", "map_range", "Color", "Value")
         case _:
             raise ValueError(f"Invalid gradient type: {gradient_type}")
-    builder.link("map_range", "gradient", "Result", "Fac")
+    builder.link("map_range", "source", "Result", "Fac")
     return builder
 
 def create_random_graph(layer: "Layer"):
