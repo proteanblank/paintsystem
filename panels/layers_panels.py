@@ -226,19 +226,19 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         layout = self.layout
         layout.label(icon_value=get_icon('layers'))
 
-    # def draw_header_preset(self, context):
-    #     layout = self.layout
-    #     ps_ctx = self.parse_context(context)
-    #     if context.mode == 'PAINT_TEXTURE' and ps_ctx.active_channel:
-    #         layout.popover(
-    #             panel="MAT_PT_ChannelsSelect",
-    #             text=ps_ctx.active_channel.name if ps_ctx.active_channel else "No Channel",
-    #             icon_value=get_icon_from_channel(ps_ctx.active_channel)
-    #         )
-    #     else:
-    #         if ps_ctx.ps_object.type == 'MESH' and ps_ctx.active_channel.bake_image:
-    #             layout.prop(ps_ctx.active_channel, "use_bake_image",
-    #                     text="Use Baked", icon="TEXTURE_DATA")
+    def draw_header_preset(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        # if context.mode == 'PAINT_TEXTURE' and ps_ctx.active_channel:
+        #     layout.popover(
+        #         panel="MAT_PT_ChannelsSelect",
+        #         text=ps_ctx.active_channel.name if ps_ctx.active_channel else "No Channel",
+        #         icon_value=get_icon_from_channel(ps_ctx.active_channel)
+        #     )
+        # else:
+        if ps_ctx.ps_object.type == 'MESH' and ps_ctx.active_channel.bake_image:
+            layout.prop(ps_ctx.active_channel, "use_bake_image",
+                    text="Use Baked", icon="TEXTURE_DATA")
 
     def draw(self, context):
         ps_ctx = self.parse_context(context)
