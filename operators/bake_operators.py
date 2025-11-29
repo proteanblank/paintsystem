@@ -5,7 +5,7 @@ from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty
 
 from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin, DEFAULT_PS_UV_MAP_NAME
 
-from ..paintsystem.data import set_layer_blend_type, get_layer_blend_type
+from ..paintsystem.data import parse_material, set_layer_blend_type, get_layer_blend_type
 from ..panels.common import get_icon_from_channel
 
 
@@ -61,13 +61,12 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
         options={'SKIP_SAVE'}
     )
     
-    def find_objects_with_material(self, context: Context) -> list[bpy.types.Object]:
-        ps_ctx = self.parse_context(context)
-        mat = ps_ctx.active_material
+    def find_objects_with_materials(self, context: Context, materials: list[Material]) -> list[bpy.types.Object]:
         objects = []
-        for obj in context.scene.objects:
-            if mat.name in obj.data.materials:
-                objects.append(obj)
+        for mat in materials:
+            for obj in context.scene.objects:
+                if obj.type == 'MESH' and mat.name in obj.data.materials:
+                    objects.append(obj)
         return objects
     
     def invoke(self, context, event):
@@ -89,13 +88,37 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
             split.prop(self, "margin", text="Margin")
             split.prop(self, "margin_type", text="")
     
+    def other_objects_ui(self, layout: UILayout, context: Context):
+        ps_ctx = self.parse_context(context)
+        enabled_materials = self.get_enabled_materials(context)
+        objects_with_mat = self.find_objects_with_materials(context, enabled_materials)
+        objects_not_selected = set(objects_with_mat) - set(ps_ctx.ps_objects)
+        if enabled_materials and objects_not_selected:
+            box = layout.box()
+            box.alert = True
+            col = box.column(align=True)
+            col.label(text=f"Detected other objects with the material{'s' if len(enabled_materials) > 1 else ''}.", icon='ERROR')
+            col.label(text="They will not be baked", icon='BLANK1')
+            box.alert = False
+            box.operator(PAINTSYSTEM_OT_SelectAllBakedObjects.bl_idname, text="Select All Objects", icon='SELECT_EXTEND')
+            header, panel = box.panel("other_objects_panel", default_closed=True)
+            header.label(text="See Detected Objects")
+            if panel:
+                grid = panel.grid_flow(columns=3, align=True, row_major=True, even_columns=True)
+                grid.alert = False
+                for obj in objects_not_selected:
+                    grid.label(text=obj.name, icon='OBJECT_DATA')
+        
     def multi_object_ui(self, layout: UILayout, context: Context):
         ps_ctx = self.parse_context(context)
-        if [ps_ctx.ps_object] != ps_ctx.ps_objects:
-            layout.prop(self, "bake_multiple_objects", text="Bake Multiple Objects")
+        # Always bake multiple objects
+        # if [ps_ctx.ps_object] != ps_ctx.ps_objects:
+        #     layout.prop(self, "bake_multiple_objects", text="Bake Multiple Objects")
+        enabled_materials = self.get_enabled_materials(context)
+        
         box = layout.box()
         temp_materials = ps_ctx.ps_scene_data.temp_materials
-        box.label(text=f"Materials to Bake ({len(self.get_enabled_materials(context))})", icon='MATERIAL')
+        box.label(text=f"Materials to Bake ({len(enabled_materials)})", icon='MATERIAL')
         col = box.column(align=True)
         for temp_material in temp_materials:
             row = col.row(align=True)
@@ -103,6 +126,8 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
                      text=f"{temp_material.material.name} (Current Material)" if temp_material.material == ps_ctx.active_material else temp_material.material.name,
                      toggle=1,
                      icon="CHECKBOX_HLT" if temp_material.enabled else "CHECKBOX_DEHLT")
+        
+        self.other_objects_ui(box, context)
     
     def get_enabled_materials(self, context: Context) -> list[Material]:
         ps_ctx = self.parse_context(context)
@@ -117,6 +142,22 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
         if ps_ctx.active_channel.type == "VECTOR":
             box = layout.box()
             box.prop(self, "as_tangent_normal")
+
+
+class PAINTSYSTEM_OT_SelectAllBakedObjects(BakeOperator):
+    bl_idname = "paint_system.select_all_baked_objects"
+    bl_label = "Select All Baked Objects"
+    bl_description = "Select all objects with baked images"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def invoke(self, context, event):
+        return self.execute(context)
+    
+    def execute(self, context):
+        objects_with_mat = self.find_objects_with_materials(context, self.get_enabled_materials(context))
+        for obj in objects_with_mat:
+            obj.select_set(True)
+        return {'FINISHED'}
 
 class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
     """Bake the active channel"""
@@ -162,14 +203,13 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
             return {'CANCELLED'}
         # Set cursor to wait
         context.window.cursor_set('WAIT')
-        ps_ctx = self.parse_context(context)
-        active_channel = ps_ctx.active_channel
-        # mat = ps_ctx.active_material
-        self.image_name = f"{active_channel.name}_Baked"
-        self.image_width = int(self.image_resolution)
-        self.image_height = int(self.image_resolution)
         
         for mat in bake_materials:
+            # Get the active channel for the material
+            _, _, active_channel, _ = parse_material(mat)
+            self.image_name = f"{mat.name}_Baked"
+            self.image_width = int(self.image_resolution)
+            self.image_height = int(self.image_resolution)
             bake_image = None
             if self.as_layer:
                 bake_image = self.create_image(context)
@@ -242,34 +282,39 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
     
     def draw(self, context):
         layout = self.layout
+        self.multi_object_ui(layout, context)
         self.bake_image_ui(layout, context)
         self.advanced_bake_settings_ui(layout, context)
     
     def execute(self, context):
         # Set cursor to wait
+        bake_materials = self.get_enabled_materials(context)
+        if not bake_materials:
+            self.report({'ERROR'}, "No materials to bake.")
+            return {'CANCELLED'}
+        # Set cursor to wait
         context.window.cursor_set('WAIT')
-        ps_ctx = self.parse_context(context)
-        active_group = ps_ctx.active_group
         
         self.image_width = int(self.image_resolution)
         self.image_height = int(self.image_resolution)
         
-        for channel in active_group.channels:
-            mat = ps_ctx.active_material
-            bake_image = channel.bake_image
-            
-            if not bake_image:
-                self.image_name = f"{ps_ctx.active_group.name}_{channel.name}"
-                bake_image = self.create_image(context)
-                bake_image.colorspace_settings.name = 'sRGB'
-                channel.bake_image = bake_image
-            elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
-                bake_image.scale(self.image_width, self.image_height)
+        for mat in bake_materials:
+            _, active_group, _, _ = parse_material(mat)
+            for channel in active_group.channels:
+                bake_image = channel.bake_image
                 
-            channel.use_bake_image = False
-            channel.bake_uv_map = self.uv_map_name
-            channel.bake(context, mat, bake_image, self.uv_map_name)
-            channel.use_bake_image = True
+                if not bake_image:
+                    self.image_name = f"{active_group.name}_{channel.name}_Baked"
+                    bake_image = self.create_image(context)
+                    bake_image.colorspace_settings.name = 'sRGB'
+                    channel.bake_image = bake_image
+                elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
+                    bake_image.scale(self.image_width, self.image_height)
+                    
+                channel.use_bake_image = False
+                channel.bake_uv_map = self.uv_map_name
+                channel.bake(context, mat, bake_image, self.uv_map_name)
+                channel.use_bake_image = True
         # Return to object mode
         bpy.ops.object.mode_set(mode="OBJECT")
         # Set cursor to default
@@ -464,7 +509,7 @@ class PAINTSYSTEM_OT_DeleteBakedImage(PSContextMixin, Operator):
             text="Click OK to delete the baked image.")
 
 
-class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Operator):
+class PAINTSYSTEM_OT_TransferImageLayerUV(BakeOperator):
     bl_idname = "paint_system.transfer_image_layer_uv"
     bl_label = "Transfer Image Layer UV"
     bl_description = "Transfer the UV of the image layer"
@@ -475,15 +520,18 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
         ps_ctx = cls.parse_context(context)
         return ps_ctx.active_channel and ps_ctx.active_layer.type == 'IMAGE' and ps_ctx.active_layer.image
     
-    def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self)
+    # def invoke(self, context, event):
+    #     return context.window_manager.invoke_props_dialog(self)
     
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
+        layout.label(text=f"Baking material: {ps_ctx.active_material.name}", icon='MATERIAL')
+        self.other_objects_ui(layout, context)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
         box.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
+        self.advanced_bake_settings_ui(layout, context)
 
     def execute(self, context):
         # Set cursor to wait
@@ -494,7 +542,8 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
         if not active_channel:
             return {'CANCELLED'}
         
-        transferred_image = bpy.data.images.new(name=f"{active_layer.image.name}_Transferred", width=active_layer.image.size[0], height=active_layer.image.size[1], alpha=True)
+        transferred_image = active_layer.image.copy()
+        transferred_image.name = f"{active_layer.image.name}_Transferred"
         
         to_be_enabled_layers = []
         # Ensure all layers are disabled except the active layer
@@ -523,7 +572,7 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(PSContextMixin, PSUVOptionsMixin, Oper
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSImageCreateMixin, Operator):
+class PAINTSYSTEM_OT_ConvertToImageLayer(BakeOperator):
     bl_idname = "paint_system.convert_to_image_layer"
     bl_label = "Transfer Image Layer UV"
     bl_description = "Transfer the UV of the image layer"
@@ -538,15 +587,18 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(PSContextMixin, PSImageCreateMixin, Ope
         self.get_coord_type(context)
         if self.use_paint_system_uv:
             self.uv_map_name = DEFAULT_PS_UV_MAP_NAME
-        return context.window_manager.invoke_props_dialog(self)
+        return super().invoke(context, event)
     
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
-        self.image_create_ui(layout, context, show_name=False)
+        layout.label(text=f"Baking material: {ps_ctx.active_material.name}", icon='MATERIAL')
+        self.other_objects_ui(layout, context)
+        self.image_create_ui(layout, context, show_name=False, show_float=True)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
         box.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
+        self.advanced_bake_settings_ui(layout, context)
 
     def execute(self, context):
         # Set cursor to wait
@@ -824,6 +876,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSImageCreateMixin, Operator):
         return {'FINISHED'}
 
 classes = (
+    PAINTSYSTEM_OT_SelectAllBakedObjects,
     PAINTSYSTEM_OT_BakeChannel,
     PAINTSYSTEM_OT_BakeAllChannels,
     PAINTSYSTEM_OT_TransferImageLayerUV,

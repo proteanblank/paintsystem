@@ -2444,25 +2444,7 @@ def get_ps_object(obj) -> bpy.types.Object:
                 ps_object = None
     return ps_object
 
-def parse_context(context: bpy.types.Context) -> PSContext:
-    """Parse the context and return a PSContext object."""
-    if not context:
-        raise ValueError("Context cannot be None")
-    if not isinstance(context, bpy.types.Context):
-        raise TypeError("context must be of type bpy.types.Context")
-    
-    ps_settings = get_preferences(context)
-    ps_scene_data = context.scene.ps_scene_data
-    obj = hasattr(context, 'active_object') and context.active_object
-    ps_object = get_ps_object(obj)
-    
-    ps_objects = []
-    if hasattr(context, 'selected_objects'):
-        for obj in [*context.selected_objects, context.active_object]:
-            ps_obj = get_ps_object(obj)
-            if ps_obj and ps_obj not in ps_objects:
-                ps_objects.append(ps_obj)
-    mat = ps_object.active_material if ps_object else None
+def parse_material(mat: Material) -> tuple[MaterialData, Group, Channel, Layer]:
     mat_data = None
     groups = None
     active_group = None
@@ -2487,6 +2469,29 @@ def parse_context(context: bpy.types.Context) -> PSContext:
             unlinked_layer = layers[min(active_channel.active_index, len(layers) - 1)]
             if unlinked_layer:
                 unlinked_layer = unlinked_layer
+    
+    return mat_data, active_group, active_channel, unlinked_layer
+
+def parse_context(context: bpy.types.Context) -> PSContext:
+    """Parse the context and return a PSContext object."""
+    if not context:
+        raise ValueError("Context cannot be None")
+    if not isinstance(context, bpy.types.Context):
+        raise TypeError("context must be of type bpy.types.Context")
+    
+    ps_settings = get_preferences(context)
+    ps_scene_data = context.scene.ps_scene_data
+    obj = hasattr(context, 'active_object') and context.active_object
+    ps_object = get_ps_object(obj)
+    
+    ps_objects = []
+    if hasattr(context, 'selected_objects'):
+        for obj in [*context.selected_objects, context.active_object]:
+            ps_obj = get_ps_object(obj)
+            if ps_obj and ps_obj not in ps_objects:
+                ps_objects.append(ps_obj)
+    mat = ps_object.active_material if ps_object else None
+    mat_data, active_group, active_channel, unlinked_layer = parse_material(mat)
     
     return PSContext(
         ps_settings=ps_settings,
