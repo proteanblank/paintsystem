@@ -504,15 +504,9 @@ def create_custom_graph(layer: "Layer"):
 
 def create_texture_graph(layer: "Layer"):
     texture_type = get_texture_identifier(layer.texture_type)
-    coord_type = layer.coord_type
-    uv_map_name = layer.uv_map_name
-    # Create builder with mixing graph - alpha will be determined later
     builder = PSNodeTreeBuilder(layer, TEXTURE_LAYER_VERSION, "texture", "Color", None, None)
     builder.add_node("texture", texture_type)
-    alpha_node_name, alpha_socket = create_coord_graph(builder, layer, coord_type, uv_map_name, 'texture', 'Vector')
-    # Link the alpha to the pre_mix node (created by create_mixing_graph)
-    if alpha_node_name is not None and alpha_socket is not None:
-        builder.link(alpha_node_name, "pre_mix", alpha_socket, "Over Alpha")
+    builder.create_coord_graph('texture', 'Vector')
     return builder
 
 def create_geometry_graph(layer: "Layer"):
