@@ -35,3 +35,12 @@ def get_icon(custom_icon_name):
     if custom_icon_name not in custom_icons:
         return None
     return custom_icons[custom_icon_name].icon_id
+
+    
+def get_icon_from_socket_type(socket_type: str) -> int:
+    type_to_icon = {
+        'COLOR': 'color_socket',
+        'VECTOR': 'vector_socket',
+        'FLOAT': 'float_socket',
+    }
+    return get_icon(type_to_icon.get(socket_type, 'color_socket'))

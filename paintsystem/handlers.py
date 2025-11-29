@@ -101,6 +101,41 @@ def load_paint_system_data():
                         if blend_mode != layer.blend_mode and layer.blend_mode != "PASSTHROUGH":
                             print(f"Layer {layer.name} has blend mode {blend_mode} but {layer.blend_mode} is set")
                             layer.blend_mode = blend_mode
+                        # Update every source node to have label 'source'
+                        source_node = layer.source_node
+                        if source_node and source_node.name != "source":
+                            source_node.name = "source"
+                            source_node.label = "source"
+                        # If type == NODE_GROUP, update the color and alpha input and output sockets
+                        if layer.type == "NODE_GROUP":
+                            # Get the color and alpha input and output sockets names from the custom node tree
+                            custom_node_tree: bpy.types.NodeTree = layer.custom_node_tree
+                            items = custom_node_tree.interface.items_tree
+                            inputs = [item for item in items if item.item_type == 'SOCKET' and item.in_out == 'INPUT']
+                            outputs = [item for item in items if item.item_type == 'SOCKET' and item.in_out == 'OUTPUT']
+                            layer.auto_update_node_tree = False
+                            if layer.custom_color_input != -1:
+                                layer.color_input_name = inputs[layer.custom_color_input].name
+                                layer.custom_color_input = -1
+                            if layer.custom_alpha_input != -1:
+                                layer.alpha_input_name = inputs[layer.custom_alpha_input].name
+                                layer.custom_alpha_input = -1
+                            if layer.custom_color_output != -1:
+                                layer.color_output_name = outputs[layer.custom_color_output].name
+                                layer.custom_color_output = -1
+                            if layer.custom_alpha_output != -1:
+                                layer.alpha_output_name = outputs[layer.custom_alpha_output].name
+                                layer.custom_alpha_output = -1
+                            layer.auto_update_node_tree = True
+                            layer.update_node_tree(bpy.context)
+                        # Updating layer to the target version
+                        target_version = get_layer_version_for_type(layer.type)
+                        if get_nodetree_version(layer.node_tree) != target_version:
+                            print(f"Updating layer {layer.name} to version {target_version}")
+                            try:
+                                layer.update_node_tree(bpy.context)
+                            except Exception as e:
+                                print(f"Error updating layer {layer.name}: {e}")
                     if has_migrated_global_layer:
                         channel.update_node_tree(bpy.context)
     # ps_scene_data Versioning

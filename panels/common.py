@@ -4,7 +4,7 @@ from ..utils.version import is_newer_than
 
 # --
 from ..paintsystem.data import PSContextMixin, Channel
-from ..custom_icons import get_icon
+from ..custom_icons import get_icon, get_icon_from_socket_type
 from ..preferences import get_preferences
 from ..utils.nodes import find_node, get_material_output, traverse_connected_nodes
 

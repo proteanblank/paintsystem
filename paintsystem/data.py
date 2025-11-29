@@ -980,29 +980,60 @@ class Layer(BaseNestedListItem):
         description="Active action index",
         default=0
     )
+    
+    # For NODE_GROUP type
     custom_node_tree: PointerProperty(
         name="Custom Node Tree",
         type=NodeTree,
         update=update_node_tree
     )
+    color_input_name: StringProperty(
+        name="Color Input Socket Name",
+        description="Color input socket",
+        default="_NONE_",
+        update=update_node_tree
+    )
+    alpha_input_name: StringProperty(
+        name="Alpha Input Socket Name",
+        description="Alpha input socket",
+        default="_NONE_",
+        update=update_node_tree
+    )
+    color_output_name: StringProperty(
+        name="Color Output Socket Name",
+        description="Color output socket",
+        default="_NONE_",
+        update=update_node_tree
+    )
+    alpha_output_name: StringProperty(
+        name="Alpha Output Socket Name",
+        description="Alpha output socket",
+        default="_NONE_",
+        update=update_node_tree
+    )
+    
+    # Deprecated. Use color_input_socket
     custom_color_input: IntProperty(
         name="Custom Color Input",
         description="Custom color input",
         default=-1,
         update=update_node_tree
     )
+    # Deprecated. Use alpha_input_socket instead
     custom_alpha_input: IntProperty(
         name="Custom Alpha Input",
         description="Custom alpha input",
         default=-1,
         update=update_node_tree
     )
+    # Deprecated. Use color_output_socket instead
     custom_color_output: IntProperty(
         name="Custom Color Output",
         description="Custom color output",
         default=-1,
         update=update_node_tree
     )
+    # Deprecated. Use alpha_output_socket instead
     custom_alpha_output: IntProperty(
         name="Custom Alpha Output",
         description="Custom alpha output",

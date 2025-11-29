@@ -1,18 +1,32 @@
 import bpy
-from bpy.types import Node, NodeTree, NodeSocket
+from bpy.types import Node, NodeTree, NodeSocket, Context
+from ..custom_icons import get_icon_from_socket_type
 
 def traverse_connected_nodes(node: Node, input: bool = True, output: bool = False) -> set[Node]:
+    visited = set()
     nodes = set()
-    if input:
-        for input_socket in node.inputs:
-            for link in input_socket.links:
-                nodes.add(link.from_node)
-                nodes.update(traverse_connected_nodes(link.from_node))
-    if output:
-        for output_socket in node.outputs:
-            for link in output_socket.links:
-                nodes.add(link.to_node)
-                nodes.update(traverse_connected_nodes(link.to_node))
+    stack = [node]
+    
+    while stack:
+        curr_node = stack.pop()
+        if curr_node in visited:
+            continue
+        visited.add(curr_node)
+        
+        if curr_node != node:
+            nodes.add(curr_node)
+            
+        if input:
+            for input_socket in curr_node.inputs:
+                for link in input_socket.links:
+                    if link.from_node not in visited:
+                        stack.append(link.from_node)
+        if output:
+            for output_socket in curr_node.outputs:
+                for link in output_socket.links:
+                    if link.to_node not in visited:
+                        stack.append(link.to_node)
+    
     return nodes
 
 def get_material_output(mat_node_tree: NodeTree) -> Node:
@@ -45,5 +59,42 @@ def find_nodes(node_tree: NodeTree, properties: dict) -> list[Node]:
     return [node for node in nodes if all(hasattr(node, prop) and getattr(node, prop) == value for prop, value in properties.items())]
 
 def find_node(node_tree: NodeTree, properties: dict) -> Node | None:
-    nodes = find_nodes(node_tree, properties)
-    return nodes[0] if nodes else None
+    start_node = get_material_output(node_tree)
+    if not start_node:
+        return None
+
+    visited = set()
+    stack = [start_node]
+    
+    while stack:
+        curr_node = stack.pop()
+        if curr_node in visited:
+            continue
+        visited.add(curr_node)
+        
+        # Check properties immediately when we encounter a node (skip the start node)
+        if curr_node != start_node:
+            if all(hasattr(curr_node, prop) and getattr(curr_node, prop) == value for prop, value in properties.items()):
+                return curr_node
+        
+        # Only continue traversing if we haven't found a match yet
+        for input_socket in curr_node.inputs:
+            for link in input_socket.links:
+                if link.from_node not in visited:
+                    stack.append(link.from_node)
+        
+        for output_socket in curr_node.outputs:
+            for link in output_socket.links:
+                if link.to_node not in visited:
+                    stack.append(link.to_node)
+
+    return None
+
+def get_nodetree_socket_enum(node_tree: NodeTree, context: Context, in_out: str = 'INPUT'):
+    socket_items = []
+    count = 0
+    for socket in node_tree.interface.items_tree:
+        if socket.item_type == 'SOCKET' and socket.in_out == in_out and socket.socket_type != 'NodeSocketShader':
+            socket_items.append((socket.name, socket.name, "", get_icon_from_socket_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
+            count += 1
+    return socket_items

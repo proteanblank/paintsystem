@@ -17,13 +17,12 @@ from ..paintsystem.data import (
     GRADIENT_TYPE_ENUM,
     GEOMETRY_TYPE_ENUM,
     get_layer_by_uid,
-    is_layer_linked,
 )
 from ..utils import get_next_unique_name
 from .common import (
     PSContextMixin,
     scale_content,
-    get_icon,
+    get_icon_from_socket_type,
     MultiMaterialOperator,
     PSUVOptionsMixin,
     PSImageCreateMixin
@@ -35,14 +34,6 @@ def get_object_uv_maps(self, context: Context):
         (uv_map.name, uv_map.name, "") for uv_map in context.object.data.uv_layers
     ]
     return intern_enum_items(items)
-    
-def get_icon_from_type(type: str) -> int:
-    type_to_icon = {
-        'COLOR': 'color_socket',
-        'VECTOR': 'vector_socket',
-        'FLOAT': 'float_socket',
-    }
-    return get_icon(type_to_icon.get(type, 'color_socket'))
 
 class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSImageCreateMixin, MultiMaterialOperator):
     """Create a new image layer"""
@@ -387,22 +378,12 @@ class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
         return {'FINISHED'}
 
 
-    
-def get_inputs(node_tree: NodeTree, context: Context):
+def get_nodetree_socket_enum(node_tree: NodeTree, context: Context, in_out: str = 'INPUT'):
     socket_items = []
     count = 0
     for socket in node_tree.interface.items_tree:
-        if socket.item_type == 'SOCKET' and socket.in_out == 'INPUT' and socket.socket_type != 'NodeSocketShader':
-            socket_items.append((str(count), socket.name, "", get_icon_from_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
-            count += 1
-    return socket_items
-
-def get_outputs(node_tree: NodeTree, context: Context):
-    socket_items = []
-    count = 0
-    for socket in node_tree.interface.items_tree:
-        if socket.item_type == 'SOCKET' and socket.in_out == 'OUTPUT' and socket.socket_type != 'NodeSocketShader':
-            socket_items.append((str(count), socket.name, "", get_icon_from_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
+        if socket.item_type == 'SOCKET' and socket.in_out == in_out and socket.socket_type != 'NodeSocketShader':
+            socket_items.append((socket.name, socket.name, "", get_icon_from_socket_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
             count += 1
     return socket_items
 class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
@@ -422,42 +403,50 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
         if not self.node_tree_name:
             return []
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        inputs = get_inputs(custom_node_tree, context)
-        inputs.append(('-1', 'None', '', 'BLANK1', len(inputs)))
+        inputs = get_nodetree_socket_enum(custom_node_tree, context, in_out='INPUT')
+        inputs.append(('_NONE_', 'None', '', 'BLANK1', len(inputs)))
         return inputs
-    
-    def get_outputs_enum_without_none(self, context: Context):
-        if not self.node_tree_name:
-            return []
-        custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        outputs = get_outputs(custom_node_tree, context)
-        return outputs
     
     def get_outputs_enum(self, context: Context):
         if not self.node_tree_name:
             return []
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        outputs = get_outputs(custom_node_tree, context)
-        outputs.append(('-1', 'None', '', 'BLANK1', len(outputs)))
+        outputs = get_nodetree_socket_enum(custom_node_tree, context, in_out='OUTPUT')
+        outputs.append(('_NONE_', 'None', '', 'BLANK1', len(outputs)))
         return outputs
     
     def auto_select_sockets(self, context: Context):
         if not self.node_tree_name:
             return
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        input_sockets = get_inputs(custom_node_tree, context)
-        output_sockets = get_outputs(custom_node_tree, context)
+        input_sockets = get_nodetree_socket_enum(custom_node_tree, context, in_out='INPUT')
+        output_sockets = get_nodetree_socket_enum(custom_node_tree, context, in_out='OUTPUT')
+        found_color_input = False
+        found_alpha_input = False
+        found_color_output = False
+        found_alpha_output = False
         for input_socket in input_sockets:
             if input_socket[1] == 'Color':
-                self.custom_color_input = input_socket[0]
+                self.color_input_name = input_socket[0]
+                found_color_input = True
             elif input_socket[1] == 'Alpha':
-                self.custom_alpha_input = input_socket[0]
+                self.alpha_input_name = input_socket[0]
+                found_alpha_input = True
         for output_socket in output_sockets:
             if output_socket[1] == 'Color':
-                self.custom_color_output = output_socket[0]
+                self.color_output_name = output_socket[0]
+                found_color_output = True
             elif output_socket[1] == 'Alpha':
-                self.custom_alpha_output = output_socket[0]
-                
+                self.alpha_output_name = output_socket[0]
+                found_alpha_output = True
+        if not found_color_input:
+            self.color_input_name = '_NONE_'
+        if not found_alpha_input:
+            self.alpha_input_name = '_NONE_'
+        if not found_color_output:
+            self.color_output_name = '_NONE_'
+        if not found_alpha_output:
+            self.alpha_output_name = '_NONE_'
     def has_unsupported_sockets(self, node_tree: NodeTree):
         for socket in node_tree.interface.items_tree:
             if socket.item_type == 'SOCKET' and socket.socket_type not in ['NodeSocketColor', 'NodeSocketFloat', 'NodeSocketVector']:
@@ -471,23 +460,23 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
         update=auto_select_sockets
     )
     
-    custom_color_input: EnumProperty(
+    color_input_name: EnumProperty(
         name="Custom Color Input",
         description="Custom color input",
         items=get_inputs_enum,
     )
-    custom_alpha_input: EnumProperty(
+    alpha_input_name: EnumProperty(
         name="Custom Alpha Input",
         description="Custom alpha input",
         items=get_inputs_enum,
         
     )
-    custom_color_output: EnumProperty(
+    color_output_name: EnumProperty(
         name="Custom Color Output",
         description="Custom color output",
-        items=get_outputs_enum_without_none
+        items=get_outputs_enum
     )
-    custom_alpha_output: EnumProperty(
+    alpha_output_name: EnumProperty(
         name="Custom Alpha Output",
         description="Custom alpha output",
         items=get_outputs_enum
@@ -501,6 +490,10 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
     def process_material(self, context):
         if not self.node_tree_name:
             return {'CANCELLED'}
+        # Must have at least one output socket
+        if not self.color_output_name != '_NONE_' and not self.alpha_output_name != '_NONE_':
+            self.report({'ERROR'}, "Node tree must have at least one output socket")
+            return {'CANCELLED'}
         ps_ctx = self.parse_context(context)
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
         ps_ctx.active_channel.create_layer(
@@ -508,10 +501,10 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
             layer_name=self.node_tree_name,
             layer_type="NODE_GROUP",
             custom_node_tree=custom_node_tree,
-            custom_color_input=int(self.custom_color_input),
-            custom_alpha_input=int(self.custom_alpha_input if self.custom_alpha_input != "" else "-1"),
-            custom_color_output=int(self.custom_color_output),
-            custom_alpha_output=int(self.custom_alpha_output if self.custom_alpha_output != "" else "-1")
+            color_input_name=self.color_input_name,
+            alpha_input_name=self.alpha_input_name,
+            color_output_name=self.color_output_name,
+            alpha_output_name=self.alpha_output_name
         )
         return {'FINISHED'}
     
@@ -546,14 +539,14 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
             text_row = box.row()
             text_row.alignment = 'CENTER'
             text_row.label(text="Input")
-            box.prop(self, "custom_color_input", text="Color")
-            box.prop(self, "custom_alpha_input", text="Alpha")
+            box.prop(self, "color_input_name", text="Color")
+            box.prop(self, "alpha_input_name", text="Alpha")
             box = row.box()
             text_row = box.row()
             text_row.alignment = 'CENTER'
             text_row.label(text="Output")
-            box.prop(self, "custom_color_output", text="Color")
-            box.prop(self, "custom_alpha_output", text="Alpha")
+            box.prop(self, "color_output_name", text="Color")
+            box.prop(self, "alpha_output_name", text="Alpha")
 
 
 class PAINTSYSTEM_OT_NewTexture(PSContextMixin, PSUVOptionsMixin, MultiMaterialOperator):

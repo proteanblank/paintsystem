@@ -353,6 +353,8 @@ def get_layer_version_for_type(type: str) -> int:
             return TEXTURE_LAYER_VERSION
         case "GEOMETRY":
             return GEOMETRY_LAYER_VERSION
+        case "NODE_GROUP":
+            return CUSTOM_LAYER_VERSION
         case _:
             raise ValueError(f"Invalid layer type: {type}")
 
@@ -486,27 +488,26 @@ def create_random_graph(layer: "Layer"):
 
 def create_custom_graph(layer: "Layer"):
     custom_node_tree = layer.custom_node_tree
-    color_input = layer.custom_color_input
-    alpha_input = layer.custom_alpha_input
-    color_output = layer.custom_color_output
-    alpha_output = layer.custom_alpha_output
-    if alpha_output != -1:
-        builder = PSNodeTreeBuilder(layer, CUSTOM_LAYER_VERSION, "custom_node_tree", color_output, "custom_node_tree", alpha_output)
-        builder.link("group_input", "custom_node_tree", "Alpha", alpha_input)
+    color_input = layer.color_input_name if layer.color_input_name != "_NONE_" else None
+    alpha_input = layer.alpha_input_name if layer.alpha_input_name != "_NONE_" else None
+    color_output = layer.color_output_name if layer.color_output_name != "_NONE_" else None
+    alpha_output = layer.alpha_output_name if layer.alpha_output_name != "_NONE_" else None
+    if alpha_output:
+        builder = PSNodeTreeBuilder(layer, CUSTOM_LAYER_VERSION, "source", color_output, "source", alpha_output)
     else:
-        builder = PSNodeTreeBuilder(layer, CUSTOM_LAYER_VERSION, "custom_node_tree", color_output)
-    builder.add_node("custom_node_tree", "ShaderNodeGroup", {"node_tree": custom_node_tree})
-    if color_input != -1:
-        builder.link("group_input", "custom_node_tree", "Color", color_input)
-    if alpha_input != -1:
-        builder.link("group_input", "custom_node_tree", "Alpha", alpha_input)
+        builder = PSNodeTreeBuilder(layer, CUSTOM_LAYER_VERSION, "source", color_output)
+    builder.add_node("source", "ShaderNodeGroup", {"node_tree": custom_node_tree, "name": "source"})
+    if color_input:
+        builder.link("group_input", "source", "Color", color_input)
+    if alpha_input:
+        builder.link("group_input", "source", "Alpha", alpha_input)
     return builder
 
 def create_texture_graph(layer: "Layer"):
     texture_type = get_texture_identifier(layer.texture_type)
-    builder = PSNodeTreeBuilder(layer, TEXTURE_LAYER_VERSION, "texture", "Color", None, None)
-    builder.add_node("texture", texture_type)
-    builder.create_coord_graph('texture', 'Vector')
+    builder = PSNodeTreeBuilder(layer, TEXTURE_LAYER_VERSION, "source", "Color", None, None)
+    builder.add_node("source", texture_type, {"name": "source"})
+    builder.create_coord_graph('source', 'Vector')
     return builder
 
 def create_geometry_graph(layer: "Layer"):
