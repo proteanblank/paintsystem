@@ -896,8 +896,18 @@ class NodeTreeBuilder:
         used_node_identifiers = self.__add_nodes_commands.keys()
         to_remove = set()
         for node in self.nodes.values():
-            if node not in to_remove and node.type != 'REROUTE' and self.get_node_identifier(node) not in used_node_identifiers:
-                to_remove.add(node)
+            node_identifier = self.get_node_identifier(node)
+            bl_idname = node.bl_idname
+            desired_bl_idname = self.__add_nodes_commands[node_identifier].node_type if node_identifier in self.__add_nodes_commands else None # Ensure deletion of nodes that are not in add commands
+            if self.adjustable:
+                # Check only nodes in add commands
+                if node_identifier not in used_node_identifiers:
+                    continue
+                if node not in to_remove and node.type != 'REROUTE' and bl_idname != desired_bl_idname:
+                    to_remove.add(node)
+            else:
+                if node not in to_remove and node.type != 'REROUTE' and (node_identifier not in used_node_identifiers or bl_idname != desired_bl_idname):
+                    to_remove.add(node)
         for node in to_remove:
             del self.nodes[self.get_node_identifier(node)]
             self.tree.nodes.remove(node)
@@ -909,6 +919,8 @@ class NodeTreeBuilder:
         """
             
         self._log(f"Compiling graph {self.frame.label}")
+        # Remove unused nodes
+        self._remove_unused_nodes()
         # Capture current node state so we can restore user-changed values on recompilation
         saved_state: Dict[str, dict] = {}
         if self.compiled:
@@ -929,10 +941,6 @@ class NodeTreeBuilder:
         for identifier, command in self.__add_nodes_commands.items():
             self._create_node(identifier, command.node_type, command.properties, command.default_values, command.default_outputs)
         self._log(f"Time taken to add nodes: {time.time() - start_time_add_nodes} seconds")
-        
-        # Remove unused nodes
-        if not self.adjustable:
-            self._remove_unused_nodes()
 
         # Re-apply previously captured state (node-level props and input defaults)
         if saved_state:
