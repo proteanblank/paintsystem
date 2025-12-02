@@ -498,7 +498,12 @@ def ensure_udim_tiles(image: bpy.types.Image, uv_layer: bpy.types.MeshUVLoopLaye
             continue
         with bpy.context.temp_override(edit_image=image):
             bpy.ops.image.tile_add(number=tile_number, color=(0, 0, 0, 0), width=width, height=height)
-    return udim_tiles
+    # Delete unused tiles
+    for tile in image.tiles:
+        if tile.number not in udim_tiles:
+            print(f"Removing tile {tile.number}")
+            image.tiles.remove(tile)
+    save_image(image)
 
 def create_ps_image(name: str, width: int = 2048, height: int = 2048, use_udim_tiles: bool = False, uv_layer: bpy.types.MeshUVLoopLayer = None, use_float: bool = False):
     img = bpy.data.images.new(

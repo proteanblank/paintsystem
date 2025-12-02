@@ -5,7 +5,7 @@ from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty
 
 from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin, DEFAULT_PS_UV_MAP_NAME
 
-from ..paintsystem.data import parse_material, set_layer_blend_type, get_layer_blend_type
+from ..paintsystem.data import ensure_udim_tiles, parse_material, set_layer_blend_type, get_layer_blend_type
 from ..panels.common import get_icon_from_channel
 
 
@@ -61,6 +61,13 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
         options={'SKIP_SAVE'}
     )
     
+    as_tangent_normal: BoolProperty(
+        name="As Tangent Normal",
+        description="Bake the channel as a tangent normal",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
+    
     def find_objects_with_materials(self, context: Context, materials: list[Material]) -> list[bpy.types.Object]:
         objects = []
         for mat in materials:
@@ -91,23 +98,28 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
     def other_objects_ui(self, layout: UILayout, context: Context):
         ps_ctx = self.parse_context(context)
         enabled_materials = self.get_enabled_materials(context)
+        if not enabled_materials:
+            return
         objects_with_mat = self.find_objects_with_materials(context, enabled_materials)
         objects_not_selected = set(objects_with_mat) - set(ps_ctx.ps_objects)
-        if enabled_materials and objects_not_selected:
+        if len(objects_with_mat) > 1:
             box = layout.box()
-            box.alert = True
-            col = box.column(align=True)
-            col.label(text=f"Detected other objects with the material{'s' if len(enabled_materials) > 1 else ''}.", icon='ERROR')
-            col.label(text="They will not be baked", icon='BLANK1')
-            box.alert = False
-            box.operator(PAINTSYSTEM_OT_SelectAllBakedObjects.bl_idname, text="Select All Objects", icon='SELECT_EXTEND')
-            header, panel = box.panel("other_objects_panel", default_closed=True)
-            header.label(text="See Detected Objects")
-            if panel:
-                grid = panel.grid_flow(columns=3, align=True, row_major=True, even_columns=True)
-                grid.alert = False
-                for obj in objects_not_selected:
-                    grid.label(text=obj.name, icon='OBJECT_DATA')
+            if objects_not_selected:
+                box.alert = True
+                col = box.column(align=True)
+                col.label(text=f"Detected other objects with the material{'s' if len(enabled_materials) > 1 else ''}.", icon='ERROR')
+                col.label(text="They will not be baked", icon='BLANK1')
+                box.alert = False
+                box.operator(PAINTSYSTEM_OT_SelectAllBakedObjects.bl_idname, text="Select All Objects", icon='SELECT_EXTEND')
+                header, panel = box.panel("other_objects_panel", default_closed=True)
+                header.label(text="See Detected Objects")
+                if panel:
+                    grid = panel.grid_flow(columns=3, align=True, row_major=True, even_columns=True)
+                    grid.alert = False
+                    for obj in objects_not_selected:
+                        grid.label(text=obj.name, icon='OBJECT_DATA')
+            else:
+                box.label(text="All objects with the material are selected", icon='CHECKMARK')
         
     def multi_object_ui(self, layout: UILayout, context: Context):
         ps_ctx = self.parse_context(context)
@@ -173,13 +185,6 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         options={'SKIP_SAVE'}
     )
     
-    as_tangent_normal: BoolProperty(
-        name="As Tangent Normal",
-        description="Bake the channel as a tangent normal",
-        default=False,
-        options={'SKIP_SAVE'}
-    )
-    
     @classmethod
     def poll(cls, context):
         ps_ctx = cls.parse_context(context)
@@ -198,6 +203,7 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
     
     def execute(self, context):
         bake_materials = self.get_enabled_materials(context)
+        ps_ctx = self.parse_context(context)
         if not bake_materials:
             self.report({'ERROR'}, "No materials to bake.")
             return {'CANCELLED'}
@@ -236,14 +242,15 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
                 )
             else:
                 bake_image = active_channel.bake_image
-                if bake_image:
+                if not bake_image:
                     # Bake image already exists, so we need to delete it
-                    bpy.data.images.remove(bake_image)
-                bake_image = self.create_image(context)
-                bake_image.colorspace_settings.name = 'sRGB'
-                active_channel.bake_image = bake_image
-                # elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
-                #     bake_image.scale(self.image_width, self.image_height)
+                    bake_image = self.create_image(context)
+                    active_channel.bake_image = bake_image
+                elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
+                    bake_image.scale(self.image_width, self.image_height)
+                uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
+                bake_image.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
+                ensure_udim_tiles(bake_image, uv_layer)
                 active_channel.bake_uv_map = self.uv_map_name
                     
                 active_channel.use_bake_image = False
@@ -297,20 +304,20 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
         
         self.image_width = int(self.image_resolution)
         self.image_height = int(self.image_resolution)
-        
+        ps_ctx = self.parse_context(context)
         for mat in bake_materials:
             _, active_group, _, _ = parse_material(mat)
             for channel in active_group.channels:
                 bake_image = channel.bake_image
-                
                 if not bake_image:
                     self.image_name = f"{active_group.name}_{channel.name}_Baked"
                     bake_image = self.create_image(context)
-                    bake_image.colorspace_settings.name = 'sRGB'
                     channel.bake_image = bake_image
                 elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
                     bake_image.scale(self.image_width, self.image_height)
-                    
+                uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
+                bake_image.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
+                ensure_udim_tiles(bake_image, uv_layer)
                 channel.use_bake_image = False
                 channel.bake_uv_map = self.uv_map_name
                 channel.bake(context, mat, bake_image, self.uv_map_name)
@@ -640,7 +647,7 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(BakeOperator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSImageCreateMixin, Operator):
+class PAINTSYSTEM_OT_MergeDown(BakeOperator):
     bl_idname = "paint_system.merge_down"
     bl_label = "Merge Down"
     bl_description = "Merge the down layers"
@@ -674,21 +681,19 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSImageCreateMixin, Operator):
             )
     
     def invoke(self, context, event):
-        # Set cursor to wait
-        context.window.cursor_set('WAIT')
         self.get_coord_type(context)
+        self.update_bake_multiple_objects(context)
         below_layer = self.get_below_layer(context)
         if below_layer:
             if below_layer.uses_coord_type:
                 if getattr(below_layer, 'coord_type', 'UV') == 'AUTO':
                     self.uv_map_name = DEFAULT_PS_UV_MAP_NAME
             else:
-                print("Using paint system UV")
                 self.uv_map_name = DEFAULT_PS_UV_MAP_NAME if self.use_paint_system_uv else self.uv_map_name
         if below_layer.type == "IMAGE":
+            self.image_resolution = "CUSTOM"
             self.image_width = below_layer.image.size[0]
             self.image_height = below_layer.image.size[1]
-            return self.execute(context)
         # Set cursor back to default
         context.window.cursor_set('DEFAULT')
         return context.window_manager.invoke_props_dialog(self)
@@ -697,10 +702,10 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSImageCreateMixin, Operator):
         layout = self.layout
         ps_ctx = self.parse_context(context)
         box = layout.box()
-        box.alert = True
         col = box.column(align=True)
         col.label(text="This operation will convert the current layer", icon='INFO')
         col.label(text="into an image layer.", icon='BLANK1')
+        self.other_objects_ui(layout, context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
@@ -760,7 +765,7 @@ class PAINTSYSTEM_OT_MergeDown(PSContextMixin, PSImageCreateMixin, Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSImageCreateMixin, Operator):
+class PAINTSYSTEM_OT_MergeUp(BakeOperator):
     bl_idname = "paint_system.merge_up"
     bl_label = "Merge Up"
     bl_description = "Merge the layer into the one above"
@@ -795,6 +800,7 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSImageCreateMixin, Operator):
 
     def invoke(self, context, event):
         self.get_coord_type(context)
+        self.update_bake_multiple_objects(context)
         above_layer = self.get_above_layer(context)
         # Choose UV based on the layer above
         if above_layer:
@@ -804,19 +810,19 @@ class PAINTSYSTEM_OT_MergeUp(PSContextMixin, PSImageCreateMixin, Operator):
             else:
                 self.uv_map_name = DEFAULT_PS_UV_MAP_NAME if self.use_paint_system_uv else self.uv_map_name
         if above_layer.type == "IMAGE":
+            self.image_resolution = "CUSTOM"
             self.image_width = above_layer.image.size[0]
             self.image_height = above_layer.image.size[1]
-            return self.execute(context)
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
         box = layout.box()
-        box.alert = True
         col = box.column(align=True)
         col.label(text="This operation will convert the current layer", icon='INFO')
         col.label(text="into an image layer.", icon='BLANK1')
+        self.other_objects_ui(layout, context)
         self.image_create_ui(layout, context, show_name=False)
         box = layout.box()
         box.label(text="UV Map", icon='UV')
