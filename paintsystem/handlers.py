@@ -94,6 +94,7 @@ def load_paint_system_data():
                                 layer.update_node_tree(bpy.context)
                         
                         # Current version of the layer
+                        layer = layer.get_layer_data()
                         mix_node = layer.mix_node
                         blend_mode = "MIX"
                         if mix_node:

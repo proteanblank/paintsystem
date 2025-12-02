@@ -579,6 +579,14 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     col.use_property_decorate = False
                     col.use_property_split = True
                     col.prop(active_layer, "texture_type", text="Texture Type")
+                    output_box = col.box()
+                    grid = output_box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
+                    grid_col = grid.column()
+                    grid_col.label(text="Color Output")
+                    grid_col.prop(active_layer, "color_output_name", text="")
+                    grid_col = grid.column()
+                    grid_col.label(text="Alpha Output")
+                    grid_col.prop(active_layer, "alpha_output_name", text="")
                     box = col.box()
                     col = box.column()
                     col.use_property_split = False
@@ -605,6 +613,27 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                         col.prop(active_layer, "normalize_normal", text="Normalize Normal", icon='MESH_DATA')
                 case _:
                     pass
+            
+            # Draw ui for adjustable sockets
+            if active_layer.type == 'NODE_GROUP':
+                header, panel = layout.panel("node_group_panel")
+                header.label(text="Sockets Settings:")
+                if panel:
+                    panel.use_property_split = True
+                    panel.use_property_decorate = False
+                    col = panel.column()
+                    box = col.box()
+                    text_row = box.row()
+                    text_row.alignment = 'CENTER'
+                    text_row.label(text="Output")
+                    box.prop(active_layer, "color_output_name", text="Color")
+                    box.prop(active_layer, "alpha_output_name", text="Alpha")
+                    box = col.box()
+                    text_row = box.row()
+                    text_row.alignment = 'CENTER'
+                    text_row.label(text="Input")
+                    box.prop(active_layer, "color_input_name", text="Color")
+                    box.prop(active_layer, "alpha_input_name", text="Alpha")
 
 # Grease Pencil Layer Settings
 
@@ -808,6 +837,14 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
 
         image_node = active_layer.source_node
         image_node_settings(layout, image_node, active_layer, "image")
+        box = layout.box()
+        grid = box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
+        col = grid.column()
+        col.label(text="Color Output")
+        col.prop(active_layer, "color_output_name", text="")
+        col = grid.column()
+        col.label(text="Alpha Output")
+        col.prop(active_layer, "alpha_output_name", text="")
 
 class MAT_MT_LayerMenu(PSContextMixin, Menu):
     bl_label = "Layer Menu"

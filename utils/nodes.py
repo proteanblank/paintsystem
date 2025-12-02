@@ -1,5 +1,6 @@
 import bpy
 from bpy.types import Node, NodeTree, NodeSocket, Context
+from bpy_extras.node_utils import find_base_socket_type
 from ..custom_icons import get_icon_from_socket_type
 
 def traverse_connected_nodes(node: Node, input: bool = True, output: bool = False) -> set[Node]:
@@ -90,11 +91,40 @@ def find_node(node_tree: NodeTree, properties: dict) -> Node | None:
 
     return None
 
-def get_nodetree_socket_enum(node_tree: NodeTree, context: Context, in_out: str = 'INPUT'):
+def get_nodetree_socket_enum(node_tree: NodeTree, in_out: str = 'INPUT', favor_socket_name: str = None, include_none: bool = False, none_at_start: bool = True):
     socket_items = []
     count = 0
-    for socket in node_tree.interface.items_tree:
-        if socket.item_type == 'SOCKET' and socket.in_out == in_out and socket.socket_type != 'NodeSocketShader':
-            socket_items.append((socket.name, socket.name, "", get_icon_from_socket_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
-            count += 1
+    if include_none and none_at_start:
+        socket_items.append(('_NONE_', 'None', '', 'BLANK1', count))
+        count += 1
+    sockets = [socket for socket in node_tree.interface.items_tree if socket.item_type == 'SOCKET' and socket.in_out == in_out and socket.socket_type != 'NodeSocketShader']
+    if favor_socket_name:
+        sockets.sort(key=lambda x: x.name == favor_socket_name, reverse=True)
+    for socket in sockets:
+        socket_items.append((socket.name, socket.name, "", get_icon_from_socket_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
+        count += 1
+    if include_none and not none_at_start:
+        socket_items.append(('_NONE_', 'None', '', 'BLANK1', count))
+        count += 1
+    return socket_items
+
+def get_node_socket_enum(node: Node, in_out: str = 'INPUT', favor_socket_name: str = None, include_none: bool = False, none_at_start: bool = True):
+    socket_items = []
+    count = 0
+    sockets = [socket for socket in (node.inputs if in_out == 'INPUT' else node.outputs) if socket.enabled]
+    if favor_socket_name not in [socket.name for socket in sockets]:
+        favor_socket_name = None
+        none_at_start = True
+    if include_none and none_at_start:
+        socket_items.append(('_NONE_', 'None', '', 'BLANK1', count))
+        count += 1
+    if favor_socket_name:
+        sockets.sort(key=lambda x: x.name == favor_socket_name, reverse=True)
+    for socket in sockets:
+        base_socket_name = find_base_socket_type(socket).replace("NodeSocket", "").upper()
+        socket_items.append((socket.name, socket.name, "", get_icon_from_socket_type(base_socket_name), count))
+        count += 1
+    if include_none and not none_at_start:
+        socket_items.append(('_NONE_', 'None', '', 'BLANK1', count))
+        count += 1
     return socket_items

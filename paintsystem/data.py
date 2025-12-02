@@ -35,7 +35,7 @@ from mathutils import Color
 # ---
 from ..custom_icons import get_icon
 from ..utils.version import is_newer_than
-from ..utils.nodes import find_node, get_material_output
+from ..utils.nodes import find_node, get_material_output, get_node_socket_enum, get_nodetree_socket_enum
 from ..preferences import get_preferences
 from ..utils import get_next_unique_name
 from .common import PaintSystemPreferences
@@ -970,6 +970,8 @@ class Layer(BaseNestedListItem):
     
     @property
     def source_node(self) -> Node | None:
+        if not self.node_tree:
+            return None
         source_node = self.node_tree.nodes.get("source")
         if source_node:
             return source_node
@@ -1043,28 +1045,61 @@ class Layer(BaseNestedListItem):
         type=NodeTree,
         update=update_node_tree
     )
-    color_input_name: StringProperty(
+    def get_inputs_enum(self, context: Context):
+        if self.type == "NODE_GROUP":
+            custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
+            if not custom_node_tree:
+                return [('_NONE_', 'None', '', 'BLANK1', 0)]
+            inputs = get_nodetree_socket_enum(custom_node_tree, in_out='INPUT', include_none=True)
+        elif self.source_node:
+            inputs = get_node_socket_enum(self.source_node, in_out='INPUT', include_none=True)
+        else:
+            return [('_NONE_', 'None', '', 'BLANK1', 0)]
+        return inputs
+    def get_color_enum(self, context: Context):
+        if self.type == "NODE_GROUP":
+            custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
+            if not custom_node_tree:
+                return []
+            outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT', include_none=False)
+        elif self.source_node:
+            outputs = get_node_socket_enum(self.source_node, in_out='OUTPUT', favor_socket_name='Color', include_none=False, none_at_start=False)
+        else:
+            return [('_NONE_', 'None', '', 'BLANK1', 0)]
+        return outputs
+    def get_alpha_enum(self, context: Context):
+        if self.type == "NODE_GROUP":
+            custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
+            if not custom_node_tree:
+                return [('_NONE_', 'None', '', 'BLANK1', 0)]
+            outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT', include_none=True)
+        elif self.source_node:
+            outputs = get_node_socket_enum(self.source_node, in_out='OUTPUT', favor_socket_name='Alpha', include_none=True, none_at_start=False)
+        else:
+            return [('_NONE_', 'None', '', 'BLANK1', 0)]
+        return outputs
+    color_input_name: EnumProperty(
         name="Color Input Socket Name",
         description="Color input socket",
-        default="_NONE_",
+        items=get_inputs_enum,
         update=update_node_tree
     )
-    alpha_input_name: StringProperty(
+    alpha_input_name: EnumProperty(
         name="Alpha Input Socket Name",
         description="Alpha input socket",
-        default="_NONE_",
+        items=get_inputs_enum,
         update=update_node_tree
     )
-    color_output_name: StringProperty(
+    color_output_name: EnumProperty(
         name="Color Output Socket Name",
         description="Color output socket",
-        default="_NONE_",
+        items=get_color_enum,
         update=update_node_tree
     )
-    alpha_output_name: StringProperty(
+    alpha_output_name: EnumProperty(
         name="Alpha Output Socket Name",
         description="Alpha output socket",
-        default="_NONE_",
+        items=get_alpha_enum,
         update=update_node_tree
     )
     
@@ -1158,11 +1193,21 @@ class Layer(BaseNestedListItem):
         default='GRADIENT_MAP',
         update=update_node_tree
     )
+    def update_texture_type(self, context: Context):
+        self.auto_update_node_tree = False
+        try:
+            if self.type == "TEXTURE":
+                self.color_output_name = "Color"
+                self.alpha_output_name = "_NONE_"
+        except:
+            pass
+        self.auto_update_node_tree = True
+        self.update_node_tree(context)
     texture_type: EnumProperty(
         items=TEXTURE_TYPE_ENUM,
         name="Texture Type",
         description="Texture type",
-        update=update_node_tree
+        update=update_texture_type
     )
     geometry_type: EnumProperty(
         items=GEOMETRY_TYPE_ENUM,

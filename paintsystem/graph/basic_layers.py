@@ -383,10 +383,30 @@ def get_adjustment_identifier(adjustment_type: str) -> str:
     }
     return identifier_mapping.get(adjustment_type, "")
 
+# Layers that can have custom types are IMAGE, ATTRIBUTE, CUSTOM, TEXTURE
+def set_default_layer_sockets(layer: "Layer"):
+    match layer.type:
+        case "IMAGE":
+            layer.color_output_name = "Color"
+            layer.alpha_output_name = "Alpha"
+        case "ATTRIBUTE":
+            layer.color_output_name = "Color"
+        case "CUSTOM":
+            pass
+            # Set by user on creating the layer
+            # layer.color_output_name = "Color"
+            # layer.alpha_output_name = "Alpha"
+        case "TEXTURE":
+            layer.color_output_name = "Color"
+        case _:
+            pass
+
 def create_image_graph(layer: "Layer"):
     img = layer.image
     # Create builder with mixing graph - alpha will be determined later
-    builder = PSNodeTreeBuilder(layer, IMAGE_LAYER_VERSION, "source", "Color", "source", "Alpha")
+    color_socket = layer.color_output_name if layer.color_output_name != "_NONE_" else "Color"
+    alpha_socket = layer.alpha_output_name if layer.alpha_output_name != "_NONE_" else "Alpha"
+    builder = PSNodeTreeBuilder(layer, IMAGE_LAYER_VERSION, "source", color_socket, "source", alpha_socket)
     builder.add_node("source", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest", "name": "source"})
     builder.create_coord_graph("source", "Vector")
     return builder
@@ -401,8 +421,15 @@ def create_solid_graph(layer: "Layer"):
     return builder
 
 def create_attribute_graph(layer: "Layer"):
-    builder = PSNodeTreeBuilder(layer, ATTRIBUTE_LAYER_VERSION, "source", "Color")
+    color_socket = layer.color_output_name if layer.color_output_name != "_NONE_" else "Color"
+    alpha_socket = layer.alpha_output_name if layer.alpha_output_name != "_NONE_" else None
+    if alpha_socket:
+        builder = PSNodeTreeBuilder(layer, ATTRIBUTE_LAYER_VERSION, "source", color_socket, "source", alpha_socket)
+    else:
+        builder = PSNodeTreeBuilder(layer, ATTRIBUTE_LAYER_VERSION, "source", color_socket)
     builder.add_node("source", "ShaderNodeAttribute", {"name": "source"})
+    if alpha_socket:
+        builder.link("group_input", "source", "Alpha", alpha_socket)
     return builder
 
 def create_adjustment_graph(layer: "Layer"):
@@ -504,8 +531,13 @@ def create_custom_graph(layer: "Layer"):
     return builder
 
 def create_texture_graph(layer: "Layer"):
+    color_socket = layer.color_output_name if layer.color_output_name != "_NONE_" else "Color"
+    alpha_socket = layer.alpha_output_name if layer.alpha_output_name != "_NONE_" else None
     texture_type = get_texture_identifier(layer.texture_type)
-    builder = PSNodeTreeBuilder(layer, TEXTURE_LAYER_VERSION, "source", "Color", None, None)
+    if alpha_socket:
+        builder = PSNodeTreeBuilder(layer, TEXTURE_LAYER_VERSION, "source", color_socket, "source", alpha_socket)
+    else:
+        builder = PSNodeTreeBuilder(layer, TEXTURE_LAYER_VERSION, "source", color_socket)
     builder.add_node("source", texture_type, {"name": "source"})
     builder.create_coord_graph('source', 'Vector')
     return builder

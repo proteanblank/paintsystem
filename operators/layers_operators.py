@@ -19,6 +19,7 @@ from ..paintsystem.data import (
     get_layer_by_uid,
 )
 from ..utils import get_next_unique_name
+from ..utils.nodes import get_nodetree_socket_enum
 from .common import (
     PSContextMixin,
     scale_content,
@@ -377,15 +378,6 @@ class PAINTSYSTEM_OT_NewRandomColor(PSContextMixin, MultiMaterialOperator):
         ps_ctx.active_channel.create_layer(context, self.layer_name, "RANDOM")
         return {'FINISHED'}
 
-
-def get_nodetree_socket_enum(node_tree: NodeTree, context: Context, in_out: str = 'INPUT'):
-    socket_items = []
-    count = 0
-    for socket in node_tree.interface.items_tree:
-        if socket.item_type == 'SOCKET' and socket.in_out == in_out and socket.socket_type != 'NodeSocketShader':
-            socket_items.append((socket.name, socket.name, "", get_icon_from_socket_type(socket.socket_type.replace("NodeSocket", "").upper()), count))
-            count += 1
-    return socket_items
 class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
     """Create a new custom node group layer"""
     bl_idname = "paint_system.new_custom_node_group_layer"
@@ -403,15 +395,22 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
         if not self.node_tree_name:
             return []
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        inputs = get_nodetree_socket_enum(custom_node_tree, context, in_out='INPUT')
+        inputs = get_nodetree_socket_enum(custom_node_tree, in_out='INPUT')
         inputs.append(('_NONE_', 'None', '', 'BLANK1', len(inputs)))
         return inputs
+    
+    def get_outputs_without_none(self, context: Context):
+        if not self.node_tree_name:
+            return []
+        custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
+        outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT')
+        return outputs
     
     def get_outputs_enum(self, context: Context):
         if not self.node_tree_name:
             return []
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        outputs = get_nodetree_socket_enum(custom_node_tree, context, in_out='OUTPUT')
+        outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT')
         outputs.append(('_NONE_', 'None', '', 'BLANK1', len(outputs)))
         return outputs
     
@@ -419,8 +418,8 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
         if not self.node_tree_name:
             return
         custom_node_tree = bpy.data.node_groups.get(self.node_tree_name)
-        input_sockets = get_nodetree_socket_enum(custom_node_tree, context, in_out='INPUT')
-        output_sockets = get_nodetree_socket_enum(custom_node_tree, context, in_out='OUTPUT')
+        input_sockets = get_nodetree_socket_enum(custom_node_tree, in_out='INPUT')
+        output_sockets = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT')
         found_color_input = False
         found_alpha_input = False
         found_color_output = False
@@ -474,7 +473,7 @@ class PAINTSYSTEM_OT_NewCustomNodeGroup(PSContextMixin, MultiMaterialOperator):
     color_output_name: EnumProperty(
         name="Custom Color Output",
         description="Custom color output",
-        items=get_outputs_enum
+        items=get_outputs_without_none
     )
     alpha_output_name: EnumProperty(
         name="Custom Alpha Output",
