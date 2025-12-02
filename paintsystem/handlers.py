@@ -1,5 +1,5 @@
 import bpy
-from .data import get_global_layer, sort_actions, parse_context, get_all_layers, is_valid_uuidv4
+from .data import get_global_layer, sort_actions, parse_context, get_all_layers, is_valid_uuidv4, save_image
 from .graph.basic_layers import get_layer_version_for_type
 import time
 from .graph.nodetree_builder import get_nodetree_version
@@ -178,14 +178,7 @@ def save_handler(scene: bpy.types.Scene):
                             images.add(image)
             
     for image in images:
-        if not image.is_dirty:
-            continue
-        if image.packed_file or image.filepath == '':
-            print(f"Packing image {image.name}")
-            image.pack()
-        else:
-            print(f"Saving image {image.name}")
-            image.save()
+        save_image(image)
 
 
 @bpy.app.handlers.persistent

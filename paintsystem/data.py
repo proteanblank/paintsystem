@@ -187,6 +187,14 @@ def intern_enum_items(items):
         return STRING_CACHE[s]
     return [tuple(intern_string(s) for s in item) for item in items]
 
+def save_image(image: Image):
+    if not image.is_dirty:
+        return
+    if image.packed_file or image.filepath == '':
+        image.pack()
+    else:
+        image.save()
+
 def is_valid_uuidv4(uuid_string):
     """
     Checks if a given string is a valid UUIDv4.
@@ -496,7 +504,7 @@ def create_ps_image(name: str, width: int = 2048, height: int = 2048, use_udim_t
     img = bpy.data.images.new(
         name=name, width=width, height=height, alpha=True, float_buffer=use_float)
     img.generated_color = (0, 0, 0, 0)
-    img.pack()
+    save_image(img)
     if use_udim_tiles:
         img.source = "TILED"
         if uv_layer:
@@ -1401,11 +1409,7 @@ class Layer(BaseNestedListItem):
         if layer.image:
             # if image is not saved, save it
             image: Image = layer.image
-            if image.is_dirty:
-                if image.filepath != '':
-                    image.save()
-                else:
-                    image.pack()
+            save_image(image)
             self.image = image.copy()
         if layer.empty_object:
             self.empty_object = layer.empty_object.copy()
@@ -1942,7 +1946,7 @@ class Channel(BaseNestedListManager):
             pixels_bake[3::4] = pixels_temp_alpha[1::4]
             bake_image.pixels.foreach_set(pixels_bake)
             bake_image.update()
-            bake_image.pack()
+            save_image(bake_image)
         bpy.data.images.remove(temp_alpha_image)
 
         for node in to_be_deleted_nodes:

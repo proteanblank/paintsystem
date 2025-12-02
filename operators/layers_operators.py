@@ -17,6 +17,7 @@ from ..paintsystem.data import (
     GRADIENT_TYPE_ENUM,
     GEOMETRY_TYPE_ENUM,
     get_layer_by_uid,
+    save_image,
 )
 from ..utils import get_next_unique_name
 from ..utils.nodes import get_nodetree_socket_enum
@@ -93,11 +94,10 @@ class PAINTSYSTEM_OT_NewImage(PSContextMixin, PSImageCreateMixin, MultiMaterialO
                 self.report({'ERROR'}, "No image selected")
                 return False
             img = bpy.data.images.get(self.image_name)
-            img.pack()
+            save_image(img)
             if not img:
                 self.report({'ERROR'}, "Image not found")
                 return False
-        img.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
         ps_ctx.active_channel.create_layer(
             context, 
             layer_name=self.image_name, 
