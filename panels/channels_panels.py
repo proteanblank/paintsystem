@@ -172,6 +172,7 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
         col.use_property_split = True
         col.use_property_decorate = False
         col.prop(active_channel, "type", text="Type")
+        col.prop(active_channel, "color_space", text="Color Space")
         col.prop(active_channel, "use_alpha", text="Use Alpha")
         if active_channel.type == "VECTOR":
             box = col.box()
