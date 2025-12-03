@@ -212,15 +212,15 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
                     connect_sockets(node_group.outputs['Color Alpha'], principled_node.inputs['Alpha'])
 
                 if self.pbr_add_metallic:
-                    channel = new_group.create_channel(context, channel_name='Metallic', channel_type='FLOAT', use_alpha=False, use_max_min=True)
+                    channel = new_group.create_channel(context, channel_name='Metallic', channel_type='FLOAT', use_alpha=False, use_max_min=True, color_space='NONCOLOR')
                     transfer_connection(mat_node_tree, principled_node.inputs['Metallic'], node_group.inputs['Metallic'])
                     connect_sockets(node_group.outputs['Metallic'], principled_node.inputs['Metallic'])
                 if self.pbr_add_roughness:
-                    channel = new_group.create_channel(context, channel_name='Roughness', channel_type='FLOAT', use_alpha=False, use_max_min=True)
+                    channel = new_group.create_channel(context, channel_name='Roughness', channel_type='FLOAT', use_alpha=False, use_max_min=True, color_space='NONCOLOR')
                     transfer_connection(mat_node_tree, principled_node.inputs['Roughness'], node_group.inputs['Roughness'])
                     connect_sockets(node_group.outputs['Roughness'], principled_node.inputs['Roughness'])
                 if self.pbr_add_normal:
-                    channel = new_group.create_channel(context, channel_name='Normal', channel_type='VECTOR', use_alpha=False, normalize_input=True)
+                    channel = new_group.create_channel(context, channel_name='Normal', channel_type='VECTOR', use_alpha=False, normalize_input=True, color_space='NONCOLOR')
                     normal_connected =transfer_connection(mat_node_tree, principled_node.inputs['Normal'], node_group.inputs['Normal'])
                     connect_sockets(node_group.outputs['Normal'], principled_node.inputs['Normal'])
                     if self.add_layers:
@@ -267,7 +267,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
                     connect_sockets(mix_shader.outputs[0], mat_output.inputs[0])
                         
             case 'NORMAL':
-                channel = new_group.create_channel(context, channel_name='Normal', channel_type='VECTOR', use_alpha=False, normalize_input=True)
+                channel = new_group.create_channel(context, channel_name='Normal', channel_type='VECTOR', use_alpha=False, normalize_input=True, color_space='NONCOLOR')
                 if self.add_layers:
                     channel.create_layer(context, layer_name='Object Normal', layer_type='GEOMETRY', geometry_type='OBJECT_NORMAL', normalize_normal=True)
                     channel.create_layer(context, layer_name='Image', layer_type='IMAGE', coord_type=self.coord_type, uv_map_name=self.uv_map_name)
