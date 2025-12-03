@@ -858,6 +858,10 @@ class Layer(BaseNestedListItem):
     def update_node_tree(self, context):
         if not self.auto_update_node_tree:
             return
+        # Ensure the paint system UV map even if it's linked
+        if self.get_layer_data().coord_type == 'AUTO':
+            ensure_paint_system_uv_map(context)
+        
         if self.is_linked:
             return
         if not is_valid_uuidv4(self.uid):
@@ -887,9 +891,6 @@ class Layer(BaseNestedListItem):
             ensure_sockets(node_tree, expected_output, "OUTPUT")
         if self.layer_name:
             self.node_tree.name = f"PS {self.layer_name} ({self.uid[:8]})"
-        
-        if self.coord_type == 'AUTO':
-            ensure_paint_system_uv_map(context)
         
         if self.coord_type == "DECAL":
             if not self.empty_object:
