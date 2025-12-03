@@ -220,7 +220,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
         ps_ctx = cls.parse_context(context)
         if ps_ctx.active_group and check_group_multiuser(ps_ctx.active_group.node_tree):
             return False
-        return (ps_ctx.active_channel is not None or ps_ctx.ps_object.type == 'GREASEPENCIL')
+        return ps_ctx.ps_object and (ps_ctx.active_channel is not None or ps_ctx.ps_object.type == 'GREASEPENCIL')
     
     def draw_header(self, context):
         layout = self.layout
