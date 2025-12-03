@@ -2438,11 +2438,9 @@ class PaintSystemGlobalData(PropertyGroup):
         if layer.is_linked:
             clipboard_layer.uid = layer.linked_layer_uid
             clipboard_layer.material = layer.linked_material
-            print(f"Linked layer: {layer.linked_layer_uid} {layer.linked_material}")
         else:
             clipboard_layer.uid = layer.uid
             clipboard_layer.material = ps_ctx.active_material
-            print(f"Copy Unlinked layer: {layer.uid} {ps_ctx.active_material}")
     
     def clear_clipboard(self):
         self.clipboard_layers.clear()

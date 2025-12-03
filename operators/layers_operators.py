@@ -870,7 +870,6 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
             base_parent_id = -1
         for idx, clipboard_layer in enumerate(clipboard_layers):
             layer = get_layer_by_uid(clipboard_layer.material, clipboard_layer.uid)
-            print(f"Layer: {layer}")
             if not layer:
                 continue
             if self.linked:
