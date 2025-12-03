@@ -5,7 +5,7 @@ from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty
 
 from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin, DEFAULT_PS_UV_MAP_NAME
 
-from ..paintsystem.data import ensure_udim_tiles, parse_material, set_layer_blend_type, get_layer_blend_type
+from ..paintsystem.data import parse_material, set_layer_blend_type, get_layer_blend_type
 from ..panels.common import get_icon_from_channel
 
 
@@ -248,9 +248,7 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
                     active_channel.bake_image = bake_image
                 elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
                     bake_image.scale(self.image_width, self.image_height)
-                uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
                 bake_image.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
-                ensure_udim_tiles(bake_image, uv_layer)
                 active_channel.bake_uv_map = self.uv_map_name
                     
                 active_channel.use_bake_image = False
@@ -315,9 +313,7 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
                     channel.bake_image = bake_image
                 elif bake_image.size[0] != self.image_width or bake_image.size[1] != self.image_height:
                     bake_image.scale(self.image_width, self.image_height)
-                uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
                 bake_image.colorspace_settings.name = 'Non-Color' if ps_ctx.active_channel.color_space == 'NONCOLOR' else 'sRGB'
-                ensure_udim_tiles(bake_image, uv_layer)
                 channel.use_bake_image = False
                 channel.bake_uv_map = self.uv_map_name
                 channel.bake(context, mat, bake_image, self.uv_map_name)

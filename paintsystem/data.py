@@ -476,7 +476,8 @@ def ensure_sockets(node_tree: NodeTree, expected_sockets: List[ExpectedSocket], 
                 socket.min_value = -1e39
                 socket.max_value = 1e39
 
-def get_udim_tiles(uv_layer: bpy.types.MeshUVLoopLayer):
+def get_udim_tiles(object: bpy.types.Object, uv_layer_name: str):
+    uv_layer = object.data.uv_layers.get(uv_layer_name)
     if not uv_layer:
         return {1001}
     udim_tiles = set()
@@ -489,9 +490,11 @@ def get_udim_tiles(uv_layer: bpy.types.MeshUVLoopLayer):
         udim_tiles.add(1000 + row * 10 + col)
     return udim_tiles
 
-def ensure_udim_tiles(image: bpy.types.Image, uv_layer: bpy.types.MeshUVLoopLayer):
+def ensure_udim_tiles(image: bpy.types.Image, objects: list[bpy.types.Object], uv_layer_name: str):
     # Check position the data in uv_layer, create a list of number for UDIM tiles
-    udim_tiles = get_udim_tiles(uv_layer)
+    udim_tiles = set()
+    for object in objects:
+        udim_tiles.update(get_udim_tiles(object, uv_layer_name))
     width, height = image.size
     for tile_number in udim_tiles:
         if any(tile_number == tile.number for tile in image.tiles):
@@ -505,17 +508,17 @@ def ensure_udim_tiles(image: bpy.types.Image, uv_layer: bpy.types.MeshUVLoopLaye
             image.tiles.remove(tile)
     save_image(image)
 
-def create_ps_image(name: str, width: int = 2048, height: int = 2048, use_udim_tiles: bool = False, uv_layer: bpy.types.MeshUVLoopLayer = None, use_float: bool = False):
+def create_ps_image(name: str, width: int = 2048, height: int = 2048, use_udim_tiles: bool = False, objects: list[bpy.types.Object] = None, uv_layer_name: str = None, use_float: bool = False):
     img = bpy.data.images.new(
         name=name, width=width, height=height, alpha=True, float_buffer=use_float)
     img.generated_color = (0, 0, 0, 0)
     save_image(img)
     if use_udim_tiles:
         img.source = "TILED"
-        if uv_layer:
-            ensure_udim_tiles(img, uv_layer)
+        if objects and uv_layer_name:
+            ensure_udim_tiles(img, objects, uv_layer_name)
         else:
-            raise ValueError("UV layer is required for UDIM tiles")
+            raise ValueError("Objects and UV layer name are required for UDIM tiles")
     return img
 
 def ensure_paint_system_uv_map(context: bpy.types.Context):
@@ -1564,6 +1567,8 @@ def restore_cycles_settings(settings):
 def ps_bake(context, objects: list[Object], mat: Material, uv_layer, bake_image, use_gpu=True, use_clear=True, margin=8, margin_type='ADJACENT_FACES'):
     bake_objects = []
     
+    ensure_udim_tiles(bake_image, objects, uv_layer)
+    
     for obj in objects:
         if mat.name in obj.data.materials:
             bake_objects.append(obj)
@@ -1575,7 +1580,6 @@ def ps_bake(context, objects: list[Object], mat: Material, uv_layer, bake_image,
     
     image_node = node_tree.nodes.new(type='ShaderNodeTexImage')
     image_node.image = bake_image
-    
     with context.temp_override(active_object=bake_objects[0], selected_objects=bake_objects):
         bake_params = {
             "type": 'EMIT',
@@ -1804,9 +1808,8 @@ class Channel(BaseNestedListManager):
                 if not layer.image:
                     if layer.coord_type == 'UV':
                         ps_ctx = PSContextMixin.parse_context(context)
-                        uv_layer = ps_ctx.ps_object.data.uv_layers.get(layer.uv_map_name)
-                        use_udim_tiles = get_udim_tiles(uv_layer) != {1001}
-                        layer.image = create_ps_image(layer.layer_name, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer)
+                        use_udim_tiles = get_udim_tiles(ps_ctx.ps_object, layer.uv_map_name) != {1001}
+                        layer.image = create_ps_image(layer.layer_name, use_udim_tiles=use_udim_tiles, objects=[ps_ctx.ps_object], uv_layer_name=layer.uv_map_name)
                     else:
                         layer.image = create_ps_image(layer.layer_name)
         

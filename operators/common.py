@@ -238,8 +238,7 @@ class PSImageCreateMixin(PSUVOptionsMixin):
             col.prop(self, "image_height", text="Height")
         if self.coord_type == 'UV':
             ps_ctx = PSContextMixin.parse_context(context)
-            uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
-            udim_tiles = get_udim_tiles(uv_layer)
+            udim_tiles = get_udim_tiles(ps_ctx.ps_object, self.uv_map_name)
             use_udim_tiles = udim_tiles != {1001}
             if udim_tiles and use_udim_tiles:
                 box.prop(self, "use_udim_tiles")
@@ -252,9 +251,8 @@ class PSImageCreateMixin(PSUVOptionsMixin):
             self.image_height = int(self.image_resolution)
         if self.coord_type == 'UV':
             ps_ctx = PSContextMixin.parse_context(context)
-            uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
-            use_udim_tiles = get_udim_tiles(uv_layer) != {1001} and self.use_udim_tiles
-            img = create_ps_image(self.image_name, self.image_width, self.image_height, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer, use_float=self.use_float)
+            use_udim_tiles = get_udim_tiles(ps_ctx.ps_object, self.uv_map_name) != {1001} and self.use_udim_tiles
+            img = create_ps_image(self.image_name, self.image_width, self.image_height, use_udim_tiles=use_udim_tiles, objects=[ps_ctx.ps_object], uv_layer_name=self.uv_map_name, use_float=self.use_float)
         else:
             img = create_ps_image(self.image_name, self.image_width, self.image_height, use_float=self.use_float)
         return img
@@ -265,11 +263,7 @@ class PSImageCreateMixin(PSUVOptionsMixin):
         ps_ctx = PSContextMixin.parse_context(context)
         if ps_ctx.ps_object.mode == 'EDIT':
             bpy.ops.object.mode_set(mode="OBJECT")
-        uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
-        if uv_layer:
-            self.use_udim_tiles = get_udim_tiles(uv_layer) != {1001}
-        else:
-            self.use_udim_tiles = False
+        self.use_udim_tiles = get_udim_tiles(ps_ctx.ps_object, self.uv_map_name) != {1001}
 
 
 class PSImageFilterMixin():
