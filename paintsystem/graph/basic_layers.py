@@ -183,7 +183,7 @@ class PSNodeTreeBuilder:
         self._builder.add_node("mapping", "ShaderNodeMapping")
         output_node_name = "mapping"
         output_socket_name = "Vector"
-        if self._layer.correct_image_aspect and self._layer.type == "IMAGE":
+        if self._layer.correct_image_aspect and self._layer.image and self._layer.type == "IMAGE":
             resolution_x = 0
             resolution_y = 0
             img = self._layer.image
@@ -407,7 +407,7 @@ def create_image_graph(layer: "Layer"):
     color_socket = layer.color_output_name if layer.color_output_name != "_NONE_" else "Color"
     alpha_socket = layer.alpha_output_name if layer.alpha_output_name != "_NONE_" else "Alpha"
     builder = PSNodeTreeBuilder(layer, IMAGE_LAYER_VERSION, "source", color_socket, "source", alpha_socket)
-    builder.add_node("source", "ShaderNodeTexImage", {"image": img, "interpolation": "Closest", "name": "source"})
+    builder.add_node("source", "ShaderNodeTexImage", {"image.force": img, "interpolation": "Closest", "name": "source"})
     builder.create_coord_graph("source", "Vector")
     return builder
 

@@ -903,15 +903,16 @@ class Layer(BaseNestedListItem):
         
         match self.type:
             case "IMAGE":
-                if not self.image:
-                    if self.coord_type == 'UV':
-                        ps_ctx = PSContextMixin.parse_context(context)
-                        uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
-                        use_udim_tiles = get_udim_tiles(uv_layer) != {1001}
-                        self.image = create_ps_image(self.layer_name, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer)
-                    else:
-                        self.image = create_ps_image(self.layer_name)
-                self.image.name = self.layer_name
+                # if not self.image:
+                #     if self.coord_type == 'UV':
+                #         ps_ctx = PSContextMixin.parse_context(context)
+                #         uv_layer = ps_ctx.ps_object.data.uv_layers.get(self.uv_map_name)
+                #         use_udim_tiles = get_udim_tiles(uv_layer) != {1001}
+                #         self.image = create_ps_image(self.layer_name, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer)
+                #     else:
+                #         self.image = create_ps_image(self.layer_name)
+                if self.image:
+                    self.image.name = self.layer_name
                 layer_graph = create_image_graph(self)
             case "FOLDER":
                 layer_graph = create_folder_graph(self)
@@ -1799,12 +1800,16 @@ class Channel(BaseNestedListManager):
             setattr(layer, key, value)
         
         # Layer type specific setup
-        # match layer.type:
-        #     case "IMAGE":
-        #         if "image" not in kwargs:
-        #             layer.image = bpy.data.images.new(name=layer.layer_name, width=2048, height=2048, alpha=True)
-        #             layer.image.generated_color = (0, 0, 0, 0)
-        #             layer.image.pack()
+        match layer.type:
+            case "IMAGE":
+                if not layer.image:
+                    if layer.coord_type == 'UV':
+                        ps_ctx = PSContextMixin.parse_context(context)
+                        uv_layer = ps_ctx.ps_object.data.uv_layers.get(layer.uv_map_name)
+                        use_udim_tiles = get_udim_tiles(uv_layer) != {1001}
+                        layer.image = create_ps_image(layer.layer_name, use_udim_tiles=use_udim_tiles, uv_layer=uv_layer)
+                    else:
+                        layer.image = create_ps_image(layer.layer_name)
         
         # Update active index
         if update_active_index:

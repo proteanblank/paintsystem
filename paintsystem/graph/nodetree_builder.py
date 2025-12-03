@@ -221,6 +221,7 @@ class Add_Node:
     default_outputs: dict = None  # Default values for output sockets, if any
     force_properties: bool = False
     force_default_values: bool = False
+    forced_properties: set = field(default_factory=set)  # Set of property names that should be forced (from .force suffix)
 
 @dataclass
 class LayerInfo:
@@ -447,9 +448,24 @@ class NodeTreeBuilder:
             self._log(f"Graph is adjustable but already compiled. Skipping node '{identifier}'")
             return
         
-        self._log(f"Adding node '{identifier}' of type '{node_type}' with properties '{properties}' and default values '{default_values}'")
+        # Process properties with .force suffix
+        forced_properties = set()
+        processed_properties = {}
+        if properties:
+            for key, value in properties.items():
+                if key.endswith('.force'):
+                    # Remove .force suffix and add to forced_properties set
+                    prop_name = key[:-6]  # Remove '.force' suffix
+                    forced_properties.add(prop_name)
+                    processed_properties[prop_name] = value
+                else:
+                    processed_properties[key] = value
+        else:
+            processed_properties = properties
+        
+        self._log(f"Adding node '{identifier}' of type '{node_type}' with properties '{processed_properties}' and default values '{default_values}'")
         add_command = Add_Node(
-            identifier=identifier, node_type=node_type, properties=properties, default_values=default_values, default_outputs=default_outputs, force_properties=force_properties, force_default_values=force_default_values)
+            identifier=identifier, node_type=node_type, properties=processed_properties, default_values=default_values, default_outputs=default_outputs, force_properties=force_properties, force_default_values=force_default_values, forced_properties=forced_properties)
         
         self.__add_nodes_commands[identifier] = add_command
         return add_command
@@ -1034,14 +1050,27 @@ class NodeTreeBuilder:
                 self._log(f"Skipping node {identifier}")
                 continue
             
-            # Ignore if the node is force_properties
-            # Find node in __add_nodes_commands
-            if not self.__add_nodes_commands[identifier].force_properties:
-                apply_node_properties(node, state['properties'])
+            # Get the add command for this node
+            add_command = self.__add_nodes_commands.get(identifier)
+            if add_command is None:
+                continue
+            
+            # Filter out forced properties (either from force_properties flag or forced_properties set)
+            properties_to_apply = {}
+            if not add_command.force_properties:
+                # If force_properties is False, apply all properties except those in forced_properties set
+                properties_to_apply = {
+                    key: value for key, value in state['properties'].items()
+                    if key not in add_command.forced_properties
+                }
+            # If force_properties is True, don't apply any properties (existing behavior)
+            
+            if properties_to_apply:
+                apply_node_properties(node, properties_to_apply)
 
             # Ignore if the node is force_default_values
             # Find node in __add_nodes_commands
-            if not self.__add_nodes_commands[identifier].force_default_values:
+            if not add_command.force_default_values:
                 apply_node_defaults(node, state['inputs'], state['outputs'])
         self._log("Applied node state")
 

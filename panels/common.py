@@ -217,7 +217,9 @@ def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, 
         row.menu("MAT_MT_ImageMenu",
                 text="", icon='COLLAPSEMENU')
         col.separator()
-    col.template_ID(data, propname, text="")
+    # col.use_property_split = True
+    # col.prop(image_node.image, "name", text="Image name")
+    col.template_ID(data, propname, text="", new="image.new", open="image.open")
     col.prop(image_node, "interpolation",
                 text="")
     col.prop(image_node, "projection",
