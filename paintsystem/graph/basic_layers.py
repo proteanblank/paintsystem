@@ -428,8 +428,6 @@ def create_attribute_graph(layer: "Layer"):
     else:
         builder = PSNodeTreeBuilder(layer, ATTRIBUTE_LAYER_VERSION, "source", color_socket)
     builder.add_node("source", "ShaderNodeAttribute", {"name": "source"})
-    if alpha_socket:
-        builder.link("group_input", "source", "Alpha", alpha_socket)
     return builder
 
 def create_adjustment_graph(layer: "Layer"):
