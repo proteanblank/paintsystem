@@ -1061,37 +1061,35 @@ class Layer(BaseNestedListItem):
         update=update_node_tree
     )
     def get_inputs_enum(self, context: Context):
+        inputs = []
         if self.type == "NODE_GROUP":
             custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
-            if not custom_node_tree:
-                return [('_NONE_', 'None', '', 'BLANK1', 0)]
-            inputs = get_nodetree_socket_enum(custom_node_tree, in_out='INPUT', include_none=True)
+            if custom_node_tree:
+                inputs = get_nodetree_socket_enum(custom_node_tree, in_out='INPUT', include_none=True)
         elif self.source_node:
             inputs = get_node_socket_enum(self.source_node, in_out='INPUT', include_none=True)
         else:
-            return [('_NONE_', 'None', '', 'BLANK1', 0)]
+            inputs = [('_NONE_', 'None', '', 'BLANK1', 0)]
         return inputs
     def get_color_enum(self, context: Context):
+        outputs = []
         if self.type == "NODE_GROUP":
             custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
-            if not custom_node_tree:
-                return []
-            outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT', include_none=False)
+            if custom_node_tree:
+                outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT', include_none=False)
         elif self.source_node:
             outputs = get_node_socket_enum(self.source_node, in_out='OUTPUT', favor_socket_name='Color', include_none=False, none_at_start=False)
-        else:
-            return [('_NONE_', 'None', '', 'BLANK1', 0)]
         return outputs
     def get_alpha_enum(self, context: Context):
+        outputs = []
         if self.type == "NODE_GROUP":
             custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
-            if not custom_node_tree:
-                return [('_NONE_', 'None', '', 'BLANK1', 0)]
-            outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT', include_none=True)
+            if custom_node_tree:
+                outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT', include_none=True)
         elif self.source_node:
             outputs = get_node_socket_enum(self.source_node, in_out='OUTPUT', favor_socket_name='Alpha', include_none=True, none_at_start=False)
         else:
-            return [('_NONE_', 'None', '', 'BLANK1', 0)]
+            outputs = [('_NONE_', 'None', '', 'BLANK1', 0)]
         return outputs
     color_input_name: EnumProperty(
         name="Color Input Socket Name",
