@@ -1826,18 +1826,31 @@ class Channel(BaseNestedListManager):
         self.update_node_tree(context)
         return layer
     
+    def set_active_index_to_layer(self, context, layer: "Layer"):
+        self.normalize_orders()
+        order = int(layer.order)
+        parent_id = int(layer.parent_id)
+        for i, item in enumerate(self.layers):
+            self.active_index = i
+            if item.order == order and item.parent_id == parent_id:
+                break
+        self.active_index = min(
+            self.active_index, len(self.layers) - 1)
+        self.update_node_tree(context)
+    
     def delete_layer(self, context, layer: "Layer"):
         item_id = layer.id
         order = int(layer.order)
         parent_id = int(layer.parent_id)
+        print(f"Deleting layer {layer.layer_name} with id {item_id} and order {order} and parent_id {parent_id}")
         def on_delete(item: "Layer"):
             item.delete_layer_data()
         if item_id != -1 and self.remove_item_and_children(item_id, on_delete):
             # Update active_index
             self.normalize_orders()
             for i, item in enumerate(self.layers):
+                self.active_index = i
                 if item.order == order and item.parent_id == parent_id:
-                    self.active_index = i
                     break
         self.active_index = min(
             self.active_index, len(self.layers) - 1)

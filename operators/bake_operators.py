@@ -753,9 +753,15 @@ class PAINTSYSTEM_OT_MergeDown(BakeOperator):
             layer.enabled = True
         
         # Remove the current layer since it's been merged
-        active_channel.delete_layers(context, [unlinked_layer, below_unlinked_layer])
-        
-        active_channel.create_layer(context, "Merged Layer", "IMAGE", coord_type="UV", uv_map_name=self.uv_map_name, image=image)
+        below_unlinked_layer.layer_name = below_unlinked_layer.layer_name + " Merged"
+        below_unlinked_layer.type = "IMAGE"
+        below_unlinked_layer.coord_type = "UV"
+        below_unlinked_layer.uv_map_name = self.uv_map_name
+        below_unlinked_layer.image = image
+        below_unlinked_layer.linked_layer_uid = ""
+        below_unlinked_layer.linked_material = None
+        active_channel.delete_layer(context, unlinked_layer)
+        active_channel.set_active_index_to_layer(context, below_unlinked_layer)
         # Set cursor back to default
         context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
@@ -869,10 +875,15 @@ class PAINTSYSTEM_OT_MergeUp(BakeOperator):
         for layer in to_be_enabled_layers:
             layer.enabled = True
 
-        # Remove the current layer since it's been merged into the layer above
-        active_channel.delete_layers(context, [unlinked_layer, above_unlinked_layer])
-        
-        active_channel.create_layer(context, "Merged Layer", "IMAGE", coord_type="UV", uv_map_name=self.uv_map_name, image=image)
+        above_unlinked_layer.layer_name = above_unlinked_layer.layer_name + " Merged"
+        above_unlinked_layer.type = "IMAGE"
+        above_unlinked_layer.coord_type = "UV"
+        above_unlinked_layer.uv_map_name = self.uv_map_name
+        above_unlinked_layer.image = image
+        above_unlinked_layer.linked_layer_uid = ""
+        above_unlinked_layer.linked_material = None
+        active_channel.delete_layer(context, unlinked_layer)
+        active_channel.set_active_index_to_layer(context, above_unlinked_layer)
         # Set cursor back to default
         context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
