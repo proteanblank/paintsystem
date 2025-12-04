@@ -509,6 +509,14 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
 
                 case 'ATTRIBUTE':
                     col = box.column()
+                    output_box = col.box()
+                    grid = output_box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
+                    grid_col = grid.column()
+                    grid_col.label(text="Color Output")
+                    grid_col.prop(active_layer, "color_output_name", text="")
+                    grid_col = grid.column()
+                    grid_col.label(text="Alpha Output")
+                    grid_col.prop(active_layer, "alpha_output_name", text="")
                     col.enabled = not active_layer.lock_layer
                     attribute_node = active_layer.source_node
                     if attribute_node:
