@@ -1008,7 +1008,7 @@ class PAINTSYSTEM_OT_ShowLayerWarnings(PSContextMixin, Operator):
     )
     
     def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self, width=200)
+        return context.window_manager.invoke_props_dialog(self, width=260)
     
     def draw(self, context):
         layout = self.layout
