@@ -108,7 +108,7 @@ def load_paint_system_data():
                             source_node.name = "source"
                             source_node.label = "source"
                         # If type == NODE_GROUP, update the color and alpha input and output sockets
-                        if layer.type == "NODE_GROUP":
+                        if layer.type == "NODE_GROUP" and layer.custom_node_tree:
                             # Get the color and alpha input and output sockets names from the custom node tree
                             custom_node_tree: bpy.types.NodeTree = layer.custom_node_tree
                             items = custom_node_tree.interface.items_tree

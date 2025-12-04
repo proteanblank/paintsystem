@@ -22,7 +22,7 @@ from .common import (
     get_icon,
     scale_content,
 )
-from .list_manager import ListManager
+from ..paintsystem.list_manager import ListManager
 from .operators_utils import redraw_panel
 
 
@@ -158,12 +158,7 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
             context.scene.view_settings.view_transform = 'Standard'
         
         node_tree = bpy.data.node_groups.new(name=f"Temp Group Name", type='ShaderNodeTree')
-        ps_mat_data = ps_ctx.ps_mat_data
-        lm = ListManager(ps_mat_data, 'groups', ps_mat_data, 'active_index')
-        new_group = lm.add_item()
-        new_group.name = self.group_name
-        new_group.node_tree = node_tree
-        new_group.update_node_tree(context)
+        new_group = ps_ctx.ps_mat_data.create_new_group(context, self.group_name, node_tree)
         new_group.template = self.template
         mat_node_tree = mat.node_tree
         

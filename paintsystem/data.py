@@ -32,6 +32,8 @@ from bpy_extras.node_utils import connect_sockets
 from typing import Optional
 from mathutils import Color
 
+from .list_manager import ListManager
+
 # ---
 from ..custom_icons import get_icon
 from ..utils.version import is_newer_than
@@ -1065,7 +1067,7 @@ class Layer(BaseNestedListItem):
     )
     def get_inputs_enum(self, context: Context):
         inputs = []
-        if self.type == "NODE_GROUP":
+        if self.type == "NODE_GROUP" and self.custom_node_tree:
             custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
             if custom_node_tree:
                 inputs = get_nodetree_socket_enum(custom_node_tree, in_out='INPUT', include_none=True)
@@ -1076,16 +1078,18 @@ class Layer(BaseNestedListItem):
         return inputs
     def get_color_enum(self, context: Context):
         outputs = []
-        if self.type == "NODE_GROUP":
+        if self.type == "NODE_GROUP" and self.custom_node_tree:
             custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
             if custom_node_tree:
                 outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT', include_none=False)
         elif self.source_node:
             outputs = get_node_socket_enum(self.source_node, in_out='OUTPUT', favor_socket_name='Color', include_none=False, none_at_start=False)
+        else:
+            outputs = [('_NONE_', 'None', '', 'BLANK1', 0)]
         return outputs
     def get_alpha_enum(self, context: Context):
         outputs = []
-        if self.type == "NODE_GROUP":
+        if self.type == "NODE_GROUP" and self.custom_node_tree:
             custom_node_tree = bpy.data.node_groups.get(self.custom_node_tree.name)
             if custom_node_tree:
                 outputs = get_nodetree_socket_enum(custom_node_tree, in_out='OUTPUT', include_none=True)
@@ -2253,7 +2257,7 @@ class Group(PropertyGroup):
     template: EnumProperty(
         name="Template",
         items=TEMPLATE_ENUM,
-        default='BASIC'
+        default='NONE'
     )
     coord_type: EnumProperty(
         items=COORDINATE_TYPE_ENUM,
@@ -2491,6 +2495,16 @@ class MaterialData(PropertyGroup):
         name="Original View Transform",
         description="Original view transform of the channel"
     )
+    
+    def create_new_group(self, context, group_name: str, node_tree: bpy.types.NodeTree = None):
+        if not node_tree:
+            node_tree = bpy.data.node_groups.new(name=f"Temp Group Name", type='ShaderNodeTree')
+        lm = ListManager(self, 'groups', self, 'active_index')
+        new_group = lm.add_item()
+        new_group.name = group_name
+        new_group.node_tree = node_tree
+        new_group.update_node_tree(context)
+        return new_group
 
 
 class CameraPlaneData(PropertyGroup):

@@ -70,16 +70,38 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
         legacy_ps_ctx = LegacyPaintSystemContextParser(context)
         legacy_groups = legacy_ps_ctx.get_material_settings().groups
         ps_ctx = self.parse_context(context)
+        ps_mat_data = ps_ctx.ps_mat_data
         warning_messages = []
         for legacy_group in legacy_groups:
-            bpy.ops.paint_system.new_group('EXEC_DEFAULT', group_name=legacy_group.name, add_layers=False, template='NONE')
+            # Workaround to remap alpha socket name
+            for item in legacy_group.node_tree.interface.items_tree:
+                if item.item_type == 'SOCKET' and item.name == "Alpha":
+                    item.name = "Color Alpha"
+            legacy_group_nodes = find_nodes(ps_ctx.active_material.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': legacy_group.node_tree})
+            relink_map = {}
+            for node_group in legacy_group_nodes:
+                # Get links
+                input_links = []
+                output_links = []
+                for input_socket in node_group.inputs[:]:
+                    for link in input_socket.links:
+                        input_links.append(link)
+                for output_socket in node_group.outputs[:]:
+                    for link in output_socket.links:
+                        output_links.append(link)
+                relink_map[node_group] = {
+                    'input_links': input_links,
+                    'output_links': output_links,
+                }
+            new_group = ps_mat_data.create_new_group(context, legacy_group.name, legacy_group.node_tree)
+            new_channel = new_group.create_channel(context, channel_name='Color', channel_type='COLOR', use_alpha=True)
             ps_ctx = self.parse_context(context)
             for legacy_layer in legacy_group.items:
                 if legacy_layer.type not in [layer[0] for layer in LAYER_TYPE_ENUM]:
                     print(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
                     warning_messages.append(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
                     continue
-                new_layer = ps_ctx.active_channel.create_layer(context, legacy_layer.name, legacy_layer.type)
+                new_layer = new_channel.create_layer(context, legacy_layer.name, legacy_layer.type)
                 
                 # Apply legacy layer properties
                 for prop in legacy_layer.bl_rna.properties:
@@ -100,12 +122,12 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                         uv_map_name = uv_map_node.uv_map
                         new_layer.coord_type = "UV"
                         new_layer.uv_map_name = uv_map_name
-                if legacy_layer.type == "NODE_GROUP":
-                    new_layer.custom_color_input = 0
-                    new_layer.custom_alpha_input = 1
-                    new_layer.custom_color_output = 0
-                    new_layer.custom_alpha_output = 1
                 new_layer.update_node_tree(context)
+                if legacy_layer.type == "NODE_GROUP":
+                    new_layer.color_input_name = "Color"
+                    new_layer.alpha_input_name = "Color Alpha"
+                    new_layer.color_output_name = "Color"
+                    new_layer.alpha_output_name = "Color Alpha"
                 # Apply node values
                 # Copy rgb node value
                 if legacy_layer.type == "SOLID_COLOR":
@@ -124,30 +146,16 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
                 if opacity_node:
                     new_layer.pre_mix_node.inputs['Opacity'].default_value = opacity_node.inputs[0].default_value
                 # refresh paintsystem context
-            ps_ctx.active_channel.update_node_tree(context)
-            ps_ctx.active_group.update_node_tree(context)
+            new_channel.update_node_tree(context)
+            new_group.update_node_tree(context)
             
             # Remap the node tree
-            # Workaround to remap alpha socket name
-            for item in legacy_group.node_tree.interface.items_tree:
-                if item.item_type == 'SOCKET' and item.name == "Alpha":
-                    item.name = "Color Alpha"
             # Find node group
-            legacy_group_nodes = find_nodes(ps_ctx.active_material.node_tree, {'bl_idname': 'ShaderNodeGroup', 'node_tree': legacy_group.node_tree})
-            for node_group in legacy_group_nodes:
-                # Get links
-                input_links = []
-                output_links = []
-                for input_socket in node_group.inputs[:]:
-                    for link in input_socket.links:
-                        input_links.append(link)
-                for output_socket in node_group.outputs[:]:
-                    for link in output_socket.links:
-                        output_links.append(link)
-                node_group.node_tree = ps_ctx.active_group.node_tree
-                for link in input_links:
+            for node_group, links in relink_map.items():
+                node_group.node_tree = new_group.node_tree
+                for link in links['input_links']:
                     connect_sockets(node_group.inputs[link.to_socket.name], link.from_socket)
-                for link in output_links:
+                for link in links['output_links']:
                     connect_sockets(link.to_socket, node_group.outputs[link.from_socket.name])
         legacy_groups.clear()
         if warning_messages:

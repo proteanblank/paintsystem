@@ -4,7 +4,7 @@ import bpy
 from ..paintsystem.data import CHANNEL_TYPE_ENUM, COLOR_SPACE_ENUM
 from ..utils import get_next_unique_name
 from .common import MultiMaterialOperator, PSContextMixin
-from .list_manager import ListManager
+from ..paintsystem.list_manager import ListManager
 from .operators_utils import redraw_panel
 
 class PAINTSYSTEM_OT_AddChannel(PSContextMixin, MultiMaterialOperator):
