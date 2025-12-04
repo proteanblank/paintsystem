@@ -178,6 +178,11 @@ class PSNodeTreeBuilder:
             else:
                 self._alpha_source_node = "proj_node"
                 self._alpha_source_socket = "Mask"
+        elif coord_type == "PARALLAX":
+            parallax_nt = get_library_nodetree(".PS Parallax")
+            self._builder.add_node("parallax", "ShaderNodeGroup", {"node_tree": parallax_nt}, force_properties=True)
+            output_node_name, output_socket_name = self._create_mapping_setup("parallax", "Vector")
+            self._builder.link(output_node_name, node_name, output_socket_name, socket_name)
     
     def _create_mapping_setup(self, node_name: str, socket_name: str):
         self._builder.add_node("mapping", "ShaderNodeMapping")

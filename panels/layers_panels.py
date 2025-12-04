@@ -770,12 +770,16 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
                 header.prop(proj_node.inputs["Enable"], "default_value", text="Normal Falloff")
                 if panel:
                     panel.prop(proj_node.inputs["Falloff"], "default_value", text="Degree")
+        elif active_layer.coord_type == 'PARALLAX':
+            parallax_node = active_layer.find_node("parallax")
+            if parallax_node:
+                col.prop(parallax_node.inputs["Depth"], "default_value", text="Depth")
         
         mapping_node = active_layer.find_node("mapping")
         if mapping_node:
             box = layout.box()
-            header, panel = box.panel("mapping_panel")
-            header.label(text="Mapping Settings:")
+            header, panel = box.panel("mapping_panel", default_closed=True)
+            header.label(text="Mapping Settings:", icon_value=get_icon('vector_socket'))
             if panel:
                 panel.use_property_split = False
                 col = panel.column()

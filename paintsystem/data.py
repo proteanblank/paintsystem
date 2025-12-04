@@ -138,6 +138,7 @@ COORDINATE_TYPE_ENUM = [
     ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
     ('DECAL', "Decal", "Use a decal output of Geometry node"),
     ('PROJECT', "Projection", "Define a projection coordinate"),
+    ('PARALLAX', 'Parallax', 'Use a parallax coordinate'),
 ]
 
 ATTRIBUTE_TYPE_ENUM = [
