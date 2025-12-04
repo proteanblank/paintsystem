@@ -410,7 +410,7 @@ def create_solid_graph(layer: "Layer"):
 
 def create_attribute_graph(layer: "Layer"):
     color_socket = parse_socket_name(layer, layer.color_output_name, "Color")
-    alpha_socket = parse_socket_name(layer, layer.alpha_output_name, None)
+    alpha_socket = parse_socket_name(layer, layer.alpha_output_name, "Alpha")
     if alpha_socket:
         builder = PSNodeTreeBuilder(layer, ATTRIBUTE_LAYER_VERSION, "source", color_socket, "source", alpha_socket)
     else:
