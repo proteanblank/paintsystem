@@ -231,10 +231,17 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
                 except Exception:
                     pass
                 try:
+                    header, panel = col.panel("paintsystem_color_history_palette", default_closed=True)
+                    header.label(text="Color History")
+                    if panel:
+                        if not ps_ctx.ps_scene_data.color_history_palette:
+                            panel.label(text="No color history yet")
+                        else:
+                            panel.template_palette(ps_ctx.ps_scene_data, "color_history_palette", color=True)
                     header, panel = col.panel("paintsystem_color_palette", default_closed=True)
                     header.label(text="Color Palette")
                     panel.template_ID(settings, "palette", new="palette.new")
-                    if settings.palette:
+                    if panel and settings.palette:
                         panel.template_palette(settings, "palette", color=True)
                 except Exception:
                     pass

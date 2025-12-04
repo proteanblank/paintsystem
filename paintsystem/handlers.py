@@ -154,6 +154,16 @@ def load_paint_system_data():
 @bpy.app.handlers.persistent
 def load_post(scene):
     
+    # Ensure color history palette is created
+    if not hasattr(scene, 'ps_scene_data'):
+        return
+    ps_scene_data = scene.ps_scene_data
+    if not ps_scene_data.color_history_palette:
+        palette_name = "Paint System History"
+        palette = bpy.data.palettes.get(palette_name)
+        if not palette:
+            palette = bpy.data.palettes.new(palette_name)
+    
     load_paint_system_data()
     # Check for donation info
     get_donation_info()
@@ -190,6 +200,56 @@ def refresh_image(scene: bpy.types.Scene):
 
 
 @bpy.app.handlers.persistent
+def color_history_handler(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph = None):
+    if not hasattr(scene, 'ps_scene_data'):
+        return
+    ps_scene_data = scene.ps_scene_data
+    if depsgraph and not depsgraph.id_type_updated('IMAGE'):
+        return
+    # Color History
+    try:
+        ps_ctx = parse_context(bpy.context)
+        active_layer = ps_ctx.active_layer
+        if not active_layer:
+            return
+        image: bpy.types.Image = active_layer.image
+        if active_layer and active_layer.type == "IMAGE" and image and image.is_dirty:
+            if not ps_scene_data.color_history_palette:
+                palette_name = "Paint System History"
+                palette = bpy.data.palettes.get(palette_name)
+                if not palette:
+                    palette = bpy.data.palettes.new(palette_name)
+                ps_scene_data.color_history_palette = palette
+            
+            palette = ps_scene_data.color_history_palette
+            current_color = ps_scene_data.get_brush_color(bpy.context)
+            
+            should_add = True
+            if len(palette.colors) > 0:
+                last_color = palette.colors[0].color
+                if (abs(last_color[0] - current_color[0]) < 0.001 and 
+                    abs(last_color[1] - current_color[1]) < 0.001 and 
+                    abs(last_color[2] - current_color[2]) < 0.001):
+                    should_add = False
+            
+            if should_add:
+                colors_to_save = [c.color[:] for c in palette.colors]
+                palette.colors.clear()
+
+                item = palette.colors.new()
+                item.color = (current_color[0], current_color[1], current_color[2])
+                # print(f"Color added: {item.color[:]}")
+                
+                for col in colors_to_save:
+                    if len(palette.colors) >= 20:
+                        break
+                    item = palette.colors.new()
+                    item.color = col
+    except Exception as e:
+        print(f"Color History Error: {e}")
+        pass
+
+@bpy.app.handlers.persistent
 def paint_system_object_update(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph = None):
     """Handle object changes and update paint canvas - based on UcuPaint's ypaint_last_object_update"""
     
@@ -200,6 +260,8 @@ def paint_system_object_update(scene: bpy.types.Scene, depsgraph: bpy.types.Deps
         return
     
     if not obj or not hasattr(scene, 'ps_scene_data'):
+        return
+    if depsgraph and not depsgraph.id_type_updated('OBJECT'):
         return
     
     ps_scene_data = scene.ps_scene_data
@@ -266,8 +328,10 @@ def register():
     bpy.app.handlers.load_post.append(refresh_image)
     if hasattr(bpy.app.handlers, 'scene_update_pre'):
         bpy.app.handlers.scene_update_pre.append(paint_system_object_update)
+        bpy.app.handlers.scene_update_pre.append(color_history_handler)
     else:
         bpy.app.handlers.depsgraph_update_post.append(paint_system_object_update)
+        bpy.app.handlers.depsgraph_update_post.append(color_history_handler)
     bpy.app.timers.register(on_addon_enable, first_interval=0.1)
     bpy.msgbus.subscribe_rna(
         key=(bpy.types.UnifiedPaintSettings, "color"),
@@ -296,5 +360,7 @@ def unregister():
     bpy.app.handlers.load_post.remove(refresh_image)
     if hasattr(bpy.app.handlers, 'scene_update_pre'):
         bpy.app.handlers.scene_update_pre.remove(paint_system_object_update)
+        bpy.app.handlers.scene_update_pre.remove(color_history_handler)
     else:
         bpy.app.handlers.depsgraph_update_post.remove(paint_system_object_update)
+        bpy.app.handlers.depsgraph_update_post.remove(color_history_handler)

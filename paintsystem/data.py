@@ -2445,6 +2445,11 @@ class PaintSystemGlobalData(PropertyGroup):
         default="#000000",
         update=update_hex_color,
     )
+    color_history_palette: PointerProperty(
+        name="Color History Palette",
+        type=bpy.types.Palette,
+        description="Palette to store color history"
+    )
     temp_materials: CollectionProperty(
         type=TempMaterial,
         name="Temp Materials",
