@@ -2499,6 +2499,10 @@ class MaterialData(PropertyGroup):
     def create_new_group(self, context, group_name: str, node_tree: bpy.types.NodeTree = None):
         if not node_tree:
             node_tree = bpy.data.node_groups.new(name=f"Temp Group Name", type='ShaderNodeTree')
+        else:
+            # Delete all nodes in the node tree
+            for node in node_tree.nodes:
+                node_tree.nodes.remove(node)
         lm = ListManager(self, 'groups', self, 'active_index')
         new_group = lm.add_item()
         new_group.name = group_name
