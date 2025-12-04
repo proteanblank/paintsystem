@@ -630,18 +630,22 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     panel.use_property_split = True
                     panel.use_property_decorate = False
                     col = panel.column()
-                    box = col.box()
-                    text_row = box.row()
-                    text_row.alignment = 'CENTER'
-                    text_row.label(text="Output")
-                    box.prop(active_layer, "color_output_name", text="Color")
-                    box.prop(active_layer, "alpha_output_name", text="Alpha")
-                    box = col.box()
-                    text_row = box.row()
-                    text_row.alignment = 'CENTER'
-                    text_row.label(text="Input")
-                    box.prop(active_layer, "color_input_name", text="Color")
-                    box.prop(active_layer, "alpha_input_name", text="Alpha")
+                    output_box = col.box()
+                    grid = output_box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
+                    grid_col = grid.column()
+                    grid_col.label(text="Color Output")
+                    grid_col.prop(active_layer, "color_output_name", text="")
+                    grid_col = grid.column()
+                    grid_col.label(text="Alpha Output")
+                    grid_col.prop(active_layer, "alpha_output_name", text="")
+                    output_box = col.box()
+                    grid = output_box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
+                    grid_col = grid.column()
+                    grid_col.label(text="Color Input")
+                    grid_col.prop(active_layer, "color_input_name", text="")
+                    grid_col = grid.column()
+                    grid_col.label(text="Alpha Input")
+                    grid_col.prop(active_layer, "alpha_input_name", text="")
 
 # Grease Pencil Layer Settings
 
