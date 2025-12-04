@@ -506,9 +506,9 @@ def create_custom_graph(layer: "Layer"):
     color_output = parse_socket_name(layer, layer.color_output_name, None)
     alpha_output = parse_socket_name(layer, layer.alpha_output_name, None)
     if alpha_output:
-        builder = PSNodeTreeBuilder(layer, CUSTOM_LAYER_VERSION, "source", color_output, "source", alpha_output)
+        builder = PSNodeTreeBuilder(layer, CUSTOM_LAYER_VERSION, "source" if color_output else None, color_output, "source" if alpha_output else None, alpha_output)
     else:
-        builder = PSNodeTreeBuilder(layer, CUSTOM_LAYER_VERSION, "source", color_output)
+        builder = PSNodeTreeBuilder(layer, CUSTOM_LAYER_VERSION, "source" if color_output else None, color_output)
     builder.add_node("source", "ShaderNodeGroup", {"node_tree": custom_node_tree, "name": "source"})
     if color_input:
         builder.link("group_input", "source", "Color", color_input)
