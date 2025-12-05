@@ -3,6 +3,8 @@ from bpy.types import UIList, Menu, Context, Image, ImagePreview, Panel, NodeTre
 from bpy.utils import register_classes_factory
 import numpy as np
 
+from ..custom_icons import get_image_editor_icon
+
 from ..utils.version import is_newer_than
 from .common import (
     PSContextMixin,
@@ -872,10 +874,14 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         layout = self.layout
         layout.enabled = not active_layer.lock_layer
         if not active_layer.external_image:
-            layout.operator("paint_system.quick_edit", text="Edit Externally (View Capture)")
+            layout.operator("paint_system.quick_edit", text="Edit Externally")
         else:
-            layout.operator("paint_system.project_apply",
-                        text="Apply")
+            if active_layer.edit_external_mode == 'IMAGE_EDIT':
+                row = layout.row(align=True)
+                row.operator("paint_system.quick_edit", text="Open Image", icon_value=get_image_editor_icon(context.preferences.filepaths.image_editor))
+                row.operator("paint_system.reload_image", text="Reload Image", icon="FILE_REFRESH")
+            elif active_layer.edit_external_mode == 'VIEW_CAPTURE':
+                layout.operator("paint_system.project_apply", text="Apply Edit")
         box = layout.box()
         col = box.column()
         image_node = active_layer.source_node

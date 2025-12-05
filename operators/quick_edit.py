@@ -1,9 +1,27 @@
 import bpy
+from bpy.props import EnumProperty, StringProperty
 from bpy.types import Operator
 from bpy.utils import register_classes_factory
-from .common import PSContextMixin
+import os
+
+from ..custom_icons import get_icon, get_image_editor_icon
+
+from ..paintsystem.data import EDIT_EXTERNAL_MODE_ENUM
+from .common import PSContextMixin, scale_content
 import numpy as np
 import pathlib
+
+
+def image_needs_save(image) -> bool:
+    """Check if an image needs to be saved to disk before external editing."""
+    if not image:
+        return False
+    # If no filepath, it needs to be saved
+    if not image.filepath:
+        return True
+    # Check if the file actually exists on disk
+    abs_path = bpy.path.abspath(image.filepath)
+    return not os.path.exists(abs_path)
 
 # https://projects.blender.org/blender/blender/src/branch/main/scripts/startup/bl_operators/image.py#L54
 class PAINTSYSTEM_OT_ProjectEdit(PSContextMixin, Operator):
@@ -217,59 +235,191 @@ class PAINTSYSTEM_OT_QuickEdit(PSContextMixin, Operator):
     bl_label = "Quick Edit"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Quickly edit the active image"
+    
+    edit_external_mode: EnumProperty(
+        items=EDIT_EXTERNAL_MODE_ENUM,
+        name="Edit External Mode",
+        description="Edit external mode",
+        default='IMAGE_EDIT'
+    )
+    
+    save_directory: StringProperty(
+        name="Save Directory",
+        description="Directory to save unsaved images",
+        subtype='DIR_PATH',
+        default=""
+    )
 
     def execute(self, context):
         current_image_editor = context.preferences.filepaths.image_editor
         if not current_image_editor:
             self.report({'ERROR'}, "No image editor set")
             return {'CANCELLED'}
-        bpy.ops.paint_system.project_edit('INVOKE_DEFAULT')
+        
+        ps_ctx = self.parse_context(context)
+        active_layer = ps_ctx.active_layer
+        
+        if self.edit_external_mode == 'VIEW_CAPTURE':
+            active_layer.edit_external_mode = 'VIEW_CAPTURE'
+            bpy.ops.paint_system.project_edit('INVOKE_DEFAULT')
+            return {'FINISHED'}
+        
+        # IMAGE_EDIT mode
+        if not active_layer:
+            self.report({'ERROR'}, "No active layer selected")
+            return {'CANCELLED'}
+        
+        if not active_layer.image:
+            self.report({'ERROR'}, "Active layer does not have an image")
+            return {'CANCELLED'}
+        
+        image = active_layer.image
+        active_layer.edit_external_mode = 'IMAGE_EDIT'
+        
+        # Check if image needs to be saved
+        if image_needs_save(image):
+            if not self.save_directory:
+                self.report({'ERROR'}, "Please select a directory to save the image")
+                return {'CANCELLED'}
+            
+            # Build filepath
+            image_name = bpy.path.clean_name(image.name)
+            if not image_name.lower().endswith('.png'):
+                image_name += '.png'
+            filepath = os.path.join(bpy.path.abspath(self.save_directory), image_name)
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            
+            # Save the image
+            image.filepath_raw = filepath
+            image.file_format = 'PNG'
+        image.save()
+        
+        # Get the absolute filepath
+        filepath = bpy.path.abspath(image.filepath)
+        
+        # Store as external image for apply operation
+        active_layer.external_image = image
+        
+        # Open in external editor
+        try:
+            bpy.ops.image.external_edit(filepath=filepath)
+        except RuntimeError as ex:
+            self.report({'ERROR'}, str(ex))
+            return {'CANCELLED'}
+        
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        # Set default save directory based on blend file location or temp dir
+        if bpy.data.is_saved:
+            self.save_directory = os.path.dirname(bpy.data.filepath)
+        else:
+            self.save_directory = bpy.app.tempdir
+        
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
+        
+        # Mode selector
+        row = layout.row()
+        scale_content(context, row, 1.5, 1.5)
+        row.prop(self, "edit_external_mode", expand=True)
+        
         if ps_ctx.ps_settings.show_tooltips:
-            box = layout.box()
-            col = box.column(align=True)
-            col.label(text="This will capture the current view", icon="INFO")
-            col.label(text="and open it in the image editor", icon="BLANK1")
-
+            if self.edit_external_mode == 'IMAGE_EDIT':
+                box = layout.box()
+                col = box.column(align=True)
+                col.label(text="Edit the layer's image directly in the", icon="INFO")
+                col.label(text="external image editor", icon="BLANK1")
+            elif self.edit_external_mode == 'VIEW_CAPTURE':
+                box = layout.box()
+                col = box.column(align=True)
+                col.label(text="Capture the current view and edit it in the", icon="INFO")
+                col.label(text="external image editor", icon="BLANK1")
+        
         current_image_editor = context.preferences.filepaths.image_editor
         image_paint = context.scene.tool_settings.image_paint
+        
+        # Show editor path
         if not current_image_editor:
             layout.prop(context.preferences.filepaths, "image_editor")
         else:
             editor_path = pathlib.Path(current_image_editor)
             app_name = editor_path.name
-            layout.label(text=f"Open {app_name}", icon="EXPORT")
-        box = layout.box()
-        row = box.row()
-        row.alignment = "CENTER"
-        row.label(text="External Settings:", icon="TOOL_SETTINGS")
-        row = box.row()
-        row.prop(image_paint, "seam_bleed", text="Bleed")
-        row.prop(image_paint, "dither", text="Dither")
-        split = box.split()
-        split.label(text="Screen Grab Size:")
-        split.prop(image_paint, "screen_grab_size", text="")
-        box = layout.box()
-        box.alert=True
-        row = box.row()
-        row.alignment = "CENTER"
-        row.label(icon="ERROR")
-        col = row.column(align=True)
-        col.label(text="Make sure to close the image editor")
-        col.label(text=" before applying the edit.")
+            row = layout.row()
+            row.template_icon(get_image_editor_icon(current_image_editor), scale=1.5)
+            col = row.column()
+            col.scale_y = 1.5
+            col.label(text=f"{app_name.replace('.exe', '')}")
+        
+        if self.edit_external_mode == 'IMAGE_EDIT':
+            # IMAGE_EDIT specific UI
+            active_layer = ps_ctx.active_layer
+            
+            if not active_layer or not active_layer.image:
+                box = layout.box()
+                box.alert = True
+                box.label(text="No image on active layer!", icon="ERROR")
+            else:
+                # image = active_layer.image
+                box = layout.box()
+                box.label(text=f"Save Directory:", icon="IMAGE_DATA")
+                box.prop(self, "save_directory", text="")
+                # Check if image needs to be saved
+                # if image_needs_save(image):
+                #     box = layout.box()
+                #     col = box.column(align=True)
+                #     col.label(text="Image will be saved in:", icon="INFO")
+                #     col.label(text=f"{self.save_directory}", icon="BLANK1")
+        else:
+            
+            box = layout.box()
+            row = box.row()
+            row.alignment = "CENTER"
+            row.label(text="External Settings:", icon="TOOL_SETTINGS")
+            row = box.row()
+            row.prop(image_paint, "seam_bleed", text="Bleed")
+            row.prop(image_paint, "dither", text="Dither")
+            split = box.split()
+            split.label(text="Screen Grab Size:")
+            split.prop(image_paint, "screen_grab_size", text="")
+        
+            # Warning about closing editor
+            box = layout.box()
+            box.alert = True
+            row = box.row()
+            row.alignment = "CENTER"
+            row.label(icon="ERROR")
+            col = row.column(align=True)
+            col.label(text="Make sure to close the image editor")
+            col.label(text=" before applying the edit.")
+
+
+class PAINTSYSTEM_OT_ReloadImage(PSContextMixin, Operator):
+    bl_idname = "paint_system.reload_image"
+    bl_label = "Reload Image"
+    bl_options = {'REGISTER'}
+    bl_description = "Reload the image"
+
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        active_layer = ps_ctx.active_layer
+        if not active_layer.external_image:
+            self.report({'ERROR'}, "No external image found")
+            return {'CANCELLED'}
+        active_layer.external_image.reload()
+        return {'FINISHED'}
 
 
 classes = (
     PAINTSYSTEM_OT_ProjectEdit,
     PAINTSYSTEM_OT_ProjectApply,
     PAINTSYSTEM_OT_QuickEdit,
+    PAINTSYSTEM_OT_ReloadImage,
 )
 
 register, unregister = register_classes_factory(classes)

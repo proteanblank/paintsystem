@@ -184,6 +184,11 @@ PARALLAX_TYPE_ENUM = [
     ('Object', "Object", "Object"),
 ]
 
+EDIT_EXTERNAL_MODE_ENUM = [
+    ('IMAGE_EDIT', "Image Edit", "Edit Image in external editor", "IMAGE", 0),
+    ('VIEW_CAPTURE', "View Capture", "Capture view and edit in external editor", "CAMERA_DATA", 1),
+]
+
 def save_image(image: Image):
     if not image.is_dirty:
         return
@@ -1253,6 +1258,12 @@ class Layer(BaseNestedListItem):
     node_tree: PointerProperty(
         name="Node Tree",
         type=NodeTree
+    )
+    edit_external_mode: EnumProperty(
+        items=EDIT_EXTERNAL_MODE_ENUM,
+        name="Edit External Mode",
+        description="Edit external mode",
+        default='IMAGE_EDIT'
     )
     external_image: PointerProperty(
         name="Edit External Image",
