@@ -109,12 +109,14 @@ def draw_input_sockets(layout, context: Context, only_output: bool = False):
     ps_ctx = PSContextMixin.parse_context(context)
     active_layer = ps_ctx.active_layer
     header, panel = layout.panel("input_sockets_panel", default_closed=True)
-    header.label(text="Sockets Settings:")
+    header.label(text="Sockets Settings:", icon_value=get_icon('float_socket'))
     if panel:
+        row = panel.row(align=True)
+        row.label(icon="BLANK1")
         if only_output:
-            output_box = panel
+            output_box = row
         else:
-            input_box = panel.box()
+            input_box = row.box()
         grid = output_box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
         grid_col = grid.column()
         grid_col.label(text="Color Output")
@@ -868,21 +870,22 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         ps_ctx = self.parse_context(context)
         active_layer = ps_ctx.active_layer
         layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
         layout.enabled = not active_layer.lock_layer
+        if not active_layer.external_image:
+            layout.operator("paint_system.quick_edit", text="Edit Externally (View Capture)")
+        else:
+            layout.operator("paint_system.project_apply",
+                        text="Apply")
         box = layout.box()
         col = box.column()
-        if not active_layer.external_image:
-            col.operator("paint_system.quick_edit", text="Edit Externally (View Capture)")
-        else:
-            col.operator("paint_system.project_apply",
-                        text="Apply")
-        line_separator(col)
         image_node = active_layer.source_node
-        image_node_settings(col, image_node, active_layer, "image", simple_ui=True)
-        col.prop(active_layer, "correct_image_aspect", text="Correct Aspect")
+        panel = image_node_settings(col, image_node, active_layer, "image", simple_ui=True)
+        if panel:
+            line_separator(col)
         draw_input_sockets(col, context, only_output=True)
+        row = col.row(align=True)
+        row.label(icon="BLANK1")
+        row.prop(active_layer, "correct_image_aspect", text="Correct Aspect", toggle=1, icon='CHECKBOX_HLT' if active_layer.correct_image_aspect else 'CHECKBOX_DEHLT')
 
 class MAT_MT_LayerMenu(PSContextMixin, Menu):
     bl_label = "Layer Menu"

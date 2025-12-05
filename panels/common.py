@@ -212,6 +212,8 @@ def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, 
         row.prop(data, propname, text="")
         if simple_ui:
             row.operator("paint_system.export_image", text="", icon="EXPORT").image_name = image_node.image.name
+            row.menu("MAT_MT_ImageMenu",
+                    text="", icon='COLLAPSEMENU')
     else:
         header.template_ID(data, propname, text="", new="image.new", open="image.open")
     if panel:
@@ -242,6 +244,7 @@ def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, 
             # Color space settings
             col.prop(image.colorspace_settings, "name", text="Color Space")
             col.prop(image, "alpha_mode", text="Alpha")
+    return panel
 
 
 def is_basic_setup(node_tree: bpy.types.NodeTree) -> bool:
