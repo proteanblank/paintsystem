@@ -16,6 +16,7 @@ from ..paintsystem.data import (
     TEXTURE_TYPE_ENUM,
     GRADIENT_TYPE_ENUM,
     GEOMETRY_TYPE_ENUM,
+    add_empty_to_collection,
     get_layer_by_uid,
     save_image,
 )
@@ -348,6 +349,8 @@ class PAINTSYSTEM_OT_SelectEmpty(PSContextMixin, Operator):
     def execute(self, context):
         ps_ctx = self.parse_context(context)
         empty_object = ps_ctx.active_layer.empty_object
+        if empty_object and empty_object.name not in context.view_layer.objects:
+            add_empty_to_collection(context, empty_object)
         if empty_object:
             bpy.ops.object.mode_set(mode='OBJECT')
             bpy.ops.object.select_all(action='DESELECT')
