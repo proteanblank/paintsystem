@@ -501,12 +501,11 @@ class BrushPainterCore:
                 y, x = step_data.random_y[i], step_data.random_x[i]
                 canvas_y = y + offset_y
                 canvas_x = x + offset_x
-                
-                if self.apply_brush_stroke(canvas, y, x, img_float, img_blurred, has_alpha, G_normalized, theta, step_data.opacity,
-                                         step_data.scaled_brush_list, canvas_y, canvas_x, extended_H, extended_W):
-                    total_strokes_applied += 1
-                    if brush_callback:
-                        brush_callback(total_strokes, total_strokes_applied)
+                self.apply_brush_stroke(canvas, y, x, img_float, img_blurred, has_alpha, G_normalized, theta, step_data.opacity,
+                                         step_data.scaled_brush_list, canvas_y, canvas_x, extended_H, extended_W)
+                total_strokes_applied += 1
+                if brush_callback:
+                    brush_callback(total_strokes, total_strokes_applied)
         
         # Crop back to original dimensions
         final_canvas = canvas[offset_y:offset_y + H, offset_x:offset_x + W]
