@@ -771,6 +771,10 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
                 if panel:
                     panel.prop(proj_node.inputs["Falloff"], "default_value", text="Degree")
         elif active_layer.coord_type == 'PARALLAX':
+            col.prop(active_layer, "parallax_space", text="Space", expand=True)
+            if active_layer.parallax_space == 'UV':
+                col.prop_search(active_layer, "parallax_uv_map_name", text="UV Map",
+                                search_data=ps_ctx.ps_object.data, search_property="uv_layers", icon='GROUP_UVS')
             parallax_node = active_layer.find_node("parallax")
             if parallax_node:
                 col.prop(parallax_node.inputs["Depth"], "default_value", text="Depth")

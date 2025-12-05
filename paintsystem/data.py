@@ -179,6 +179,11 @@ FILTER_TYPE_ENUM = [
     ('SHARPEN', "Sharpen", "Sharpen"),
 ]
 
+PARALLAX_TYPE_ENUM = [
+    ('UV', "UV", "UV"),
+    ('Object', "Object", "Object"),
+]
+
 STRING_CACHE = {}
 def intern_enum_items(items):
     def intern_string(s):
@@ -1285,6 +1290,20 @@ class Layer(BaseNestedListItem):
         description="Lock the alpha channel",
         default=False,
         update=update_brush_settings
+    )
+    
+    # For parallax coordinate type
+    parallax_space: EnumProperty(
+        items=PARALLAX_TYPE_ENUM,
+        name="Parallax Type",
+        description="Parallax type",
+        default='UV',
+        update=update_node_tree
+    )
+    parallax_uv_map_name: StringProperty(
+        name="Parallax UV Map",
+        description="Name of the UV map to use for parallax",
+        update=update_node_tree
     )
     
     # Decal properties

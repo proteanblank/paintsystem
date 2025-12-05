@@ -179,8 +179,19 @@ class PSNodeTreeBuilder:
                 self._alpha_source_node = "proj_node"
                 self._alpha_source_socket = "Mask"
         elif coord_type == "PARALLAX":
-            parallax_nt = get_library_nodetree(".PS Parallax")
-            self._builder.add_node("parallax", "ShaderNodeGroup", {"node_tree": parallax_nt}, force_properties=True)
+            match self._layer.parallax_space:
+                case "UV":
+                    parallax_nt = get_library_nodetree(".PS UV Parallax")
+                    self._builder.add_node("geometry", "ShaderNodeNewGeometry")
+                    self._builder.add_node("parallax", "ShaderNodeGroup", {"node_tree": parallax_nt}, force_properties=True)
+                    self._builder.add_node("uvmap", "ShaderNodeUVMap", {"uv_map": self._layer.parallax_uv_map_name}, force_properties=True)
+                    self._builder.add_node("uv_tangent", "ShaderNodeTangent", {"direction_type": "UV_MAP", "uv_map": self._layer.parallax_uv_map_name}, force_properties=True)
+                    self._builder.link("uvmap", "parallax", "UV", "UV")
+                    self._builder.link("uv_tangent", "parallax", "Tangent", "Tangent")
+                    self._builder.link("geometry", "parallax", "Normal", "Normal")
+                case "Object":
+                    parallax_nt = get_library_nodetree(".PS Object Parallax")
+                    self._builder.add_node("parallax", "ShaderNodeGroup", {"node_tree": parallax_nt}, force_properties=True)
             output_node_name, output_socket_name = self._create_mapping_setup("parallax", "Vector")
             self._builder.link(output_node_name, node_name, output_socket_name, socket_name)
     
