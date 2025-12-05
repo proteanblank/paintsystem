@@ -390,7 +390,12 @@ def get_adjustment_identifier(adjustment_type: str) -> str:
 
 # Layers that can have custom types are IMAGE, ATTRIBUTE, CUSTOM, TEXTURE
 def parse_socket_name(layer: "Layer", socket_name: str, default_socket_name: str = None) -> str:
-    if layer.source_node:
+    if layer.type == "NODE_GROUP":
+        custom_node_tree = layer.custom_node_tree
+        if custom_node_tree:
+            return socket_name if socket_name in custom_node_tree.interface.items_tree else None
+        return default_socket_name
+    elif layer.source_node:
         return socket_name if socket_name != "_NONE_" else None
     return default_socket_name
 
