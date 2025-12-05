@@ -905,9 +905,6 @@ class Layer(BaseNestedListItem):
         
         if self.coord_type == "DECAL":
             if not self.empty_object:
-                image_tex_node = self.source_node
-                if image_tex_node and image_tex_node.extension != "CLIP":
-                    image_tex_node.extension = "CLIP"
                 self.ensure_empty_object()
                 self.empty_object.empty_display_type = 'SINGLE_ARROW'
             elif self.empty_object.name not in context.view_layer.objects:
@@ -1182,9 +1179,10 @@ class Layer(BaseNestedListItem):
                         pass
     def update_coord_type(self, context: Context):
         if self.coord_type in ['DECAL', 'PROJECT']:
-            image_node = self.source_node
-            if image_node:
-                image_node.extension = "CLIP"
+            if self.type == "IMAGE":
+                image_node = self.source_node
+                if image_node:
+                    image_node.extension = "CLIP"
         if self.coord_type == "PROJECT" and not self.find_node("proj_node"):
             # Capture the camera position
             self.set_projection_view(context)
@@ -1247,10 +1245,15 @@ class Layer(BaseNestedListItem):
         default=False,
         update=update_node_tree
     )
+    def update_type(self, context: Context):
+        if self.type == "IMAGE":
+            self.color_output_name = "Color"
+            self.alpha_output_name = "Alpha"
+        self.update_node_tree(context)
     type: EnumProperty(
         items=LAYER_TYPE_ENUM,
         default='IMAGE',
-        update=update_node_tree
+        update=update_type
     )
     lock_layer: BoolProperty(
         name="Lock Layer",

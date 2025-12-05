@@ -201,14 +201,19 @@ def check_group_multiuser(group_node_tree: bpy.types.NodeTree) -> bool:
     return user_count > 1
 
 
-def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, data, propname="image", text="", icon="NONE", icon_value=None):
-    box = layout.box()
-    if data[propname]:
-        box.template_ID(data, propname, text="")
+def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, data, propname="image", text="", icon="NONE", icon_value=None, default_closed=True, simple_ui=False):
+    if simple_ui:
+        box = layout
     else:
-        box.template_ID(data, propname, text="", new="image.new", open="image.open")
-    header, panel = box.panel("image_node_settings_panel", default_closed=True)
-    header.label(text="Image Settings:")
+        box = layout.box()
+    header, panel = box.panel("image_node_settings_panel", default_closed=default_closed)
+    if data[propname]:
+        row = header.row(align=True)
+        row.prop(data, propname, text="")
+        if simple_ui:
+            row.operator("paint_system.export_image", text="", icon="EXPORT").image_name = image_node.image.name
+    else:
+        header.template_ID(data, propname, text="", new="image.new", open="image.open")
     if panel:
         col = panel.column()
         if text or icon != "NONE" or icon_value:
@@ -218,14 +223,12 @@ def image_node_settings(layout: bpy.types.UILayout, image_node: bpy.types.Node, 
             col.separator()
         col.use_property_split = True
         col.use_property_decorate = False
-        if image_node.image:
+        if not simple_ui and image_node.image:
             row = col.row(align=True)
             row.operator("paint_system.export_image", text="Export As...", icon="EXPORT").image_name = image_node.image.name
             row.menu("MAT_MT_ImageMenu",
                     text="", icon='COLLAPSEMENU')
             col.separator()
-        # col.use_property_split = True
-        # col.prop(image_node.image, "name", text="Image name")
         col.prop(image_node, "interpolation",
                     text="")
         col.prop(image_node, "projection",

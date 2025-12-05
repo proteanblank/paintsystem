@@ -104,6 +104,33 @@ def draw_layer_icon(layer: Layer, layout: bpy.types.UILayout):
             layout.label(icon='MESH_DATA')
         case _:
             layout.label(icon='BLANK1')
+
+def draw_input_sockets(layout, context: Context, only_output: bool = False):
+    ps_ctx = PSContextMixin.parse_context(context)
+    active_layer = ps_ctx.active_layer
+    header, panel = layout.panel("input_sockets_panel", default_closed=True)
+    header.label(text="Sockets Settings:")
+    if panel:
+        if only_output:
+            output_box = panel
+        else:
+            input_box = panel.box()
+        grid = output_box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
+        grid_col = grid.column()
+        grid_col.label(text="Color Output")
+        grid_col.prop(active_layer, "color_output_name", text="")
+        grid_col = grid.column()
+        grid_col.label(text="Alpha Output")
+        grid_col.prop(active_layer, "alpha_output_name", text="")
+        if not only_output:
+            input_box = panel.box()
+            grid = input_box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
+            grid_col = grid.column()
+            grid_col.label(text="Color Input")
+            grid_col.prop(active_layer, "color_input_name", text="")
+            grid_col = grid.column()
+            grid_col.label(text="Alpha Input")
+            grid_col.prop(active_layer, "alpha_input_name", text="")
 class MAT_PT_UL_LayerList(PSContextMixin, UIList):
     def draw_item(self, context: Context, layout, data, item, icon, active_data, active_property, index):
         linked_item = item.get_layer_data()
@@ -327,9 +354,9 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                 bake_box = layout.box()
                 col = bake_box.column()
                 col.label(text="Baked Image", icon="TEXTURE_DATA")
+                image_node_settings(col, image_node, active_channel, "bake_image", simple_ui=True, default_closed=True)
                 col.operator("wm.call_menu", text="Apply Image Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
                 col.operator("paint_system.delete_bake_image", text="Delete", icon="TRASH")
-                image_node_settings(layout, image_node, active_channel, "bake_image")
                 return
 
 
@@ -371,22 +398,27 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                 col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
 
 
+def get_image(context) -> bpy.types.Image:
+    image = None
+    ps_ctx = PSContextMixin.parse_context(context)
+    if ps_ctx.active_channel and  ps_ctx.active_channel.use_bake_image:
+        image = ps_ctx.active_channel.bake_image
+    elif ps_ctx.active_layer and ps_ctx.active_layer.image:
+        image = ps_ctx.active_layer.image
+    return image
+
 class MAT_MT_ImageFilterMenu(PSContextMixin, Menu):
     bl_label = "Image Filter Menu"
     bl_idname = "MAT_MT_ImageFilterMenu"
 
     @classmethod
     def poll(cls, context):
-        ps_ctx = cls.parse_context(context)
-        layer = ps_ctx.active_layer
-        return layer and layer.image
+        return get_image(context)
 
     def draw(self, context):
         layout = self.layout
         
         layout.operator_context = 'INVOKE_REGION_WIN'
-        
-        ps_ctx = self.parse_context(context)
         if PIL_AVAILABLE:
             layout.operator("paint_system.brush_painter",
                             icon="BRUSH_DATA")
@@ -587,21 +619,15 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     col.use_property_decorate = False
                     col.use_property_split = True
                     col.prop(active_layer, "texture_type", text="Texture Type")
-                    output_box = col.box()
-                    grid = output_box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
-                    grid_col = grid.column()
-                    grid_col.label(text="Color Output")
-                    grid_col.prop(active_layer, "color_output_name", text="")
-                    grid_col = grid.column()
-                    grid_col.label(text="Alpha Output")
-                    grid_col.prop(active_layer, "alpha_output_name", text="")
-                    box = col.box()
-                    col = box.column()
-                    col.use_property_split = False
+                    draw_input_sockets(col, context, only_output=True)
                     texture_node = active_layer.source_node
                     if texture_node:
-                        col.label(text="Texture Settings:", icon='TEXTURE')
-                        col.template_node_inputs(texture_node)
+                        box = layout.box()
+                        header, panel = box.panel("texture_node_settings_panel")
+                        header.label(text="Texture Settings:", icon='TEXTURE')
+                        if panel:
+                            panel.use_property_split = False
+                            panel.template_node_inputs(texture_node)
                 case 'GEOMETRY':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
@@ -747,16 +773,17 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
             col.prop_search(active_layer, "uv_map_name", text="UV Map",
                                 search_data=ps_ctx.ps_object.data, search_property="uv_layers", icon='GROUP_UVS')
         elif active_layer.coord_type == 'DECAL':
+            col.use_property_split = False
             empty_col = col.column(align=True)
-            empty_col.prop(active_layer, "empty_object", text="Empty")
-            split = empty_col.split(factor=0.4)
-            split.label(text="")
-            split.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
-            col.prop(active_layer, "use_decal_depth_clip", text="Use Clip")
+            empty_col.prop(active_layer, "empty_object", text="")
+            empty_col.operator("paint_system.select_empty", text="Select Empty", icon='OBJECT_ORIGIN')
+            split = col.split(factor=0.35, align=True)
+            split.prop(active_layer, "use_decal_depth_clip", text="Clip", toggle=1, icon='CHECKBOX_HLT' if active_layer.use_decal_depth_clip else 'CHECKBOX_DEHLT')
             decal_clip = active_layer.find_node("decal_depth_clip")
             if decal_clip:
-                decal_clip_col = col.column(align=True)
-                decal_clip_col.prop(decal_clip.inputs[2], "default_value", text="Depth Clip")
+                decal_clip_col = split.column(align=True)
+                decal_clip_col.enabled = active_layer.use_decal_depth_clip
+                decal_clip_col.prop(decal_clip.inputs[2], "default_value", text="Depth")
         elif active_layer.coord_type == 'PROJECT':
             proj_col = col.column(align=True)
             proj_col.scale_y = 2
@@ -782,7 +809,7 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
         mapping_node = active_layer.find_node("mapping")
         if mapping_node:
             box = layout.box()
-            header, panel = box.panel("mapping_panel", default_closed=True)
+            header, panel = box.panel("mapping_panel")
             header.label(text="Mapping Settings:", icon_value=get_icon('vector_socket'))
             if panel:
                 panel.use_property_split = False
@@ -846,25 +873,16 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         layout.enabled = not active_layer.lock_layer
         box = layout.box()
         col = box.column()
-        row = col.row()
-        row.use_property_split = False
-        row.prop(active_layer, "correct_image_aspect", text="Correct Aspect")
         if not active_layer.external_image:
             col.operator("paint_system.quick_edit", text="Edit Externally (View Capture)")
         else:
             col.operator("paint_system.project_apply",
                         text="Apply")
-
+        line_separator(col)
         image_node = active_layer.source_node
-        image_node_settings(layout, image_node, active_layer, "image")
-        box = layout.box()
-        grid = box.grid_flow(columns=2, align=True, even_columns=True, row_major=True)
-        col = grid.column()
-        col.label(text="Color Output")
-        col.prop(active_layer, "color_output_name", text="")
-        col = grid.column()
-        col.label(text="Alpha Output")
-        col.prop(active_layer, "alpha_output_name", text="")
+        image_node_settings(col, image_node, active_layer, "image", simple_ui=True)
+        col.prop(active_layer, "correct_image_aspect", text="Correct Aspect")
+        draw_input_sockets(col, context, only_output=True)
 
 class MAT_MT_LayerMenu(PSContextMixin, Menu):
     bl_label = "Layer Menu"
