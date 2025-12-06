@@ -1,6 +1,7 @@
 import bpy
 from bpy.props import IntProperty
-from ..paintsystem.data import PSContextMixin, COORDINATE_TYPE_ENUM, create_ps_image, get_udim_tiles
+from ..paintsystem.data import COORDINATE_TYPE_ENUM, create_ps_image, get_udim_tiles
+from ..paintsystem.context import PSContextMixin
 from ..custom_icons import get_icon, get_icon_from_socket_type
 from ..preferences import get_preferences
 from ..utils.unified_brushes import get_unified_settings

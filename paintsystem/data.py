@@ -40,7 +40,7 @@ from ..utils.version import is_newer_than
 from ..utils.nodes import find_node, get_material_output, get_node_socket_enum, get_nodetree_socket_enum
 from ..preferences import get_preferences
 from ..utils import get_next_unique_name
-from .common import PaintSystemPreferences
+from .context import get_global_layer, parse_context
 from .graph import (
     NodeTreeBuilder,
     Add_Node,
@@ -61,13 +61,19 @@ from .graph import (
 from .graph.common import get_library_nodetree, get_library_object, DEFAULT_PS_UV_MAP_NAME
 from .nested_list_manager import BaseNestedListManager, BaseNestedListItem
 
-BLEND_MODES = []
+BLEND_MODE_ENUM = []
 for blend_mode in bpy.types.ShaderNodeMixRGB.bl_rna.properties['blend_type'].enum_items:
-    BLEND_MODES.append((blend_mode.identifier, blend_mode.name, blend_mode.description))
+    BLEND_MODE_ENUM.append((blend_mode.identifier, blend_mode.name, blend_mode.description))
     if blend_mode.identifier in ["MIX", "COLOR_BURN", "ADD", "LINEAR_LIGHT", "DIVIDE"]:
         if blend_mode.identifier == "MIX":
-            BLEND_MODES.append(("PASSTHROUGH", "Pass Through", "Pass Through"))
-        BLEND_MODES.append((None))
+            BLEND_MODE_ENUM.append(("PASSTHROUGH", "Pass Through", "Pass Through"))
+        BLEND_MODE_ENUM.append((None))
+
+MASK_BLEND_MODE_ENUM = [
+    ('SUBTRACT', "Subtract", "Subtract"),
+    ('ADD', "Add", "Add"),
+    ('MULTIPLY', "Multiply", "Multiply"),
+]
 
 TEMPLATE_ENUM = [
     ('BASIC', "Basic", "Basic painting setup", "IMAGE", 0),
@@ -128,6 +134,21 @@ TEXTURE_TYPE_ENUM = [
 ]
 
 COORDINATE_TYPE_ENUM = [
+    ('AUTO', "Auto UV", "Automatically create a new UV Map"),
+    ('UV', "UV", "Open an existing UV Map"),
+    ('OBJECT', "Object", "Use a object output of Texture Coordinate node"),
+    ('CAMERA', "Camera", "Use a camera output of Texture Coordinate node"),
+    ('WINDOW', "Window", "Use a window output of Texture Coordinate node"),
+    ('REFLECTION', "Reflection", "Use a reflection output of Texture Coordinate node"),
+    ('POSITION', "Position", "Use a position output of Geometry node"),
+    ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
+    ('DECAL', "Decal", "Use a decal output of Geometry node"),
+    ('PROJECT', "Projection", "Define a projection coordinate"),
+    ('PARALLAX', 'Parallax', 'Use a parallax coordinate'),
+]
+
+MASK_COORDINATE_TYPE_ENUM = [
+    ('LAYER', "Layer", "Use the layer's coordinate type"),
     ('AUTO', "Auto UV", "Automatically create a new UV Map"),
     ('UV', "UV", "Open an existing UV Map"),
     ('OBJECT', "Object", "Use a object output of Texture Coordinate node"),
@@ -832,6 +853,18 @@ class LayerMask(PropertyGroup):
         description="Mask type",
         default='IMAGE',
     )
+    coord_type: EnumProperty(
+        items=COORDINATE_TYPE_ENUM,
+        name="Coordinate Type",
+        description="Coordinate type",
+        default='UV',
+    )
+    blend_mode: EnumProperty(
+        items=MASK_BLEND_MODE_ENUM,
+        name="Blend Mode",
+        description="Blend mode",
+        default='MULTIPLY',
+    )
     mask_image: PointerProperty(
         name="Mask Image",
         type=Image,
@@ -1240,9 +1273,12 @@ class Layer(BaseNestedListItem):
         update=update_node_tree
     )
     def update_type(self, context: Context):
-        if self.type == "IMAGE":
-            self.color_output_name = "Color"
-            self.alpha_output_name = "Alpha"
+        try:
+            if self.type == "IMAGE":
+                self.color_output_name = "Color"
+                self.alpha_output_name = "Alpha"
+        except:
+            pass
         self.update_node_tree(context)
     type: EnumProperty(
         items=LAYER_TYPE_ENUM,
@@ -1346,7 +1382,7 @@ class Layer(BaseNestedListItem):
         for channel in find_channels_containing_layer(layer_data):
             channel.update_node_tree(context)
     def get_blend_mode_items(self, context: Context) -> list[tuple[str, str, str]]:
-        return BLEND_MODES if self.type == "FOLDER" else [blend_mode for blend_mode in BLEND_MODES if blend_mode == None or blend_mode[0] != "PASSTHROUGH"]
+        return BLEND_MODE_ENUM if self.type == "FOLDER" else [blend_mode for blend_mode in BLEND_MODE_ENUM if blend_mode == None or blend_mode[0] != "PASSTHROUGH"]
     blend_mode: EnumProperty(
         items=get_blend_mode_items,
         name="Blend Mode",
@@ -1834,7 +1870,7 @@ class Channel(BaseNestedListManager):
             case "IMAGE":
                 if not layer.image:
                     if layer.coord_type == 'UV':
-                        ps_ctx = PSContextMixin.parse_context(context)
+                        ps_ctx = parse_context(context)
                         use_udim_tiles = get_udim_tiles(ps_ctx.ps_object, layer.uv_map_name) != {1001}
                         layer.image = create_ps_image(layer.layer_name, use_udim_tiles=use_udim_tiles, objects=[ps_ctx.ps_object], uv_layer_name=layer.uv_map_name)
                     else:
@@ -2480,7 +2516,7 @@ class PaintSystemGlobalData(PropertyGroup):
     )
     
     def add_layer_to_clipboard(self, layer: "Layer"):
-        ps_ctx = PSContextMixin.parse_context(bpy.context)
+        ps_ctx = parse_context(bpy.context)
         clipboard_layer = self.clipboard_layers.add()
         if layer.is_linked:
             clipboard_layer.uid = layer.linked_layer_uid
@@ -2581,15 +2617,6 @@ def get_all_layers() -> list[Layer]:
                         layers.append(layer)
     return layers
 
-def get_global_layer(layer: Layer) -> GlobalLayer | None:
-    """Get the global layer data from the context."""
-    if not layer or not bpy.context.scene or not bpy.context.scene.ps_scene_data:
-        return None
-    # for global_layer in bpy.context.scene.ps_scene_data.layers[layer.ref_layer_id]:
-    #     if global_layer.name == layer.ref_layer_id:
-    #         return global_layer
-    return bpy.context.scene.ps_scene_data.layers.get(layer.ref_layer_id, None)
-
 def is_layer_linked(check_layer: Layer) -> bool:
     """Check if the layer is linked"""
     # Check all material in the scene and count the number of times the global layer is used
@@ -2617,109 +2644,6 @@ def sort_actions(context: bpy.types.Context, global_layer: GlobalLayer) -> list[
         sorted_actions.sort(key=lambda x: x[0])
     return [x for _, x in sorted_actions]
 
-@dataclass
-class PSContext:
-    ps_settings: PaintSystemPreferences | None = None
-    ps_scene_data: PaintSystemGlobalData | None = None
-    active_object: bpy.types.Object | None = None
-    ps_object: bpy.types.Object | None = None
-    ps_objects: list[bpy.types.Object] | None = None
-    active_material: bpy.types.Material | None = None
-    ps_mat_data: MaterialData | None = None
-    active_group: Group | None = None
-    active_channel: Channel | None = None
-    active_layer: Layer | None = None
-    unlinked_layer: Layer | None = None
-    active_global_layer: GlobalLayer | None = None
-
-def get_ps_object(obj) -> bpy.types.Object:
-    ps_object = None
-    if obj:
-        match obj.type:
-            case 'EMPTY':
-                if obj.parent and obj.parent.type == 'MESH' and hasattr(obj.parent.active_material, 'ps_mat_data'):
-                    ps_object = obj.parent
-            case 'MESH':
-                ps_object = obj
-            case 'GREASEPENCIL':
-                if is_newer_than(4,3,0):
-                    ps_object = obj
-            case _:
-                obj = None
-                ps_object = None
-    return ps_object
-
-def parse_material(mat: Material) -> tuple[MaterialData, Group, Channel, Layer]:
-    mat_data = None
-    groups = None
-    active_group = None
-    if mat and hasattr(mat, 'ps_mat_data') and mat.ps_mat_data:
-        mat_data = mat.ps_mat_data
-        groups = mat_data.groups
-        if groups and mat_data.active_index >= 0:
-            active_group = groups[min(mat_data.active_index, len(groups) - 1)]
-    
-    channels = None
-    active_channel = None
-    if active_group:
-        channels = active_group.channels
-        if channels and active_group.active_index >= 0:
-            active_channel = channels[min(active_group.active_index, len(channels) - 1)]
-
-    layers = None
-    unlinked_layer = None
-    if active_channel:
-        layers = active_channel.layers
-        if layers and active_channel.active_index >= 0:
-            unlinked_layer = layers[min(active_channel.active_index, len(layers) - 1)]
-            if unlinked_layer:
-                unlinked_layer = unlinked_layer
-    
-    return mat_data, active_group, active_channel, unlinked_layer
-
-def parse_context(context: bpy.types.Context) -> PSContext:
-    """Parse the context and return a PSContext object."""
-    if not context:
-        raise ValueError("Context cannot be None")
-    if not isinstance(context, bpy.types.Context):
-        raise TypeError("context must be of type bpy.types.Context")
-    
-    ps_settings = get_preferences(context)
-    ps_scene_data = context.scene.ps_scene_data
-    obj = hasattr(context, 'active_object') and context.active_object
-    ps_object = get_ps_object(obj)
-    
-    ps_objects = []
-    if hasattr(context, 'selected_objects'):
-        for obj in [*context.selected_objects, context.active_object]:
-            ps_obj = get_ps_object(obj)
-            if ps_obj and ps_obj not in ps_objects:
-                ps_objects.append(ps_obj)
-    mat = ps_object.active_material if ps_object else None
-    mat_data, active_group, active_channel, unlinked_layer = parse_material(mat)
-    
-    return PSContext(
-        ps_settings=ps_settings,
-        ps_scene_data=ps_scene_data,
-        active_object=obj,
-        ps_object=ps_object,
-        ps_objects=ps_objects,
-        active_material=mat,
-        ps_mat_data=mat_data,
-        active_group=active_group,
-        active_channel=active_channel,
-        active_layer=unlinked_layer.get_layer_data() if unlinked_layer else None,
-        unlinked_layer=unlinked_layer,
-        active_global_layer=get_global_layer(unlinked_layer) if unlinked_layer else None
-    )
-
-class PSContextMixin:
-    """A mixin for classes that need access to the paint system context."""
-
-    @staticmethod
-    def parse_context(context: bpy.types.Context) -> PSContext:
-        """Return a PSContext parsed from Blender context. Safe to call from class or instance methods."""
-        return parse_context(context)
 
 
 # Legacy properties (for backward compatibility)

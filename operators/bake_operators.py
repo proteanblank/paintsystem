@@ -3,9 +3,10 @@ from bpy.types import Context, Material, Operator, UILayout
 from bpy.utils import register_classes_factory
 from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty
 
-from .common import PSContextMixin, PSImageCreateMixin, PSUVOptionsMixin, DEFAULT_PS_UV_MAP_NAME
+from .common import PSContextMixin, PSImageCreateMixin, DEFAULT_PS_UV_MAP_NAME
 
-from ..paintsystem.data import parse_material, set_layer_blend_type, get_layer_blend_type
+from ..paintsystem.data import set_layer_blend_type, get_layer_blend_type
+from ..paintsystem.context import parse_material
 from ..panels.common import get_icon_from_channel
 
 

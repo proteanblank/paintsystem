@@ -1,6 +1,6 @@
 import bpy
 from bpy.utils import register_submodule_factory
-from .data import PaintSystemGlobalData, MaterialData, get_global_layer
+from .context import PSContextMixin
 
 submodules = [
     "data",

@@ -1,8 +1,7 @@
 import bpy
 from bpy.types import Panel
 
-from .common import scale_content
-from ..paintsystem.data import PSContextMixin
+from .common import scale_content, PSContextMixin
 from bpy.utils import register_classes_factory
 
 

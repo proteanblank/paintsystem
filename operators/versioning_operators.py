@@ -2,9 +2,10 @@ import bpy
 from bpy.types import Operator, Object, NodeTree, Node
 from bpy.utils import register_classes_factory
 
+from .common import PSContextMixin
+
 from ..paintsystem.data import (
     LegacyPaintSystemContextParser,
-    PSContextMixin,
     LegacyPaintSystemLayer,
     LAYER_TYPE_ENUM,
 )
