@@ -37,15 +37,14 @@ def frame_change_pre(scene):
             layer.enabled = enabled
 
 
-def load_paint_system_data():
+def load_paint_system_data(scene: bpy.types.Scene):
     print(f"Loading Paint System data...")
     start_time = time.time()
-    ps_ctx = parse_context(bpy.context)
-    if not ps_ctx.ps_scene_data:
+    if not hasattr(scene, 'ps_scene_data'):
         return
     
     # Global Layer Versioning. Will be removed in the future.
-    for global_layer in ps_ctx.ps_scene_data.layers:
+    for global_layer in scene.ps_scene_data.layers:
         target_version = get_layer_version_for_type(global_layer.type)
         if get_nodetree_version(global_layer.node_tree) != target_version:
             print(f"Updating layer {global_layer.name} to version {target_version}")
@@ -55,6 +54,7 @@ def load_paint_system_data():
                 print(f"Error updating layer {global_layer.name}: {e}")
     
     seen_global_layers_map = {}
+    checked_layers = set()
     # Layer Versioning
     for mat in bpy.data.materials:
         if hasattr(mat, 'ps_mat_data'):
@@ -62,6 +62,7 @@ def load_paint_system_data():
                 for channel in group.channels:
                     has_migrated_global_layer = False
                     for layer in channel.layers:
+                        checked_layers.add(layer.name)
                         # Check if layer has valid uuid
                         if not is_valid_uuidv4(layer.uid):
                             layer.uid = str(uuid.uuid4())
@@ -148,7 +149,7 @@ def load_paint_system_data():
         ps_scene_data.last_selected_ps_object = None
         ps_scene_data.last_selected_material = None
             
-    print(f"Paint System: Checked {len(ps_ctx.ps_scene_data.layers) if ps_ctx.ps_scene_data else 0} layers in {round((time.time() - start_time) * 1000, 2)} ms")
+    print(f"Paint System: Checked {len(checked_layers)} layers in {round((time.time() - start_time) * 1000, 2)} ms")
 
 
 @bpy.app.handlers.persistent
@@ -164,7 +165,7 @@ def load_post(scene):
         if not palette:
             palette = bpy.data.palettes.new(palette_name)
     
-    load_paint_system_data()
+    load_paint_system_data(scene)
     # Check for donation info
     get_donation_info()
     # if donation_info:
