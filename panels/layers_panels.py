@@ -97,7 +97,10 @@ def draw_layer_icon(layer: Layer, layout: bpy.types.UILayout):
         case 'ATTRIBUTE':
             layout.label(icon='MESH_DATA')
         case 'GRADIENT':
-            layout.label(icon='COLOR')
+            if layer.gradient_type == 'FAKE_LIGHT':
+                layout.label(icon='LIGHT')
+            else:
+                layout.label(icon='COLOR')
         case 'RANDOM':
             layout.label(icon='SEQ_HISTOGRAM')
         case 'TEXTURE':
@@ -589,15 +592,19 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                                 err_col = err_box.column(align=True)
                                 err_col.label(text="Gradient Empty not found", icon='ERROR')
                                 err_col.operator("paint_system.fix_missing_gradient_empty", text="Fix Missing Gradient Empty")
-                        col.separator()
-                        col.label(text="Gradient Settings:", icon='SHADERFX')
-                        col.template_node_inputs(gradient_node)
-                        col.separator()
-                        col.prop(map_range_node, "interpolation_type", text="Interpolation")
-                        if map_range_node.interpolation_type in ('STEPPED'):
-                            col.prop(map_range_node.inputs[5], "default_value", text="Steps")
-                        col.prop(map_range_node.inputs[1], "default_value", text="Start Distance")
-                        col.prop(map_range_node.inputs[2], "default_value", text="End Distance")
+                        box = layout.box()
+                        header, panel = box.panel("gradient_node_settings_panel")
+                        header.label(text="Gradient Settings:", icon='SHADERFX')
+                        if panel:
+                            panel.template_node_inputs(gradient_node)
+                            header, panel = panel.panel("map_range_node_settings_panel", default_closed=True)
+                            header.label(text="Map Range:", icon='SHADERFX')
+                            if panel:
+                                panel.prop(map_range_node, "interpolation_type", text="Interpolation")
+                                if map_range_node.interpolation_type in ('STEPPED'):
+                                    panel.prop(map_range_node.inputs[5], "default_value", text="Steps")
+                                panel.prop(map_range_node.inputs[1], "default_value", text="Start Distance")
+                                panel.prop(map_range_node.inputs[2], "default_value", text="End Distance")
                 case 'SOLID_COLOR':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
