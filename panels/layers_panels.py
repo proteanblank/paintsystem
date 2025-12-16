@@ -518,11 +518,23 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
             if ps_ctx.ps_settings.use_legacy_ui:
                 box = layout.box()
                 layer_settings_ui(box, context)
-            if active_layer.type not in ('ADJUSTMENT', 'NODE_GROUP', 'ATTRIBUTE', 'GRADIENT', 'SOLID_COLOR', 'RANDOM', 'TEXTURE', 'GEOMETRY'):
+            if active_layer.type not in ('IMAGE', 'ADJUSTMENT', 'NODE_GROUP', 'ATTRIBUTE', 'GRADIENT', 'SOLID_COLOR', 'RANDOM', 'TEXTURE', 'GEOMETRY'):
                 return
             elif not ps_ctx.ps_settings.use_legacy_ui:
                 box = layout.box()
             match active_layer.type:
+                case 'IMAGE':
+                    col = box.column()
+                    scale_content(context, col, 1.2, 1.2)
+                    if not active_layer.external_image:
+                        col.operator("paint_system.quick_edit", text="Edit Externally")
+                    else:
+                        if active_layer.edit_external_mode == 'IMAGE_EDIT':
+                            row = col.row(align=True)
+                            row.operator("paint_system.quick_edit", text="Open Image", icon_value=get_image_editor_icon(context.preferences.filepaths.image_editor))
+                            row.operator("paint_system.reload_image", text="Reload Image", icon="FILE_REFRESH")
+                        elif active_layer.edit_external_mode == 'VIEW_CAPTURE':
+                            col.operator("paint_system.project_apply", text="Apply Edit")
                 case 'ADJUSTMENT':
                     col = box.column()
                     col.enabled = not active_layer.lock_layer
@@ -566,10 +578,10 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     if gradient_node and map_range_node:
                         col.use_property_split = True
                         col.use_property_decorate = False
-                        if active_layer.gradient_type in ('LINEAR', 'RADIAL'):
+                        if active_layer.gradient_type in ('LINEAR', 'RADIAL', 'FAKE_LIGHT'):
                             if active_layer.empty_object and active_layer.empty_object.name in context.view_layer.objects:
                                 empty_col = col.column(align=True)
-                                empty_col.operator("paint_system.select_empty", text="Select Gradient Empty", icon='OBJECT_ORIGIN')
+                                empty_col.operator("paint_system.select_empty", text="Select Gradient Empty" if active_layer.gradient_type != 'FAKE_LIGHT' else "Select Light Empty", icon='OBJECT_ORIGIN')
                                 empty_col.prop(active_layer, "empty_object", text="")
                             else:
                                 err_box = col.box()
@@ -873,15 +885,6 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         active_layer = ps_ctx.active_layer
         layout = self.layout
         layout.enabled = not active_layer.lock_layer
-        if not active_layer.external_image:
-            layout.operator("paint_system.quick_edit", text="Edit Externally")
-        else:
-            if active_layer.edit_external_mode == 'IMAGE_EDIT':
-                row = layout.row(align=True)
-                row.operator("paint_system.quick_edit", text="Open Image", icon_value=get_image_editor_icon(context.preferences.filepaths.image_editor))
-                row.operator("paint_system.reload_image", text="Reload Image", icon="FILE_REFRESH")
-            elif active_layer.edit_external_mode == 'VIEW_CAPTURE':
-                layout.operator("paint_system.project_apply", text="Apply Edit")
         box = layout.box()
         col = box.column()
         image_node = active_layer.source_node
@@ -975,6 +978,8 @@ class MAT_MT_AddGradientLayerMenu(Menu):
     def draw(self, context):
         layout = self.layout
         for idx, (node_type, name, description) in enumerate(GRADIENT_TYPE_ENUM):
+            if node_type == 'FAKE_LIGHT':
+                continue
             layout.operator("paint_system.new_gradient_layer",
                 text=name, icon='COLOR' if idx == 0 else 'NONE').gradient_type = node_type
 
@@ -1044,6 +1049,8 @@ class MAT_MT_AddLayerMenu(Menu):
         col.menu("MAT_MT_AddGeometryLayerMenu", text="Geometry", icon='MESH_DATA')
         col.separator()
         # col.label(text="Advanced:")
+        col.operator("paint_system.new_gradient_layer",
+                text="Fake Light", icon='LIGHT').gradient_type = 'FAKE_LIGHT'
         col.operator("paint_system.new_attribute_layer",
                      text="Attribute Color", icon='MESH_DATA')
         col.operator("paint_system.new_random_color_layer",

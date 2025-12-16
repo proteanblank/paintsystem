@@ -285,7 +285,9 @@ class PAINTSYSTEM_OT_NewGradient(PSContextMixin, MultiMaterialOperator):
 
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
-        ps_ctx.active_channel.create_layer(context, self.gradient_type.title(), "GRADIENT", gradient_type=self.gradient_type)
+        layer = ps_ctx.active_channel.create_layer(context, self.gradient_type.title() if self.gradient_type != 'FAKE_LIGHT' else "Fake Light", "GRADIENT", gradient_type=self.gradient_type)
+        if self.gradient_type == 'FAKE_LIGHT':
+            layer.blend_mode = "MULTIPLY"
         return {'FINISHED'}
 
 

@@ -22,6 +22,7 @@ from bpy.types import (
     Context,
     Image,
     Node,
+    NodeSocket,
     NodeTree,
     Object,
     PropertyGroup,
@@ -30,7 +31,7 @@ from bpy.types import (
 from bpy.utils import register_classes_factory
 from bpy_extras.node_utils import connect_sockets
 from typing import Optional
-from mathutils import Color
+from mathutils import Color, Euler, Vector
 
 from .list_manager import ListManager
 
@@ -108,6 +109,7 @@ GRADIENT_TYPE_ENUM = [
     ('LINEAR', "Linear Gradient", "Linear gradient"),
     ('RADIAL', "Radial Gradient", "Radial gradient"),
     ('DISTANCE', "Distance Gradient", "Distance gradient"),
+    ('FAKE_LIGHT', "Fake Light", "Fake light"),
 ]
 
 ADJUSTMENT_TYPE_ENUM = [
@@ -868,13 +870,17 @@ class Layer(BaseNestedListItem):
             case "ADJUSTMENT":
                 layer_graph = create_adjustment_graph(self)
             case "GRADIENT":
-                if self.gradient_type in ('LINEAR', 'RADIAL'):
+                if self.gradient_type in ('LINEAR', 'RADIAL', 'FAKE_LIGHT'):
                     if not self.empty_object:
                         self.ensure_empty_object()
                         if self.gradient_type == 'LINEAR':
                             self.empty_object.empty_display_type = 'SINGLE_ARROW'
                         elif self.gradient_type == 'RADIAL':
                             self.empty_object.empty_display_type = 'SPHERE'
+                        elif self.gradient_type == 'FAKE_LIGHT':
+                            self.empty_object.location += Vector((0, 0, 2))
+                            self.empty_object.rotation_euler = Euler((3*math.pi/4, math.pi/4, 0))
+                            self.empty_object.empty_display_type = 'SINGLE_ARROW'
                     elif self.empty_object.name not in context.view_layer.objects:
                         add_empty_to_collection(context, self.empty_object)
                 layer_graph = create_gradient_graph(self)
@@ -890,7 +896,7 @@ class Layer(BaseNestedListItem):
                 raise ValueError(f"Invalid layer type: {self.type}")
         
         # Clean up
-        if self.empty_object and self.type not in ("GRADIENT", "IMAGE", "TEXTURE"):
+        if self.empty_object and self.type not in ["GRADIENT", "IMAGE", "TEXTURE", "FAKE_LIGHT"]:
             collection = get_paint_system_collection(context)
             if self.empty_object.name in collection.objects:
                 collection.objects.unlink(self.empty_object)
@@ -903,6 +909,28 @@ class Layer(BaseNestedListItem):
             layer_graph.link("group_input", "group_output", "Color", "Color")
             layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
         layer_graph.compile()
+        
+        # For fake light, we need to update the empty object rotation via drivers
+        object_rot_node = self.find_node("object_rotation")
+        def add_rot_driver_to_socket(socket: NodeSocket, transform_type: str = "ROT_X"):
+            # Try to delete the driver first
+            try:
+                socket.driver_remove("default_value")
+            except:
+                pass
+            curve = socket.driver_add("default_value")
+            curve.driver.type = "AVERAGE"
+            driver_var = curve.driver.variables.new()
+            driver_var.name = "rotation_euler"
+            driver_var.type = "TRANSFORMS"
+            driver_var.targets[0].id = self.empty_object
+            driver_var.targets[0].transform_type = transform_type
+            return curve
+        if object_rot_node:
+            add_rot_driver_to_socket(object_rot_node.inputs["X"], "ROT_X")
+            add_rot_driver_to_socket(object_rot_node.inputs["Y"], "ROT_Y")
+            add_rot_driver_to_socket(object_rot_node.inputs["Z"], "ROT_Z")
+        
         update_active_image(self, context)
     
     # Not used anymore

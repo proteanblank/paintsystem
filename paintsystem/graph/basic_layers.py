@@ -7,6 +7,18 @@ from .common import create_mixing_graph, NodeTreeBuilder, create_coord_graph, ge
 if TYPE_CHECKING:
     from ..data import Layer
 
+IMAGE_LAYER_VERSION = 4
+FOLDER_LAYER_VERSION = 2
+SOLID_COLOR_LAYER_VERSION = 2
+ATTRIBUTE_LAYER_VERSION = 2
+ADJUSTMENT_LAYER_VERSION = 2
+GRADIENT_LAYER_VERSION = 2
+RANDOM_LAYER_VERSION = 3
+CUSTOM_LAYER_VERSION = 2
+TEXTURE_LAYER_VERSION = 2
+GEOMETRY_LAYER_VERSION = 2
+
+ALPHA_OVER_LAYER_VERSION = 1
 
 class PSNodeTreeBuilder:
     """
@@ -334,19 +346,6 @@ class PSNodeTreeBuilder:
         return self._builder
 
 
-IMAGE_LAYER_VERSION = 4
-FOLDER_LAYER_VERSION = 2
-SOLID_COLOR_LAYER_VERSION = 2
-ATTRIBUTE_LAYER_VERSION = 2
-ADJUSTMENT_LAYER_VERSION = 2
-GRADIENT_LAYER_VERSION = 2
-RANDOM_LAYER_VERSION = 3
-CUSTOM_LAYER_VERSION = 2
-TEXTURE_LAYER_VERSION = 2
-GEOMETRY_LAYER_VERSION = 2
-
-ALPHA_OVER_LAYER_VERSION = 1
-
 def get_layer_version_for_type(type: str) -> int:
     match type:
         case "IMAGE":
@@ -489,6 +488,20 @@ def create_gradient_graph(layer: "Layer"):
         case "GRADIENT_MAP":
             builder.add_node("map_range", "ShaderNodeMapRange")
             builder.link("group_input", "map_range", "Color", "Value")
+        case "FAKE_LIGHT":
+            builder.add_node("map_range", "ShaderNodeMapRange")
+            builder.add_node("rgb", "ShaderNodeRGB", default_outputs={0: (1, 1, 1, 1)})
+            builder.add_node("combine_xyz", "ShaderNodeCombineXYZ", default_values={2: -1}, force_default_values=True)
+            builder.add_node("object_rotation", "ShaderNodeCombineXYZ")
+            builder.add_node("vector_rotate", "ShaderNodeVectorRotate", {"rotation_type": "EULER_XYZ"})
+            builder.add_node("normal", "ShaderNodeNewGeometry")
+            builder.add_node("dot_product", "ShaderNodeVectorMath", {"operation": "DOT_PRODUCT"})
+            builder.add_node("scale", "ShaderNodeVectorMath", {"operation": "SCALE"})
+            builder.link("combine_xyz", "vector_rotate", "Vector", "Vector")
+            builder.link("object_rotation", "vector_rotate", "Vector", "Rotation")
+            builder.link("vector_rotate", "dot_product", "Vector", 0)
+            builder.link("normal", "dot_product", "Normal", 1)
+            builder.link("dot_product", "map_range", "Value", "Value")
         case _:
             raise ValueError(f"Invalid gradient type: {gradient_type}")
     builder.link("map_range", "source", "Result", "Fac")
