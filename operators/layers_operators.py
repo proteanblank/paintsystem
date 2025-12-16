@@ -878,9 +878,9 @@ class PAINTSYSTEM_OT_PasteLayer(PSContextMixin, Operator):
             if not layer:
                 continue
             if self.linked:
-                new_layer = ps_ctx.active_channel.create_layer(context, layer.layer_name, "BLANK" if layer.type != "FOLDER" else "FOLDER", insert_at="BEFORE" if idx == 0 else "AFTER", linked_layer_uid=clipboard_layer.uid, linked_material=clipboard_layer.material)
+                new_layer = ps_ctx.active_channel.create_layer(context, layer.layer_name, "BLANK" if layer.type != "FOLDER" else "FOLDER", insert_at="CURSOR" if idx == 0 else "AFTER", linked_layer_uid=clipboard_layer.uid, linked_material=clipboard_layer.material)
             else:
-                new_layer = ps_ctx.active_channel.create_layer(context, layer.layer_name, layer.type, insert_at="BEFORE" if idx == 0 else "AFTER")
+                new_layer = ps_ctx.active_channel.create_layer(context, layer.layer_name, layer.type, insert_at="CURSOR" if idx == 0 else "AFTER")
                 new_layer.copy_layer_data(layer)
             new_layer_id_map[layer.id] = new_layer
             if layer.parent_id != -1:

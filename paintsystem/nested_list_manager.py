@@ -420,6 +420,9 @@ class BaseNestedListManager(PropertyGroup):
         item = self.get_item_by_id(item_id)
         if not item:
             return False
+        
+        # Normalize order of items
+        self.normalize_orders()
 
         flattened = self.flatten_hierarchy()
         current_flat_index = next(
