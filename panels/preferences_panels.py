@@ -1,7 +1,9 @@
 import bpy
 from bpy.types import AddonPreferences
-from bpy.props import BoolProperty, FloatProperty
+from bpy.props import BoolProperty, FloatProperty, IntProperty
 from bpy.utils import register_classes_factory
+
+from ..paintsystem.version_check import get_latest_version
 from .common import find_keymap
 from ..preferences import addon_package
 
@@ -63,6 +65,38 @@ class PaintSystemPreferences(AddonPreferences):
         default=False,
         options={'SKIP_SAVE'}
     )
+    
+    # Version check settings
+    version_check_interval_days: IntProperty(
+        name="Version Check Interval (Days)",
+        description="Days between version checks",
+        default=1,
+        min=0,
+        soft_max=30
+    )
+    
+    version_check_interval_hours: IntProperty(
+        name="Version Check Interval (Hours)",
+        description="Hours between version checks",
+        default=0,
+        min=0,
+        soft_max=23
+    )
+    
+    version_check_interval_minutes: IntProperty(
+        name="Version Check Interval (Minutes)",
+        description="Minutes between version checks",
+        default=0,
+        min=0,
+        soft_max=59
+    )
+    
+    loading_version_check: BoolProperty(
+        name="Loading Version Check",
+        description="Loading version check",
+        default=False,
+        options={'SKIP_SAVE'}
+    )
 
     def draw_shortcut(self, layout, kmi, text):
         row = layout.row(align=True)
@@ -96,6 +130,23 @@ class PaintSystemPreferences(AddonPreferences):
         layout.prop(self, "use_legacy_ui", text="Use Legacy UI")
         # layout.prop(self, "name_layers_group",
         #             text="Name Layers According to Group Name")
+        
+        # Version check settings
+        from ..utils.version import is_online
+        if is_online():
+            box = layout.box()
+            row = box.row()
+            row.operator("paint_system.check_for_updates", text="", icon='FILE_REFRESH')
+            latest_version = get_latest_version()
+            if latest_version:
+                row.label(text=f"Latest Version: {latest_version}")
+            else:
+                row.label(text="Failed to check latest version")
+            box.label(text="Version Check Interval:")
+            row = box.row()
+            row.prop(self, "version_check_interval_days", text="Days")
+            row.prop(self, "version_check_interval_hours", text="Hours")
+            row.prop(self, "version_check_interval_minutes", text="Minutes")
 
         box = layout.box()
         box.label(text="Paint System Shortcuts:")

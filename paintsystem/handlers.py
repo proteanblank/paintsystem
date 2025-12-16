@@ -1,4 +1,6 @@
 import bpy
+
+from .version_check import get_latest_version
 from .data import get_global_layer, sort_actions, parse_context, get_all_layers, is_valid_uuidv4, save_image
 from .graph.basic_layers import get_layer_version_for_type
 import time
@@ -170,6 +172,8 @@ def load_post(scene):
     get_donation_info()
     # if donation_info:
     #     print(f"Donation info: {donation_info}")
+    # Check for version check
+    get_latest_version()
 
 @bpy.app.handlers.persistent
 def save_handler(scene: bpy.types.Scene):
