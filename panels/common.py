@@ -307,7 +307,7 @@ def toggle_paint_mode_ui(layout: bpy.types.UILayout, context: bpy.types.Context)
         row.scale_x = 1.5
         
         row.menu("MAT_MT_PaintSystemMergeAndExport",
-                    text="Bake and Export", icon_value=get_icon('channels'))
+                    text="Bake and Export")
 
 def layer_settings_ui(layout: bpy.types.UILayout, context: bpy.types.Context):
     ps_ctx = PSContextMixin.parse_context(context)
