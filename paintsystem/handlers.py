@@ -169,7 +169,7 @@ def load_post(scene):
     
     load_paint_system_data(scene)
     # Check for donation info
-    get_donation_info()
+    # get_donation_info()
     # if donation_info:
     #     print(f"Donation info: {donation_info}")
     # Check for version check
