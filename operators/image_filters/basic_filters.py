@@ -12,9 +12,26 @@ from .common import blender_image_to_numpy, numpy_to_blender_image, numpy_to_pil
 def gaussian_blur(numpy_array, gaussian_sigma):
     if not PIL_AVAILABLE or not COMMON_PIL_AVAILABLE:
         raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
+    
+    # Handle alpha channel correctly for straight alpha (Blender format)
+    # Convert to premultiplied alpha (RGBa), blur, then convert back to straight alpha (RGBA)
+    # This prevents dark edges when blurring alpha transitions
+    
     img_pil = numpy_to_pil(numpy_array)
-    radius = int(gaussian_sigma * 2)
-    blurred_pil = img_pil.filter(ImageFilter.GaussianBlur(radius=radius))
+    
+    # Check if image has alpha channel
+    if img_pil.mode == 'RGBA':
+        # Convert to premultiplied alpha (RGBa mode)
+        img_pil = img_pil.convert('RGBa')
+        radius = int(gaussian_sigma * 2)
+        blurred_pil = img_pil.filter(ImageFilter.GaussianBlur(radius=radius))
+        # Convert back to straight alpha (RGBA)
+        blurred_pil = blurred_pil.convert('RGBA')
+    else:
+        # No alpha channel, blur directly
+        radius = int(gaussian_sigma * 2)
+        blurred_pil = img_pil.filter(ImageFilter.GaussianBlur(radius=radius))
+    
     img_smoothed = pil_to_numpy(blurred_pil)
     return img_smoothed
 
