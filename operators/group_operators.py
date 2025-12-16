@@ -5,6 +5,8 @@ from bpy.utils import register_classes_factory
 from bpy_extras.node_utils import connect_sockets, find_base_socket_type
 from mathutils import Vector
 
+from ..utils.version import is_newer_than
+
 from ..paintsystem.graph.common import get_library_nodetree
 
 from ..paintsystem.data import TEMPLATE_ENUM
@@ -148,6 +150,10 @@ class PAINTSYSTEM_OT_NewGroup(PSContextMixin, PSUVOptionsMixin, MultiMaterialOpe
         ps_ctx = self.parse_context(context)
         mat = ps_ctx.active_material
         mat.use_nodes = True
+        
+        # For version not higher than 4.2, use the old blend method
+        if not is_newer_than(4, 2):
+            mat.blend_method = 'HASHED'
         
         if self.use_alpha_blend:
             mat.blend_method = 'BLEND'
