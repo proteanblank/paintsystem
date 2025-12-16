@@ -3,7 +3,7 @@ from datetime import datetime
 from bpy.utils import register_classes_factory
 from bpy.types import Panel, Menu, UIList
 
-from ..paintsystem.version_check import is_update_available
+from ..paintsystem.version_check import get_latest_version
 
 from ..utils.version import is_newer_than, is_online
 
@@ -224,13 +224,22 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             
             return
         ps_ctx = self.parse_context(context)
-        if is_online() and is_update_available():
-            box = layout.box()
-            box.alert = True
-            box.label(text="Update Available", icon="INFO")
-            row = box.row()
-            scale_content(context, row)
-            row.operator("paint_system.open_extension_preferences", text="Update Paint System", icon="FILE_REFRESH")
+        if is_online() and ps_ctx.ps_settings:
+            # Trigger version check (non-blocking)
+            get_latest_version()
+            
+            # Check update state
+            update_state = ps_ctx.ps_settings.update_state
+            if update_state == 'AVAILABLE':
+                box = layout.box()
+                box.alert = True
+                box.label(text="Update Available", icon="INFO")
+                row = box.row()
+                scale_content(context, row)
+                row.operator("paint_system.open_extension_preferences", text="Update Paint System", icon="FILE_REFRESH")
+            elif update_state == 'LOADING':
+                box = layout.box()
+                box.label(text="Checking for updates...", icon="INFO")
         if not ps_ctx.ps_settings.use_legacy_ui and ps_ctx.active_channel:
             toggle_paint_mode_ui(layout, context)
         ob = ps_ctx.ps_object

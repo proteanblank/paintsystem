@@ -177,7 +177,7 @@ class PAINTSYSTEM_OT_CheckForUpdates(PSContextMixin, Operator):
         ps_ctx = cls.parse_context(context)
         if ps_ctx.ps_settings is None:
             return False
-        return is_online() and not ps_ctx.ps_settings.loading_version_check
+        return is_online() and ps_ctx.ps_settings.update_state != 'LOADING'
     
     def execute(self, context):
         # Delete version cache

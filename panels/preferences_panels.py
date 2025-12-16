@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import AddonPreferences
-from bpy.props import BoolProperty, FloatProperty, IntProperty
+from bpy.props import BoolProperty, FloatProperty, IntProperty, EnumProperty
 from bpy.utils import register_classes_factory
 
 from ..paintsystem.version_check import get_latest_version
@@ -91,10 +91,15 @@ class PaintSystemPreferences(AddonPreferences):
         soft_max=59
     )
     
-    loading_version_check: BoolProperty(
-        name="Loading Version Check",
-        description="Loading version check",
-        default=False,
+    update_state: EnumProperty(
+        name='Update State',
+        description='Extension update state',
+        items=(
+            ('UNAVAILABLE', 'Unavailable', ''),
+            ('AVAILABLE', 'Available', ''),
+            ('LOADING', 'Loading', '')
+        ),
+        default='UNAVAILABLE',
         options={'SKIP_SAVE'}
     )
 

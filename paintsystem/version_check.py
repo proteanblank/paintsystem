@@ -4,7 +4,7 @@ import sys
 import os
 import time
 import threading
-from typing import Optional
+from typing import Optional, Tuple
 from .data import parse_context
 from ..utils.version import is_newer_than, is_online
 
@@ -70,20 +70,37 @@ def load_version_cache() -> Optional[str]:
         return None
 
 
-def thread_fetch_latest_version():
-    """Fetch the latest version in a background thread."""
-    print(f"Fetching latest version...")
+def thread_check_update():
+    """Check for updates in a background thread - combines latest version check and update availability."""
+    print(f"Checking for updates...")
     ps_ctx = parse_context(bpy.context)
     
     try:
-        version = _get_latest_version_internal()
-        if version is not None:
-            save_version_cache(version)
+        # Get current version first (doesn't require repo reading)
+        current_version = _get_current_version_internal()
+        
+        # Get latest version and check if update is available in one go
+        latest_version, update_available = _get_latest_version_and_check_update_internal(current_version)
+        
+        if latest_version is not None:
+            save_version_cache(latest_version)
+        
+        # Update the state based on results
+        if ps_ctx.ps_settings is not None:
+            if latest_version is None:
+                ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
+            elif update_available:
+                ps_ctx.ps_settings.update_state = 'AVAILABLE'
+            else:
+                ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
     except Exception as e:
-        print(f"Error fetching version: {e}", file=sys.stderr)
+        print(f"Error checking for updates: {e}", file=sys.stderr)
+        if ps_ctx.ps_settings is not None:
+            ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
     finally:
         if ps_ctx.ps_settings is not None:
-            ps_ctx.ps_settings.loading_version_check = False
+            if ps_ctx.ps_settings.update_state == 'LOADING':
+                ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
 
 
 def _get_latest_version_internal() -> Optional[str]:
@@ -93,14 +110,34 @@ def _get_latest_version_internal() -> Optional[str]:
     Returns:
         The latest version string (e.g., "1.2.3") if found, None otherwise.
     """
+    latest_version, _ = _get_latest_version_and_check_update_internal(None)
+    return latest_version
+
+
+def _get_latest_version_and_check_update_internal(current_version: Optional[str]) -> Tuple[Optional[str], bool]:
+    """
+    Get the latest version and check if update is available in one repository call.
+    
+    Args:
+        current_version: Current installed version (if None, will be fetched from bl_info)
+    
+    Returns:
+        Tuple of (latest_version, update_available)
+        - latest_version: The latest version string (e.g., "1.2.3") if found, None otherwise
+        - update_available: True if update is available, False otherwise
+    """
     pkg_id = ADDON_ID
+    
+    # Get current version if not provided
+    if current_version is None:
+        current_version = _get_current_version_internal()
     
     try:
         from bl_pkg import bl_extension_ops as ext_op
         from bl_pkg import bl_extension_utils
     except ImportError:
         # Fallback for different Blender versions
-        return None
+        return None, False
     
     repos_all = ext_op.extension_repos_read(use_active_only=True)
     repo_cache_store = ext_op.repo_cache_store_ensure()
@@ -108,7 +145,7 @@ def _get_latest_version_internal() -> Optional[str]:
     repo_directory_supset = [repo_entry.directory for repo_entry in repos_all]
     
     if not repos_all:
-        return None
+        return None, False
     
     # Clear cache for repos that don't use cache
     for repo_item in repos_all:
@@ -139,8 +176,16 @@ def _get_latest_version_internal() -> Optional[str]:
                 continue
             
             if pkg_id_remote == pkg_id:
-                return item_remote.version
-    return None
+                latest_version = item_remote.version
+                # Check if update is available
+                if current_version and latest_version:
+                    comparison = _compare_versions(current_version, latest_version)
+                    update_available = comparison < 0
+                else:
+                    update_available = False
+                return latest_version, update_available
+    
+    return None, False
 
 
 def get_latest_version() -> Optional[str]:
@@ -165,17 +210,23 @@ def get_latest_version() -> Optional[str]:
     if not is_extension:
         return None
     
-    if ps_ctx.ps_settings is None or ps_ctx.ps_settings.loading_version_check:
+    if ps_ctx.ps_settings is None:
         return None
+    
+    # Check if already loading
+    if ps_ctx.ps_settings.update_state == 'LOADING':
+        # Try to return cached version while loading
+        cached_version = load_version_cache()
+        return cached_version
     
     # Try to load from cache first
     cached_version = load_version_cache()
     if cached_version is not None:
         return cached_version
     
-    # Start background thread to fetch version
-    ps_ctx.ps_settings.loading_version_check = True
-    threading.Thread(target=thread_fetch_latest_version).start()
+    # Start background thread to check for updates (combines latest version and update check)
+    ps_ctx.ps_settings.update_state = 'LOADING'
+    threading.Thread(target=thread_check_update).start()
     
     return None
 
@@ -324,17 +375,24 @@ def _compare_versions(version1: str, version2: str) -> int:
 
 def is_update_available() -> Optional[bool]:
     """
-    Check if an update is available by comparing current installed version with latest version.
+    Check if an update is available by checking the update_state preference.
+    This avoids duplicate repository calls by using the state set by the background thread.
     
     Returns:
         True if update is available, False if up to date, None if unable to determine.
     """
-    current_version = get_current_version()
-    latest_version = get_latest_version()
-    
-    if current_version is None or latest_version is None:
+    ps_ctx = parse_context(bpy.context)
+    if ps_ctx.ps_settings is None:
         return None
     
-    comparison = _compare_versions(current_version, latest_version)
-    return comparison < 0  # True if current < latest
+    # Trigger check if not already done
+    get_latest_version()
+    
+    # Return based on update_state
+    if ps_ctx.ps_settings.update_state == 'AVAILABLE':
+        return True
+    elif ps_ctx.ps_settings.update_state == 'UNAVAILABLE':
+        return False
+    else:  # LOADING
+        return None
 
