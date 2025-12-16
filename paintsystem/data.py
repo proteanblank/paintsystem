@@ -604,77 +604,6 @@ class MarkerAction(PropertyGroup):
     )
 
 class GlobalLayer(PropertyGroup):
-            
-    def update_node_tree(self, context):
-        if not self.node_tree:
-            return
-        if self.layer_name:
-            self.node_tree.name = f".PS_Layer ({self.layer_name})"
-        
-        match self.type:
-            case "IMAGE":
-                if self.image:
-                    self.image.name = self.layer_name
-                layer_graph = create_image_graph(self)
-            case "FOLDER":
-                layer_graph = create_folder_graph(self)
-            case "SOLID_COLOR":
-                layer_graph = create_solid_graph(self)
-            case "ATTRIBUTE":
-                layer_graph = create_attribute_graph(self)
-            case "ADJUSTMENT":
-                layer_graph = create_adjustment_graph(self)
-            case "GRADIENT":
-                def add_empty_to_collection(empty_object):
-                    collection = get_paint_system_collection(context)
-                    collection.objects.link(empty_object)
-                    
-                if self.gradient_type in ('LINEAR', 'RADIAL'):
-                    if not self.empty_object:
-                        ps_ctx = parse_context(context)
-                        with bpy.context.temp_override():
-                            empty_object = bpy.data.objects.new(f"{self.name}", None)
-                            empty_object.parent = ps_ctx.ps_object
-                            add_empty_to_collection(empty_object)
-                        self.empty_object = empty_object
-                        if self.gradient_type == 'LINEAR':
-                            self.empty_object.empty_display_type = 'SINGLE_ARROW'
-                        elif self.gradient_type == 'RADIAL':
-                            self.empty_object.empty_display_type = 'SPHERE'
-                    elif self.empty_object.name not in context.view_layer.objects:
-                        add_empty_to_collection(context, self.empty_object)
-                layer_graph = create_gradient_graph(self)
-            case "RANDOM":
-                layer_graph = create_random_graph(self)
-            case "NODE_GROUP":
-                layer_graph = create_custom_graph(self)
-            case "TEXTURE":
-                layer_graph = create_texture_graph(self)
-            case "GEOMETRY":
-                layer_graph = create_geometry_graph(self)
-            case _:
-                raise ValueError(f"Invalid layer type: {self.type}")
-        
-        # Clean up
-        if self.empty_object and self.type != "GRADIENT":
-            collection = get_paint_system_collection(context)
-            if self.empty_object.name in collection.objects:
-                collection.objects.unlink(self.empty_object)
-        
-        if not self.enabled:
-            layer_graph.link("group_input", "group_output", "Color", "Color")
-            layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
-        layer_graph.compile()
-        update_active_image(self, context)
-    
-    # Not used anymore
-    def update_layer_name(self, context):
-        """Update the layer name to ensure uniqueness."""
-        new_name = get_next_unique_name(self.layer_name, [layer.layer_name for layer in context.scene.ps_scene_data.layers if layer != self])
-        if new_name != self.layer_name:
-            self.layer_name = new_name
-        self.update_node_tree(context)
-            
     def find_node(self, identifier: str) -> Node | None:
         return get_node_from_nodetree(self.node_tree, identifier)
             
@@ -695,7 +624,6 @@ class GlobalLayer(PropertyGroup):
     layer_name: StringProperty(
         name="Name",
         description="Layer name",
-        update=update_node_tree
     )
     updating_name_flag: bpy.props.BoolProperty(
         default=False, 
@@ -704,7 +632,6 @@ class GlobalLayer(PropertyGroup):
     image: PointerProperty(
         name="Image",
         type=Image,
-        update=update_node_tree
     )
     actions: CollectionProperty(
         type=MarkerAction,
@@ -719,79 +646,66 @@ class GlobalLayer(PropertyGroup):
     custom_node_tree: PointerProperty(
         name="Custom Node Tree",
         type=NodeTree,
-        update=update_node_tree
     )
     custom_color_input: IntProperty(
         name="Custom Color Input",
         description="Custom color input",
         default=-1,
-        update=update_node_tree
     )
     custom_alpha_input: IntProperty(
         name="Custom Alpha Input",
         description="Custom alpha input",
         default=-1,
-        update=update_node_tree
     )
     custom_color_output: IntProperty(
         name="Custom Color Output",
         description="Custom color output",
         default=-1,
-        update=update_node_tree
     )
     custom_alpha_output: IntProperty(
         name="Custom Alpha Output",
         description="Custom alpha output",
         default=-1,
-        update=update_node_tree
     )
     coord_type: EnumProperty(
         items=COORDINATE_TYPE_ENUM,
         name="Coordinate Type",
         description="Coordinate type",
         default='UV',
-        update=update_node_tree
     )
     uv_map_name: StringProperty(
         name="UV Map",
         description="Name of the UV map to use",
-        update=update_node_tree
     )
     adjustment_type: EnumProperty(
         items=ADJUSTMENT_TYPE_ENUM,
         name="Adjustment Type",
         description="Adjustment type",
-        update=update_node_tree
     )
     empty_object: PointerProperty(
         name="Empty Object",
         type=Object,
-        update=update_node_tree
     )
     gradient_type: EnumProperty(
         items=GRADIENT_TYPE_ENUM,
         name="Gradient Type",
         description="Gradient type",
         default='LINEAR',
-        update=update_node_tree
     )
     texture_type: EnumProperty(
         items=TEXTURE_TYPE_ENUM,
         name="Texture Type",
         description="Texture type",
-        update=update_node_tree
     )
     geometry_type: EnumProperty(
         items=GEOMETRY_TYPE_ENUM,
         name="Geometry Type",
         description="Geometry type",
-        update=update_node_tree
     )
     normalize_normal: BoolProperty(
         name="Normalize Normal",
         description="Normalize the normal",
         default=False,
-        update=update_node_tree
     )
     type: EnumProperty(
         items=LAYER_TYPE_ENUM,
@@ -801,7 +715,6 @@ class GlobalLayer(PropertyGroup):
         name="Lock Layer",
         description="Lock the layer",
         default=False,
-        update=update_active_image
     )
     node_tree: PointerProperty(
         name="Node Tree",
@@ -815,26 +728,22 @@ class GlobalLayer(PropertyGroup):
         name="Expanded",
         description="Expand the layer",
         default=True,
-        # update=select_layer
     )
     is_clip: BoolProperty(
         name="Clip",
         description="Clip the layer",
         default=False,
-        update=update_active_channel
     )
     enabled: BoolProperty(
         name="Enabled",
         description="Toggle layer visibility",
         default=True,
-        update=update_node_tree,
         options=set()
     )
     lock_alpha: BoolProperty(
         name="Lock Alpha",
         description="Lock the alpha channel",
         default=False,
-        update=update_brush_settings
     )
 
 class LayerMask(PropertyGroup):
