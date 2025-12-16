@@ -5,6 +5,30 @@ from urllib import request
 jobs = [
     # Blender 4 test first and last patch version of each minor version
     {
+        "version": "4.0.0",
+        "version_x_y": "4.0",
+        "sha": "released",
+        "download_url": "https://download.blender.org/release/Blender4.0/blender-4.0.0-linux-x64.tar.xz",
+    },
+    {
+        "version": "4.0.2",
+        "version_x_y": "4.0",
+        "sha": "released",
+        "download_url": "https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-x64.tar.xz",
+    },
+    {
+        "version": "4.1.0",
+        "version_x_y": "4.1",
+        "sha": "released",
+        "download_url": "https://download.blender.org/release/Blender4.1/blender-4.1.0-linux-x64.tar.xz",
+    },
+    {
+        "version": "4.1.1",
+        "version_x_y": "4.1",
+        "sha": "released",
+        "download_url": "https://download.blender.org/release/Blender4.1/blender-4.1.1-linux-x64.tar.xz",
+    },
+    {
         "version": "4.2.0",
         "version_x_y": "4.2",
         "sha": "released",
