@@ -367,7 +367,7 @@ class PAINTSYSTEM_OT_ExportAllImages(PSContextMixin, Operator):
     as_copy: BoolProperty(
         name="As Copy",
         description="Export the images as copies",
-        default=True
+        default=False
     )
     
     replace_whitespaces: BoolProperty(

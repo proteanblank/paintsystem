@@ -230,16 +230,17 @@ class MAT_MT_PaintSystemMergeAndExport(PSContextMixin, Menu):
                     text="Use Baked Image", icon='CHECKBOX_HLT' if active_channel.use_bake_image else 'CHECKBOX_DEHLT')
             layout.separator()
         layout.label(text="Bake")
-        layout.operator("paint_system.bake_channel", text=f"Bake Active Channel ({active_channel.name})", icon_value=get_icon_from_channel(active_channel))
+        layout.operator("paint_system.bake_channel", text="Bake Active Channel", icon_value=get_icon_from_channel(active_channel))
         layout.operator("paint_system.bake_channel", text=f"Bake Active Channel as Layer", icon_value=get_icon("image")).as_layer = True
-        # layout.operator("paint_system.bake_all_channels", text="Bake all Channels")
+        if not ps_ctx.ps_settings.use_legacy_ui:
+            layout.operator("paint_system.bake_all_channels", text=f"Bake All Channels", icon_value=get_icon('channels'))
         layout.separator()
-        layout.label(text="Export")
-        if not active_channel.bake_image:
-            layout.label(text="Please bake the channel first!", icon='ERROR')
-            return
-        layout.operator("paint_system.export_image", text="Export Baked Image", icon='EXPORT').image_name = active_channel.bake_image.name
-        layout.operator("paint_system.delete_bake_image", text="Delete Baked Image", icon='TRASH')
+        layout.label(text="Export Baked Images")
+        if active_channel.bake_image:
+            layout.operator("paint_system.export_image", text="Export Active Channel", icon='EXPORT').image_name = active_channel.bake_image.name
+            layout.operator("paint_system.delete_bake_image", text="Delete Active Channel", icon='TRASH')
+        if not ps_ctx.ps_settings.use_legacy_ui:
+            layout.operator("paint_system.export_all_images", text="Export All Channels", icon='EXPORT')
 
 class MAT_PT_Layers(PSContextMixin, Panel):
     bl_idname = 'MAT_PT_Layers'

@@ -121,7 +121,8 @@ class MAT_PT_ChannelsPanel(PSContextMixin, Panel):
     def draw(self, context):
         layout = self.layout
         ps_ctx = self.parse_context(context)
-        layout.menu("MAT_MT_PaintSystemChannelsMergeAndExport", icon="TEXTURE_DATA", text="Bake and Export")
+        if ps_ctx.ps_settings.use_legacy_ui:
+            layout.menu("MAT_MT_PaintSystemChannelsMergeAndExport", icon="TEXTURE_DATA", text="Bake and Export")
         row = layout.row()
         row.template_list(
             "PAINTSYSTEM_UL_channels", 
