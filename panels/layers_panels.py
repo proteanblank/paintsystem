@@ -1071,7 +1071,7 @@ class PAINTSYSTEM_UL_Actions(PSContextMixin, UIList):
         layout.prop(item, "action_bind", text="", icon_only=True, emboss=False)
         bind_to = 'Marker' if item.action_bind == 'MARKER' else 'Frame'
         bind_name = (item.marker_name if item.marker_name else "None") if item.action_bind == 'MARKER' else str(item.frame)
-        layout.label(text=f"{bind_to} {bind_name} Action")
+        layout.label(text=f"{bind_to} {bind_name} ({item.action_type.title()})")
     
     def filter_items(self, context, data, propname):
         actions = getattr(data, propname).values()
@@ -1114,9 +1114,9 @@ class MAT_PT_Actions(PSContextMixin, Panel):
             col = box.column(align=True)
             col.label(text="Actions can control layer visibility", icon='INFO')
             col.label(text="with frame number or marker", icon='BLANK1')
+        layout.label(text="Action Order:")
         row = layout.row()
         actions_col = row.column()
-        scale_content(context, actions_col)
         actions_col.template_list("PAINTSYSTEM_UL_Actions", "", active_layer,
                           "actions", active_layer, "active_action_index", rows=5)
         col = row.column(align=True)

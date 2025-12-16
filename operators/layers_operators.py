@@ -971,6 +971,7 @@ class PAINTSYSTEM_OT_AddAction(PSContextMixin, Operator):
             action.frame = self.frame
         elif self.action_bind == 'MARKER':
             action.marker_name = self.marker_name
+        redraw_panel(context)
         return {'FINISHED'}
     
     def invoke(self, context, event):
