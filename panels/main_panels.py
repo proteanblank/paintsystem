@@ -74,7 +74,7 @@ class MAT_PT_Support(PSContextMixin, Panel):
                             date_format = '%d %b %H:%M'
                         row = align_center(col)
                         row.enabled = idx == 0
-                        row.label(text=f"${donation['price']} donated at {datetime.fromisoformat(donation['timestamp']).strftime(date_format)}")
+                        row.label(text=f"${donation['price']} donated on {datetime.fromisoformat(donation['timestamp']).strftime(date_format)}")
         align_center(layout).label(text="But more importantly,")
         row = layout.row(align=True)
         row.scale_x = 1.5
