@@ -210,10 +210,21 @@ class PAINTSYSTEM_OT_OpenExtensionPreferences(Operator):
             bpy.ops.preferences.addon_expand(module=addon_package())
         return {'FINISHED'}
 
+class PAINTSYSTEM_OT_DismissUpdate(PSContextMixin, Operator):
+    bl_idname = "paint_system.dismiss_update"
+    bl_label = "Dismiss Update"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        ps_ctx = self.parse_context(context)
+        ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
+        return {'FINISHED'}
+
 classes = (
     PAINTSYSTEM_OT_UpdatePaintSystemData,
     PAINTSYSTEM_OT_CheckForUpdates,
     PAINTSYSTEM_OT_OpenExtensionPreferences,
+    PAINTSYSTEM_OT_DismissUpdate,
 )
 
 register, unregister = register_classes_factory(classes)

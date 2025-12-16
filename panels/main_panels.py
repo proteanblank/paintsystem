@@ -233,7 +233,9 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             if update_state == 'AVAILABLE':
                 box = layout.box()
                 box.alert = True
-                box.label(text="Update Available", icon="INFO")
+                row = box.row()
+                row.label(text="Update Available", icon="INFO")
+                row.operator("paint_system.dismiss_update", text="", icon="X")
                 row = box.row()
                 scale_content(context, row)
                 row.operator("paint_system.open_extension_preferences", text="Update Paint System", icon="FILE_REFRESH")
