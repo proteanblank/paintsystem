@@ -7,12 +7,10 @@ except ImportError:
     PIL_AVAILABLE = False
     PILImage = None
 import numpy as np
-import struct
 import time
 from pathlib import Path
 import os
 import re
-import tempfile
 from dataclasses import dataclass
 from typing import Dict, Optional
 
@@ -280,6 +278,70 @@ def pil_to_numpy(pil_image):
     img_float = img_uint8.astype(np.float64) / 255.0
     return img_float
 
+def is_temp_filepath(filepath: str) -> bool:
+    """
+    Check if a filepath is in the temporary directory.
+    """
+    if not filepath:
+        return False
+    temp_dir = bpy.app.tempdir
+    abs_filepath = bpy.path.abspath(filepath)
+    abs_temp_dir = os.path.abspath(temp_dir)
+    return abs_filepath.startswith(abs_temp_dir)
+
+def delete_temp_image_files(image: Image):
+    """
+    Delete temporary files associated with an image if they are in the temp directory.
+    Handles both UDIM (multiple tile files) and non-UDIM (single file) images.
+    """
+    if not image.filepath:
+        return
+    
+    if not is_temp_filepath(image.filepath):
+        return
+    
+    # Check if this is a UDIM tiled image
+    is_udim = image.source == 'TILED' and len(image.tiles) > 1
+    
+    if is_udim:
+        # For UDIM images, delete all tile files
+        directory = os.path.dirname(bpy.path.abspath(image.filepath))
+        filename = bpy.path.basename(image.filepath)
+        
+        # Extract prefix and extension
+        if '.<UDIM>.' in filename:
+            prefix = filename.split('.<UDIM>.')[0]
+            extension = filename.split('.<UDIM>.')[-1]
+        else:
+            prefix = os.path.splitext(filename)[0]
+            extension = os.path.splitext(filename)[1]
+        
+        # Delete all tile files matching the pattern
+        if os.path.exists(directory):
+            for f in os.listdir(directory):
+                # Try to match UDIM tile pattern: prefix.number.extension
+                for sep in ['.', '_', '-']:
+                    pattern = rf'^{re.escape(prefix)}{re.escape(sep)}(\d{{4}})(\..+)?$'
+                    match = re.match(pattern, f)
+                    if match:
+                        tile_path = os.path.join(directory, f)
+                        try:
+                            if os.path.exists(tile_path):
+                                os.remove(tile_path)
+                        except OSError as e:
+                            if debug_mode:
+                                print(f"Failed to delete temp tile file {tile_path}: {e}")
+                        break
+    else:
+        # For non-UDIM images, delete the single file
+        abs_filepath = bpy.path.abspath(image.filepath)
+        try:
+            if os.path.exists(abs_filepath):
+                os.remove(abs_filepath)
+        except OSError as e:
+            if debug_mode:
+                print(f"Failed to delete temp file {abs_filepath}: {e}")
+
 def switch_image_content(image1: Image, image2: Image):
     """Switch the contents of two images."""
     start_time = time.time()
@@ -364,6 +426,9 @@ def set_image_pixels(image: Image, image_tiles: ImageTiles):
         # Repack if it was originally packed
         if image_tiles.ori_packed:
             image.pack()
+            # Delete temp files if the current filepath is in temp directory
+            if is_temp_filepath(image.filepath):
+                delete_temp_image_files(image)
             image.filepath = image_tiles.ori_path
     else:
         # Single array (non-UDIM)
