@@ -19,7 +19,7 @@ import numpy
 # Conditionally import PIL-dependent functions and classes
 if PIL_AVAILABLE:
     from .image_filters import gaussian_blur, sharpen_image
-    from .image_filters.brush_painter.brush_painter_core import BrushPainterCore
+    from .image_filters.brush_painter_core import BrushPainterCore
 else:
     gaussian_blur = None
     sharpen_image = None

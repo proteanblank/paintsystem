@@ -10,8 +10,8 @@ except ImportError:
 import os
 import glob
 from dataclasses import dataclass
-from ...common import blender_image_to_numpy, numpy_to_blender_image
-from ....paintsystem.image import set_image_pixels
+from ..common import blender_image_to_numpy, numpy_to_blender_image
+from ...paintsystem.image import set_image_pixels
 
 @dataclass
 class StepData:
