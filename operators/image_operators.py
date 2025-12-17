@@ -2,21 +2,22 @@ import bpy
 from bpy.types import Menu, Operator
 from bpy.props import StringProperty, IntProperty, EnumProperty, BoolProperty, FloatProperty
 from bpy.utils import register_classes_factory
-from .common import PSContextMixin, PSImageFilterMixin, get_unified_settings, get_icon
-from .image_filters import (
+from .common import (
+    PSContextMixin,
+    PSImageFilterMixin,
+    get_unified_settings,
+    get_icon,
     blender_image_to_numpy,
-    numpy_to_blender_image,
-    switch_image_content,
-    list_brush_presets,
-    resolve_brush_preset_path,
-    )
-from .image_filters.common import PIL_AVAILABLE
+    PIL_AVAILABLE
+)
+from ..paintsystem.image import set_image_pixels, ImageTiles
+from .image_filters import list_brush_presets, resolve_brush_preset_path
 import numpy
 
 # Conditionally import PIL-dependent functions and classes
 if PIL_AVAILABLE:
     from .image_filters import gaussian_blur, sharpen_image
-    from .image_filters.brush_painter.brush_painter_core import BrushPainterCore
+    from .image_filters.brush_painter_core import BrushPainterCore
 else:
     gaussian_blur = None
     sharpen_image = None
@@ -177,10 +178,11 @@ if PIL_AVAILABLE:
             image = self.get_image(context)
             if not image:
                 return {'CANCELLED'}
-            np_image = blender_image_to_numpy(image)
-            np_image = gaussian_blur(np_image, self.gaussian_sigma)
-            new_image = numpy_to_blender_image(np_image, f"{image.name}_blurred")
-            ps_ctx.active_layer.image = new_image
+            image_tiles = blender_image_to_numpy(image)
+            if image_tiles is None:
+                return {'CANCELLED'}
+            blurred_tiles = gaussian_blur(image_tiles, self.gaussian_sigma)
+            set_image_pixels(image, blurred_tiles)
             return {'FINISHED'}
         
         def invoke(self, context, event):
@@ -204,10 +206,11 @@ if PIL_AVAILABLE:
             image = self.get_image(context)
             if not image:
                 return {'CANCELLED'}
-            np_image = blender_image_to_numpy(image)
-            np_image = sharpen_image(np_image, self.sharpen_amount)
-            new_image = numpy_to_blender_image(np_image, f"{image.name}_sharpened")
-            ps_ctx.active_layer.image = new_image
+            image_tiles = blender_image_to_numpy(image)
+            if image_tiles is None:
+                return {'CANCELLED'}
+            sharpened_tiles = sharpen_image(image_tiles, self.sharpen_amount)
+            set_image_pixels(image, sharpened_tiles)
             return {'FINISHED'}
         
         def invoke(self, context, event):

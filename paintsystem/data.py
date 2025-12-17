@@ -33,6 +33,8 @@ from bpy_extras.node_utils import connect_sockets
 from typing import Optional
 from mathutils import Color, Euler, Vector
 
+from .image import blender_image_to_numpy, set_image_pixels, save_image, ImageTiles
+
 from .list_manager import ListManager
 
 # ---
@@ -211,14 +213,6 @@ EDIT_EXTERNAL_MODE_ENUM = [
     ('IMAGE_EDIT', "Image Edit", "Edit Image in external editor", "IMAGE", 0),
     ('VIEW_CAPTURE', "View Capture", "Capture view and edit in external editor", "CAMERA_DATA", 1),
 ]
-
-def save_image(image: Image):
-    if not image.is_dirty:
-        return
-    if image.packed_file or image.filepath == '':
-        image.pack()
-    else:
-        image.save()
 
 def is_valid_uuidv4(uuid_string):
     """
@@ -521,6 +515,12 @@ def ensure_udim_tiles(image: bpy.types.Image, objects: list[bpy.types.Object], u
     for object in objects:
         udim_tiles.update(get_udim_tiles(object, uv_layer_name))
     width, height = image.size
+    
+    # Clean up tiles that does not have image
+    for tile in image.tiles:
+        if tile.channels == 0:
+            image.tiles.remove(tile)
+
     for tile_number in udim_tiles:
         if any(tile_number == tile.number for tile in image.tiles):
             continue
@@ -1965,13 +1965,30 @@ class Channel(BaseNestedListManager):
         temp_alpha_image = ps_bake(context, ps_objects, mat, uv_layer, temp_alpha_image, use_gpu, margin=margin, margin_type=margin_type)
 
         if bake_image and temp_alpha_image:
-            pixels_bake = np.empty(len(bake_image.pixels), dtype=np.float32)
-            pixels_temp_alpha = np.empty(len(temp_alpha_image.pixels), dtype=np.float32)
-            bake_image.pixels.foreach_get(pixels_bake)
-            temp_alpha_image.pixels.foreach_get(pixels_temp_alpha)
-            pixels_bake[3::4] = pixels_temp_alpha[1::4]
-            bake_image.pixels.foreach_set(pixels_bake)
-            bake_image.update()
+            print(f"Pixel length: {len(bake_image.pixels)}")
+            print(f"Pixel length: {len(temp_alpha_image.pixels)}")
+            # pixels_bake = np.empty(len(bake_image.pixels), dtype=np.float32)
+            # pixels_temp_alpha = np.empty(len(temp_alpha_image.pixels), dtype=np.float32)
+            pixels_bake = blender_image_to_numpy(bake_image)
+            pixels_temp_alpha = blender_image_to_numpy(temp_alpha_image)
+            
+            if pixels_bake is None or pixels_temp_alpha is None:
+                return
+            
+            # Process tiles - handle both UDIM and non-UDIM cases
+            temp_alpha_single = pixels_temp_alpha.get_single_tile()
+            
+            # Update alpha channel for each tile in bake_image
+            for tile_num in pixels_bake.tiles.keys():
+                bake_tile = pixels_bake.tiles[tile_num]
+                # Use corresponding tile if available, otherwise use single tile
+                if tile_num in pixels_temp_alpha.tiles:
+                    temp_tile = pixels_temp_alpha.tiles[tile_num]
+                    bake_tile[:, :, 3] = temp_tile[:, :, 0]
+                else:
+                    bake_tile[:, :, 3] = temp_alpha_single[:, :, 0]
+            
+            set_image_pixels(bake_image, pixels_bake)
             save_image(bake_image)
         bpy.data.images.remove(temp_alpha_image)
 

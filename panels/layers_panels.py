@@ -33,7 +33,7 @@ from ..paintsystem.data import (
 
 # Check if PIL is available for conditional UI display
 try:
-    from ..operators.image_filters.common import PIL_AVAILABLE
+    from ..paintsystem.image import PIL_AVAILABLE
 except ImportError:
     PIL_AVAILABLE = False
 

@@ -1,11 +1,12 @@
+import time
 import bpy
-from bpy.types import Context, Material, Operator, UILayout
+from bpy.types import Context, Image, Material, Operator, UILayout
 from bpy.utils import register_classes_factory
 from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty
 
 from .common import PSContextMixin, PSImageCreateMixin, DEFAULT_PS_UV_MAP_NAME
 
-from ..paintsystem.data import set_layer_blend_type, get_layer_blend_type
+from ..paintsystem.data import Layer, set_layer_blend_type, get_layer_blend_type
 from ..paintsystem.context import parse_material
 from ..panels.common import get_icon_from_channel
 
@@ -203,6 +204,7 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         return super().invoke(context, event)
     
     def execute(self, context):
+        start_time = time.time()
         bake_materials = self.get_enabled_materials(context)
         ps_ctx = self.parse_context(context)
         if not bake_materials:
@@ -272,6 +274,10 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
         bpy.ops.object.mode_set(mode="OBJECT")
         # Set cursor to default
         context.window.cursor_set('DEFAULT')
+        
+        end_time = time.time()
+        # report the time taken
+        self.report({'INFO'}, f"Baked {len(bake_materials)} materials in {round(end_time - start_time, 2)} seconds")
         return {'FINISHED'}
 
 
@@ -293,6 +299,7 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
         self.advanced_bake_settings_ui(layout, context)
     
     def execute(self, context):
+        start_time = time.time()
         # Set cursor to wait
         bake_materials = self.get_enabled_materials(context)
         if not bake_materials:
@@ -323,6 +330,9 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
         bpy.ops.object.mode_set(mode="OBJECT")
         # Set cursor to default
         context.window.cursor_set('DEFAULT')
+        end_time = time.time()
+        # report the time taken
+        self.report({'INFO'}, f"Baked {len(bake_materials)} materials in {round(end_time - start_time, 2)} seconds")
         return {'FINISHED'}
 
 
@@ -538,6 +548,7 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(BakeOperator):
         self.advanced_bake_settings_ui(layout, context)
 
     def execute(self, context):
+        start_time = time.time()
         # Set cursor to wait
         context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
@@ -573,6 +584,9 @@ class PAINTSYSTEM_OT_TransferImageLayerUV(BakeOperator):
             layer.enabled = True
         # Set cursor back to default
         context.window.cursor_set('DEFAULT')
+        end_time = time.time()
+        # report the time taken
+        self.report({'INFO'}, f"Transferred image layer UV in {round(end_time - start_time, 2)} seconds")
         return {'FINISHED'}
 
 
@@ -605,6 +619,7 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(BakeOperator):
         self.advanced_bake_settings_ui(layout, context)
 
     def execute(self, context):
+        start_time = time.time()
         # Set cursor to wait
         context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
@@ -641,8 +656,22 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(BakeOperator):
         active_channel.remove_children(active_layer.id)
         # Set cursor back to default
         context.window.cursor_set('DEFAULT')
+        end_time = time.time()
+        # report the time taken
+        self.report({'INFO'}, f"Converted to image layer in {round(end_time - start_time, 2)} seconds")
         return {'FINISHED'}
 
+def apply_merged_image_to_layer(merged_layer: "Layer", image: Image, uv_map_name: str):
+    merged_layer.layer_name = merged_layer.layer_name + " Merged"
+    merged_layer.type = "IMAGE"
+    merged_layer.coord_type = "UV"
+    merged_layer.uv_map_name = uv_map_name
+    merged_layer.image = image
+    merged_layer.linked_layer_uid = ""
+    merged_layer.linked_material = None
+    merged_layer.correct_image_aspect = False
+    if image.size[0] != image.size[1]:
+        merged_layer.correct_image_aspect = False
 
 class PAINTSYSTEM_OT_MergeDown(BakeOperator):
     bl_idname = "paint_system.merge_down"
@@ -709,6 +738,7 @@ class PAINTSYSTEM_OT_MergeDown(BakeOperator):
         box.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
+        start_time = time.time()
         # Set cursor to wait
         context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
@@ -754,17 +784,14 @@ class PAINTSYSTEM_OT_MergeDown(BakeOperator):
             layer.enabled = True
         
         # Remove the current layer since it's been merged
-        below_unlinked_layer.layer_name = below_unlinked_layer.layer_name + " Merged"
-        below_unlinked_layer.type = "IMAGE"
-        below_unlinked_layer.coord_type = "UV"
-        below_unlinked_layer.uv_map_name = self.uv_map_name
-        below_unlinked_layer.image = image
-        below_unlinked_layer.linked_layer_uid = ""
-        below_unlinked_layer.linked_material = None
+        apply_merged_image_to_layer(below_unlinked_layer, image, self.uv_map_name)
         active_channel.delete_layer(context, unlinked_layer)
         active_channel.set_active_index_to_layer(context, below_unlinked_layer)
         # Set cursor back to default
         context.window.cursor_set('DEFAULT')
+        end_time = time.time()
+        # report the time taken
+        self.report({'INFO'}, f"Merged down in {round(end_time - start_time, 2)} seconds")
         return {'FINISHED'}
 
 
@@ -832,6 +859,7 @@ class PAINTSYSTEM_OT_MergeUp(BakeOperator):
         box.prop_search(self, "uv_map_name", ps_ctx.ps_object.data, "uv_layers", text="")
 
     def execute(self, context):
+        start_time = time.time()
         # Set cursor to wait
         context.window.cursor_set('WAIT')
         ps_ctx = self.parse_context(context)
@@ -876,17 +904,14 @@ class PAINTSYSTEM_OT_MergeUp(BakeOperator):
         for layer in to_be_enabled_layers:
             layer.enabled = True
 
-        above_unlinked_layer.layer_name = above_unlinked_layer.layer_name + " Merged"
-        above_unlinked_layer.type = "IMAGE"
-        above_unlinked_layer.coord_type = "UV"
-        above_unlinked_layer.uv_map_name = self.uv_map_name
-        above_unlinked_layer.image = image
-        above_unlinked_layer.linked_layer_uid = ""
-        above_unlinked_layer.linked_material = None
+        apply_merged_image_to_layer(above_unlinked_layer, image, self.uv_map_name)
         active_channel.delete_layer(context, unlinked_layer)
         active_channel.set_active_index_to_layer(context, above_unlinked_layer)
         # Set cursor back to default
         context.window.cursor_set('DEFAULT')
+        end_time = time.time()
+        # report the time taken
+        self.report({'INFO'}, f"Merged up in {round(end_time - start_time, 2)} seconds")
         return {'FINISHED'}
 
 classes = (
