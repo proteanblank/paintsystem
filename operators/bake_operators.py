@@ -419,6 +419,9 @@ class PAINTSYSTEM_OT_ExportAllImages(PSContextMixin, Operator):
                 image_name = channel.bake_image.name
                 if self.replace_whitespaces:
                     image_name = image_name.replace(" ", "_")
+                # If image has tiles, add UDIM marker to the image name
+                if len(channel.bake_image.tiles) > 1:
+                    image_name = f"{image_name}.<UDIM>"
                 row.label(text=f"{channel.name}: {image_name}.png", icon_value=get_icon_from_channel(channel))
                 exported_count += 1
             else:
@@ -467,6 +470,9 @@ class PAINTSYSTEM_OT_ExportAllImages(PSContextMixin, Operator):
                     filename = image.name
                     if self.replace_whitespaces:
                         filename = filename.replace(" ", "_")
+                    # If image has tiles, add UDIM marker to the image name
+                    if len(image.tiles) > 1:
+                        filename = f"{filename}.<UDIM>"
                     filename = f"{filename}.png"
                     filepath = os.path.join(self.directory, filename)
                     image.save(filepath=filepath, save_copy=self.as_copy)
