@@ -178,7 +178,6 @@ def load_post(scene):
 
 @bpy.app.handlers.persistent
 def save_handler(scene: bpy.types.Scene):
-    print("Saving Paint System data...")
     images = set()
     
     for mat in bpy.data.materials:

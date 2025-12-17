@@ -26,6 +26,8 @@ class ImageTiles:
     For UDIM images, contains multiple tiles.
     """
     tiles: Dict[int, np.ndarray]  # Mapping of tile number to numpy array
+    ori_path: str
+    ori_packed: bool
     
     @property
     def is_udim(self) -> bool:
@@ -81,7 +83,6 @@ def temp_save_image(image):
         temp_dir = bpy.app.tempdir
         # Use image name or a default name
         image_name = image.name.replace(' ', '_')
-        # Create filepath with UDIM marker - Blender will replace <UDIM> with tile numbers
         temp_filepath = os.path.join(temp_dir, f"{image_name}.<UDIM>.png")
         with bpy.context.temp_override(edit_image=image):
             bpy.ops.image.save_as(filepath=temp_filepath)
@@ -120,14 +121,14 @@ def blender_image_to_numpy(image: Image) -> Optional[ImageTiles]:
         end_time = time.time()
         if debug_mode:
             print(f"Blender image to numpy took {(end_time - start_time)*1000} milliseconds")
-        return ImageTiles(tiles=tiles_dict)
+        return ImageTiles(tiles=tiles_dict, ori_path=image.filepath, ori_packed=(image.packed_file or image.filepath == ''))
     
     # UDIM image - need to load all tiles from disk
     if not PIL_AVAILABLE:
         raise ImportError("PIL (Pillow) is required to process UDIM images. Please install Pillow.")
     
     # Remember original state
-    was_packed = image.packed_file is not None
+    was_packed = (image.packed_file or image.filepath == '')
     original_filepath = image.filepath
     
     # Save image to ensure all tiles are on disk
@@ -226,7 +227,7 @@ def blender_image_to_numpy(image: Image) -> Optional[ImageTiles]:
     if debug_mode:
         print(f"Blender UDIM image to numpy took {(end_time - start_time)*1000} milliseconds for {len(tiles_dict)} tiles")
     
-    return ImageTiles(tiles=tiles_dict)
+    return ImageTiles(tiles=tiles_dict, ori_path=original_filepath, ori_packed=was_packed)
 
 def numpy_to_blender_image(array, image_name="BrushPainted", create_new=True) -> Image:
     """Convert numpy array back to Blender image."""
@@ -311,13 +312,6 @@ def set_image_pixels(image: Image, image_tiles: ImageTiles):
         if not PIL_AVAILABLE:
             raise ImportError("PIL (Pillow) is required to process UDIM images. Please install Pillow.")
         
-        # Remember original state
-        was_packed = image.packed_file is not None
-        
-        # Unpack if needed
-        if was_packed:
-            image.unpack(method='USE_ORIGINAL')
-        
         # Get directory and filename pattern
         if image.filepath:
             directory = os.path.dirname(bpy.path.abspath(image.filepath))
@@ -368,8 +362,9 @@ def set_image_pixels(image: Image, image_tiles: ImageTiles):
         image.update_tag()
         
         # Repack if it was originally packed
-        if was_packed:
+        if image_tiles.ori_packed:
             image.pack()
+            image.filepath = image_tiles.ori_path
     else:
         # Single array (non-UDIM)
         array = image_tiles.get_single_tile()

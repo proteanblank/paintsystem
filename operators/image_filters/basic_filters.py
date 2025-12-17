@@ -45,7 +45,7 @@ def gaussian_blur(image_tiles: ImageTiles, gaussian_sigma) -> ImageTiles:
         tile_num: _gaussian_blur_single(tile_array, gaussian_sigma)
         for tile_num, tile_array in image_tiles.tiles.items()
     }
-    return ImageTiles(tiles=blurred_tiles)
+    return ImageTiles(tiles=blurred_tiles, ori_path=image_tiles.ori_path, ori_packed=image_tiles.ori_packed)
 
 
 def _sharpen_image_single(numpy_array, sharpen_amount):
@@ -66,7 +66,7 @@ def sharpen_image(image_tiles: ImageTiles, sharpen_amount) -> ImageTiles:
         tile_num: _sharpen_image_single(tile_array, sharpen_amount)
         for tile_num, tile_array in image_tiles.tiles.items()
     }
-    return ImageTiles(tiles=sharpened_tiles)
+    return ImageTiles(tiles=sharpened_tiles, ori_path=image_tiles.ori_path, ori_packed=image_tiles.ori_packed)
 
 
 def _smooth_image_single(numpy_array, smooth_amount):
@@ -86,4 +86,4 @@ def smooth_image(image_tiles: ImageTiles, smooth_amount) -> ImageTiles:
         tile_num: _smooth_image_single(tile_array, smooth_amount)
         for tile_num, tile_array in image_tiles.tiles.items()
     }
-    return ImageTiles(tiles=smoothed_tiles)
+    return ImageTiles(tiles=smoothed_tiles, ori_path=image_tiles.ori_path, ori_packed=image_tiles.ori_packed)

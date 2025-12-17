@@ -539,6 +539,6 @@ class BrushPainterCore:
             result_tiles[tile_num] = result_tile
         
         # Update image tiles in place
-        result_image_tiles = ImageTiles(tiles=result_tiles)
+        result_image_tiles = ImageTiles(tiles=result_tiles, ori_path=image_tiles.ori_path, ori_packed=image_tiles.ori_packed)
         set_image_pixels(image, result_image_tiles)
         return image
