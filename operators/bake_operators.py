@@ -1,11 +1,11 @@
 import bpy
-from bpy.types import Context, Material, Operator, UILayout
+from bpy.types import Context, Image, Material, Operator, UILayout
 from bpy.utils import register_classes_factory
 from bpy.props import StringProperty, BoolProperty, IntProperty, EnumProperty
 
 from .common import PSContextMixin, PSImageCreateMixin, DEFAULT_PS_UV_MAP_NAME
 
-from ..paintsystem.data import set_layer_blend_type, get_layer_blend_type
+from ..paintsystem.data import Layer, set_layer_blend_type, get_layer_blend_type
 from ..paintsystem.context import parse_material
 from ..panels.common import get_icon_from_channel
 
@@ -643,6 +643,17 @@ class PAINTSYSTEM_OT_ConvertToImageLayer(BakeOperator):
         context.window.cursor_set('DEFAULT')
         return {'FINISHED'}
 
+def apply_merged_image_to_layer(merged_layer: "Layer", image: Image, uv_map_name: str):
+    merged_layer.layer_name = merged_layer.layer_name + " Merged"
+    merged_layer.type = "IMAGE"
+    merged_layer.coord_type = "UV"
+    merged_layer.uv_map_name = uv_map_name
+    merged_layer.image = image
+    merged_layer.linked_layer_uid = ""
+    merged_layer.linked_material = None
+    merged_layer.correct_image_aspect = False
+    if image.size[0] != image.size[1]:
+        merged_layer.correct_image_aspect = False
 
 class PAINTSYSTEM_OT_MergeDown(BakeOperator):
     bl_idname = "paint_system.merge_down"
@@ -754,13 +765,7 @@ class PAINTSYSTEM_OT_MergeDown(BakeOperator):
             layer.enabled = True
         
         # Remove the current layer since it's been merged
-        below_unlinked_layer.layer_name = below_unlinked_layer.layer_name + " Merged"
-        below_unlinked_layer.type = "IMAGE"
-        below_unlinked_layer.coord_type = "UV"
-        below_unlinked_layer.uv_map_name = self.uv_map_name
-        below_unlinked_layer.image = image
-        below_unlinked_layer.linked_layer_uid = ""
-        below_unlinked_layer.linked_material = None
+        apply_merged_image_to_layer(below_unlinked_layer, image, self.uv_map_name)
         active_channel.delete_layer(context, unlinked_layer)
         active_channel.set_active_index_to_layer(context, below_unlinked_layer)
         # Set cursor back to default
@@ -876,13 +881,7 @@ class PAINTSYSTEM_OT_MergeUp(BakeOperator):
         for layer in to_be_enabled_layers:
             layer.enabled = True
 
-        above_unlinked_layer.layer_name = above_unlinked_layer.layer_name + " Merged"
-        above_unlinked_layer.type = "IMAGE"
-        above_unlinked_layer.coord_type = "UV"
-        above_unlinked_layer.uv_map_name = self.uv_map_name
-        above_unlinked_layer.image = image
-        above_unlinked_layer.linked_layer_uid = ""
-        above_unlinked_layer.linked_material = None
+        apply_merged_image_to_layer(above_unlinked_layer, image, self.uv_map_name)
         active_channel.delete_layer(context, unlinked_layer)
         active_channel.set_active_index_to_layer(context, above_unlinked_layer)
         # Set cursor back to default
