@@ -10,8 +10,8 @@ except ImportError:
 import os
 import glob
 from dataclasses import dataclass
-from ..common import blender_image_to_numpy, numpy_to_blender_image
-from ...paintsystem.image import set_image_pixels
+from ..common import blender_image_to_numpy
+from ...paintsystem.image import set_image_pixels, ImageTiles
 
 @dataclass
 class StepData:
@@ -511,47 +511,34 @@ class BrushPainterCore:
             return None
         
         # Convert Blender image to numpy
-        img_float = blender_image_to_numpy(image)
-        if img_float is None:
+        image_tiles = blender_image_to_numpy(image)
+        if image_tiles is None:
             return None
         
-        # Check if this is a UDIM image (dictionary of tiles)
-        if isinstance(img_float, dict):
-            # Process each tile separately
-            result_tiles = {}
-            custom_img_float = None
+        # Process each tile separately
+        result_tiles = {}
+        custom_image_tiles = None
+        
+        if custom_image_gradient:
+            custom_image_tiles = blender_image_to_numpy(custom_image_gradient)
+            if custom_image_tiles is None:
+                return None
+        
+        for tile_num, tile_array in image_tiles.tiles.items():
+            custom_tile_array = None
+            if custom_image_tiles:
+                custom_tile_array = custom_image_tiles.tiles.get(tile_num)
             
-            if custom_image_gradient:
-                custom_img_float_dict = blender_image_to_numpy(image)
-                if custom_img_float_dict is None:
-                    return None
-            
-            for tile_num, tile_array in img_float.items():
-                if custom_image_gradient and isinstance(custom_img_float_dict, dict):
-                    custom_img_float = custom_img_float_dict.get(tile_num)
-                
-                result_tile = self._apply_brush_painting_single(
-                    tile_array, 
-                    brush_folder_path, 
-                    brush_texture_path, 
-                    custom_img_float,
-                    brush_callback
-                )
-                result_tiles[tile_num] = result_tile
-            
-            # Update image tiles in place
-            set_image_pixels(image, result_tiles)
-            return image
-        else:
-            # Non-UDIM image - process as before
-            final_canvas = self._apply_brush_painting_single(
-                img_float,
-                brush_folder_path,
-                brush_texture_path,
-                blender_image_to_numpy(image) if custom_image_gradient else None,
+            result_tile = self._apply_brush_painting_single(
+                tile_array, 
+                brush_folder_path, 
+                brush_texture_path, 
+                custom_tile_array,
                 brush_callback
             )
-            
-            # Convert back to Blender image
-            result_image = numpy_to_blender_image(final_canvas, f"{image.name}_brushed", create_new=True)
-            return result_image
+            result_tiles[tile_num] = result_tile
+        
+        # Update image tiles in place
+        result_image_tiles = ImageTiles(tiles=result_tiles)
+        set_image_pixels(image, result_image_tiles)
+        return image

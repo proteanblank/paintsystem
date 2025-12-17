@@ -13,8 +13,39 @@ from pathlib import Path
 import os
 import re
 import tempfile
+from dataclasses import dataclass
+from typing import Dict, Optional
 
 debug_mode = False
+
+@dataclass
+class ImageTiles:
+    """
+    Represents image tiles from a Blender image.
+    For non-UDIM images, contains a single tile (typically tile 1001).
+    For UDIM images, contains multiple tiles.
+    """
+    tiles: Dict[int, np.ndarray]  # Mapping of tile number to numpy array
+    
+    @property
+    def is_udim(self) -> bool:
+        """Returns True if this represents a UDIM image with multiple tiles."""
+        return len(self.tiles) > 1
+    
+    def get_single_tile(self) -> np.ndarray:
+        """
+        Get the single tile for non-UDIM images.
+        For UDIM images, returns the first tile.
+        """
+        if not self.tiles:
+            raise ValueError("No tiles available")
+        return next(iter(self.tiles.values()))
+    
+    def get_tile(self, tile_number: int) -> np.ndarray:
+        """Get a specific tile by number."""
+        if tile_number not in self.tiles:
+            raise KeyError(f"Tile {tile_number} not found")
+        return self.tiles[tile_number]
 
 def save_image(image: Image):
     if not image.is_dirty:
@@ -55,11 +86,10 @@ def temp_save_image(image):
         with bpy.context.temp_override(edit_image=image):
             bpy.ops.image.save_as(filepath=temp_filepath)
 
-def blender_image_to_numpy(image: Image):
+def blender_image_to_numpy(image: Image) -> Optional[ImageTiles]:
     """
-    Convert Blender image to numpy array.
-    For UDIM images, returns a dictionary mapping tile numbers to numpy arrays.
-    For non-UDIM images, returns a single numpy array.
+    Convert Blender image to ImageTiles dataclass.
+    Always returns ImageTiles, even for non-UDIM images (which will have a single tile).
     """
     start_time = time.time()
     if image is None:
@@ -84,10 +114,13 @@ def blender_image_to_numpy(image: Image):
         
         # Flip vertically (Blender uses bottom-left origin, numpy uses top-left)
         pixels = np.flipud(pixels)
+        
+        # For non-UDIM images, use tile number 1001 (standard default)
+        tiles_dict = {1001: pixels}
         end_time = time.time()
         if debug_mode:
             print(f"Blender image to numpy took {(end_time - start_time)*1000} milliseconds")
-        return pixels
+        return ImageTiles(tiles=tiles_dict)
     
     # UDIM image - need to load all tiles from disk
     if not PIL_AVAILABLE:
@@ -193,7 +226,7 @@ def blender_image_to_numpy(image: Image):
     if debug_mode:
         print(f"Blender UDIM image to numpy took {(end_time - start_time)*1000} milliseconds for {len(tiles_dict)} tiles")
     
-    return tiles_dict
+    return ImageTiles(tiles=tiles_dict)
 
 def numpy_to_blender_image(array, image_name="BrushPainted", create_new=True) -> Image:
     """Convert numpy array back to Blender image."""
@@ -264,19 +297,17 @@ def switch_image_content(image1: Image, image2: Image):
     if debug_mode:
         print(f"Switch image content took {(end_time - start_time)*1000} milliseconds")
 
-def set_image_pixels(image: Image, array_or_tiles):
+def set_image_pixels(image: Image, image_tiles: ImageTiles):
     """
-    Set image pixels from numpy array or dictionary of tiles.
-    For UDIM images, pass a dictionary mapping tile numbers to numpy arrays.
-    For non-UDIM images, pass a single numpy array.
+    Set image pixels from ImageTiles dataclass.
     """
     start_time = time.time()
     
     # Check if this is a UDIM tiled image
     is_udim = image.source == 'TILED' and len(image.tiles) > 1
     
-    if isinstance(array_or_tiles, dict):
-        # Dictionary of tiles (UDIM)
+    if image_tiles.is_udim or is_udim:
+        # UDIM image - save tiles to disk
         if not PIL_AVAILABLE:
             raise ImportError("PIL (Pillow) is required to process UDIM images. Please install Pillow.")
         
@@ -304,7 +335,7 @@ def set_image_pixels(image: Image, array_or_tiles):
             extension = os.path.splitext(filename)[1]
         
         # Save each tile
-        for tile_number, array in array_or_tiles.items():
+        for tile_number, array in image_tiles.tiles.items():
             # Flip vertically back to Blender coordinate system
             array = np.flipud(array.copy())
             
@@ -341,7 +372,7 @@ def set_image_pixels(image: Image, array_or_tiles):
             image.pack()
     else:
         # Single array (non-UDIM)
-        array = array_or_tiles
+        array = image_tiles.get_single_tile()
         # Flip vertically back to Blender coordinate system
         array = np.flipud(array)
         

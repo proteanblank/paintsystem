@@ -33,7 +33,7 @@ from bpy_extras.node_utils import connect_sockets
 from typing import Optional
 from mathutils import Color, Euler, Vector
 
-from .image import blender_image_to_numpy, set_image_pixels, save_image
+from .image import blender_image_to_numpy, set_image_pixels, save_image, ImageTiles
 
 from .list_manager import ListManager
 
@@ -1971,23 +1971,21 @@ class Channel(BaseNestedListManager):
             pixels_bake = blender_image_to_numpy(bake_image)
             pixels_temp_alpha = blender_image_to_numpy(temp_alpha_image)
             
-            # Handle both single arrays and tile dictionaries
-            if isinstance(pixels_bake, dict) and isinstance(pixels_temp_alpha, dict):
-                # Both are UDIM - process each tile
-                for tile_num in pixels_bake.keys():
-                    if tile_num in pixels_temp_alpha:
-                        pixels_bake[tile_num][:, :, 3] = pixels_temp_alpha[tile_num][:, :, 0]
-            elif isinstance(pixels_bake, dict):
-                # Only bake_image is UDIM - use first tile of temp_alpha
-                for tile_num in pixels_bake.keys():
-                    pixels_bake[tile_num][:, :, 3] = pixels_temp_alpha[:, :, 0]
-            elif isinstance(pixels_temp_alpha, dict):
-                # Only temp_alpha is UDIM - use first tile
-                first_tile = next(iter(pixels_temp_alpha.values()))
-                pixels_bake[:, :, 3] = first_tile[:, :, 0]
-            else:
-                # Both are single arrays
-                pixels_bake[:, :, 3] = pixels_temp_alpha[:, :, 0]
+            if pixels_bake is None or pixels_temp_alpha is None:
+                return
+            
+            # Process tiles - handle both UDIM and non-UDIM cases
+            temp_alpha_single = pixels_temp_alpha.get_single_tile()
+            
+            # Update alpha channel for each tile in bake_image
+            for tile_num in pixels_bake.tiles.keys():
+                bake_tile = pixels_bake.tiles[tile_num]
+                # Use corresponding tile if available, otherwise use single tile
+                if tile_num in pixels_temp_alpha.tiles:
+                    temp_tile = pixels_temp_alpha.tiles[tile_num]
+                    bake_tile[:, :, 3] = temp_tile[:, :, 0]
+                else:
+                    bake_tile[:, :, 3] = temp_alpha_single[:, :, 0]
             
             set_image_pixels(bake_image, pixels_bake)
             save_image(bake_image)

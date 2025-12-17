@@ -8,11 +8,9 @@ from .common import (
     get_unified_settings,
     get_icon,
     blender_image_to_numpy,
-    numpy_to_blender_image,
-    switch_image_content,
     PIL_AVAILABLE
 )
-from ..paintsystem.image import set_image_pixels
+from ..paintsystem.image import set_image_pixels, ImageTiles
 from .image_filters import list_brush_presets, resolve_brush_preset_path
 import numpy
 
@@ -180,17 +178,11 @@ if PIL_AVAILABLE:
             image = self.get_image(context)
             if not image:
                 return {'CANCELLED'}
-            np_image = blender_image_to_numpy(image)
-            np_image = gaussian_blur(np_image, self.gaussian_sigma)
-            
-            # Check if result is a dict (UDIM tiles) or single array
-            if isinstance(np_image, dict):
-                # UDIM image - update tiles in place
-                set_image_pixels(image, np_image)
-            else:
-                # Non-UDIM image - create new image
-                new_image = numpy_to_blender_image(np_image, f"{image.name}_blurred")
-                ps_ctx.active_layer.image = new_image
+            image_tiles = blender_image_to_numpy(image)
+            if image_tiles is None:
+                return {'CANCELLED'}
+            blurred_tiles = gaussian_blur(image_tiles, self.gaussian_sigma)
+            set_image_pixels(image, blurred_tiles)
             return {'FINISHED'}
         
         def invoke(self, context, event):
@@ -214,17 +206,11 @@ if PIL_AVAILABLE:
             image = self.get_image(context)
             if not image:
                 return {'CANCELLED'}
-            np_image = blender_image_to_numpy(image)
-            np_image = sharpen_image(np_image, self.sharpen_amount)
-            
-            # Check if result is a dict (UDIM tiles) or single array
-            if isinstance(np_image, dict):
-                # UDIM image - update tiles in place
-                set_image_pixels(image, np_image)
-            else:
-                # Non-UDIM image - create new image
-                new_image = numpy_to_blender_image(np_image, f"{image.name}_sharpened")
-                ps_ctx.active_layer.image = new_image
+            image_tiles = blender_image_to_numpy(image)
+            if image_tiles is None:
+                return {'CANCELLED'}
+            sharpened_tiles = sharpen_image(image_tiles, self.sharpen_amount)
+            set_image_pixels(image, sharpened_tiles)
             return {'FINISHED'}
         
         def invoke(self, context, event):
