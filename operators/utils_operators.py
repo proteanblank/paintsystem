@@ -153,36 +153,46 @@ class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
     bl_idname = "paint_system.color_sampler"
     bl_label = "Color Sampler"
 
+    target: EnumProperty(
+        name="Target Color",
+        description="Choose which brush color to set",
+        items=(
+            ('PRIMARY', "Primary", "Sample the primary brush color"),
+            ('SECONDARY', "Secondary", "Sample the secondary brush color"),
+        ),
+        default='PRIMARY',
+    )
+
     x: IntProperty()
     y: IntProperty()
     
     @classmethod
     def poll(cls, context):
-        return context.mode == 'PAINT_TEXTURE'
+        return context.area.type == 'VIEW_3D' and context.mode == 'PAINT_TEXTURE'
 
     def execute(self, context):
         if is_newer_than(4,4):
             bpy.ops.paint.sample_color('INVOKE_DEFAULT', merged=True)
             return {'FINISHED'}
-        # Get the screen dimensions
-        x, y = self.x, self.y
 
+        x, y = self.x, self.y
         buffer = gpu.state.active_framebuffer_get()
         pixel = buffer.read_color(x, y, 1, 1, 3, 0, 'FLOAT')
         pixel.dimensions = 1 * 1 * 3
         pix_value = [float(item) for item in pixel]
 
         tool_settings = UnifiedPaintPanel.paint_settings(context)
-        unified_settings = get_unified_settings(context, "use_unified_color")
         brush_settings = tool_settings.brush
-        unified_settings.color = pix_value
-        brush_settings.color = pix_value
+        unified_settings = get_unified_settings(context, "use_unified_color")
+
+        if self.target == 'PRIMARY':
+            if unified_settings:
+                unified_settings.color = pix_value
+            brush_settings.color = pix_value
+        else:
+            brush_settings.secondary_color = pix_value
 
         return {'FINISHED'}
-
-    @classmethod
-    def poll(cls, context):
-        return context.area.type == 'VIEW_3D' and context.mode == 'PAINT_TEXTURE'
 
     def invoke(self, context, event):
         self.x = event.mouse_x
@@ -342,6 +352,81 @@ class PAINTSYSTEM_OT_DuplicatePaintSystemData(PSContextMixin, MultiMaterialOpera
         return {'FINISHED'}
 
 
+class PAINTSYSTEM_OT_ToggleTransformGizmos(Operator):
+    bl_idname = "paint_system.toggle_transform_gizmos"
+    bl_label = "Toggle Transform Gizmos"
+    bl_options = {'REGISTER'}
+    bl_description = "Toggle transform gizmos on/off with state memory for paint mode"
+
+    def execute(self, context):
+        space = context.area.spaces[0] if context.area and context.area.spaces else None
+        if not space or space.type != 'VIEW_3D':
+            return {'CANCELLED'}
+        
+        wm = context.window_manager
+        obj = context.active_object
+        
+        # Determine current gizmo state
+        gizmos_enabled = (space.show_gizmo_object_translate or
+                         space.show_gizmo_object_rotate or
+                         space.show_gizmo_object_scale)
+        
+        # Treat paint, sculpt, vertex/weight paint, and GP draw modes the same for gizmos
+        paint_like_modes = {
+            'PAINT_TEXTURE',
+            'SCULPT',
+            'PAINT_VERTEX',
+            'PAINT_WEIGHT',
+            'PAINT_GPENCIL',
+            'PAINT_GPENCIL_LEGACY',
+            'PAINT_GREASE_PENCIL',
+        }
+        in_paint_mode = obj and obj.mode in paint_like_modes
+        
+        if in_paint_mode:
+            # Store current gizmo state before entering paint mode
+            wm["ps_gizmo_translate"] = space.show_gizmo_object_translate
+            wm["ps_gizmo_rotate"] = space.show_gizmo_object_rotate
+            wm["ps_gizmo_scale"] = space.show_gizmo_object_scale
+            # Keep gizmos disabled during paint mode
+            space.show_gizmo_object_translate = False
+            space.show_gizmo_object_rotate = False
+            space.show_gizmo_object_scale = False
+        else:
+            # Not in paint mode - toggle gizmos normally
+            new_state = not gizmos_enabled
+            space.show_gizmo_object_translate = new_state
+            space.show_gizmo_object_rotate = new_state
+            space.show_gizmo_object_scale = new_state
+        
+        # Redraw the viewport
+        for area in context.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+        
+        return {'FINISHED'}
+
+
+class PAINTSYSTEM_OT_OpenTexPaintMenu(Operator):
+    """Open Texture Paint right-click menu with color wheel and brush options"""
+    bl_idname = "paint_system.open_texpaint_menu"
+    bl_label = "Paint System Menu"
+    bl_options = {'REGISTER'}
+    bl_description = "Open the Texture Paint right-click menu"
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'PAINT_TEXTURE'
+
+    def execute(self, context):
+        # Call the popover panel
+        bpy.ops.wm.call_panel(name="MAT_PT_TexPaintRMBMenu", keep_open=False)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return self.execute(context)
+
+
 classes = (
     PAINTSYSTEM_OT_TogglePaintMode,
     PAINTSYSTEM_OT_AddPresetBrushes,
@@ -356,6 +441,8 @@ classes = (
     PAINTSYSTEM_OT_AddCameraPlane,
     PAINTSYSTEM_OT_HidePaintingTips,
     PAINTSYSTEM_OT_DuplicatePaintSystemData,
+    PAINTSYSTEM_OT_ToggleTransformGizmos,
+    PAINTSYSTEM_OT_OpenTexPaintMenu,
 )
 
 addon_keymaps = []
