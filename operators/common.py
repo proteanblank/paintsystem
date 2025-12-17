@@ -224,7 +224,7 @@ class PSImageCreateMixin(PSUVOptionsMixin):
         options={'SKIP_SAVE'}
     )
     
-    def image_create_ui(self, layout, context, show_name=True, show_float=False):
+    def image_create_ui(self, layout, context, show_name=True, show_float=True):
         if show_name:
             row = layout.row(align=True)
             scale_content(context, row)
