@@ -1,7 +1,8 @@
 import bpy
 
 from .version_check import get_latest_version
-from .data import get_global_layer, sort_actions, parse_context, get_all_layers, is_valid_uuidv4, save_image
+from .data import get_global_layer, sort_actions, parse_context, get_all_layers, is_valid_uuidv4
+from .image import save_image
 from .graph.basic_layers import get_layer_version_for_type
 import time
 from .graph.nodetree_builder import get_nodetree_version

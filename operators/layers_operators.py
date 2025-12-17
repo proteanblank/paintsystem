@@ -18,8 +18,8 @@ from ..paintsystem.data import (
     GEOMETRY_TYPE_ENUM,
     add_empty_to_collection,
     get_layer_by_uid,
-    save_image,
 )
+from ..paintsystem.image import save_image
 from ..utils import get_next_unique_name
 from ..utils.nodes import get_nodetree_socket_enum
 from .common import (

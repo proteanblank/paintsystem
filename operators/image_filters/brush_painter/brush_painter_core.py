@@ -10,7 +10,8 @@ except ImportError:
 import os
 import glob
 from dataclasses import dataclass
-from ..common import blender_image_to_numpy, numpy_to_blender_image
+from ...common import blender_image_to_numpy, numpy_to_blender_image
+from ....paintsystem.image import set_image_pixels
 
 @dataclass
 class StepData:
@@ -449,15 +450,8 @@ class BrushPainterCore:
         
         return steps_data
     
-    def apply_brush_painting(self, image, brush_folder_path=None, brush_texture_path=None, custom_image_gradient=None, brush_callback=None):
-        """Main function to apply brush painting to a Blender image."""
-        if not PIL_AVAILABLE:
-            raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
-        if image is None:
-            return None
-        
-        # Convert Blender image to numpy
-        img_float = blender_image_to_numpy(image)
+    def _apply_brush_painting_single(self, img_float, brush_folder_path=None, brush_texture_path=None, custom_img_float=None, brush_callback=None):
+        """Apply brush painting to a single numpy array."""
         if img_float is None:
             return None
         
@@ -475,10 +469,7 @@ class BrushPainterCore:
         # Calculate blurred image and gradients
         img_blurred = self.calculate_gaussian_blur(img_float)
         
-        if custom_image_gradient:
-            custom_img_float = blender_image_to_numpy(image)
-            if custom_img_float is None:
-                return None
+        if custom_img_float is not None:
             custom_blurred = self.calculate_gaussian_blur(custom_img_float)
             G_normalized, theta = self.calculate_gradients(custom_blurred)
         else:
@@ -510,7 +501,57 @@ class BrushPainterCore:
         # Crop back to original dimensions
         final_canvas = canvas[offset_y:offset_y + H, offset_x:offset_x + W]
         
-        # Convert back to Blender image
-        result_image = numpy_to_blender_image(final_canvas, f"{image.name}_brushed", create_new=True)
+        return final_canvas
+    
+    def apply_brush_painting(self, image, brush_folder_path=None, brush_texture_path=None, custom_image_gradient=None, brush_callback=None):
+        """Main function to apply brush painting to a Blender image."""
+        if not PIL_AVAILABLE:
+            raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
+        if image is None:
+            return None
         
-        return result_image
+        # Convert Blender image to numpy
+        img_float = blender_image_to_numpy(image)
+        if img_float is None:
+            return None
+        
+        # Check if this is a UDIM image (dictionary of tiles)
+        if isinstance(img_float, dict):
+            # Process each tile separately
+            result_tiles = {}
+            custom_img_float = None
+            
+            if custom_image_gradient:
+                custom_img_float_dict = blender_image_to_numpy(image)
+                if custom_img_float_dict is None:
+                    return None
+            
+            for tile_num, tile_array in img_float.items():
+                if custom_image_gradient and isinstance(custom_img_float_dict, dict):
+                    custom_img_float = custom_img_float_dict.get(tile_num)
+                
+                result_tile = self._apply_brush_painting_single(
+                    tile_array, 
+                    brush_folder_path, 
+                    brush_texture_path, 
+                    custom_img_float,
+                    brush_callback
+                )
+                result_tiles[tile_num] = result_tile
+            
+            # Update image tiles in place
+            set_image_pixels(image, result_tiles)
+            return image
+        else:
+            # Non-UDIM image - process as before
+            final_canvas = self._apply_brush_painting_single(
+                img_float,
+                brush_folder_path,
+                brush_texture_path,
+                blender_image_to_numpy(image) if custom_image_gradient else None,
+                brush_callback
+            )
+            
+            # Convert back to Blender image
+            result_image = numpy_to_blender_image(final_canvas, f"{image.name}_brushed", create_new=True)
+            return result_image

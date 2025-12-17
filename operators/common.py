@@ -9,6 +9,7 @@ from bpy.types import Operator, Context
 from bpy.props import BoolProperty, EnumProperty, StringProperty
 
 from ..paintsystem.graph.common import DEFAULT_PS_UV_MAP_NAME
+from ..paintsystem.image import *
 
 icons = bpy.types.UILayout.bl_rna.functions["prop"].parameters["icon"].enum_items.keys()
 

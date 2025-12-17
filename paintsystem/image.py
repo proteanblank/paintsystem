@@ -1,0 +1,358 @@
+import bpy
+from bpy.types import Image
+try:
+    from PIL import Image as PILImage
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    PILImage = None
+import numpy as np
+import struct
+import time
+from pathlib import Path
+import os
+import re
+import tempfile
+
+debug_mode = False
+
+def save_image(image: Image):
+    if not image.is_dirty:
+        return
+    if image.packed_file or image.filepath == '':
+        image.pack()
+    else:
+        image.save()
+
+def temp_save_image(image):
+    """Save image to temporary directory, ensuring all UDIM tiles are saved."""
+    if image.source != 'TILED' or len(image.tiles) <= 1:
+        # Non-UDIM image, just save normally
+        with bpy.context.temp_override(edit_image=image):
+            bpy.ops.image.save_as(filepath=bpy.app.tempdir)
+        return
+    
+    # For UDIM images, we need to save all tiles
+    # Remember if image was packed
+    was_packed = image.packed_file is not None
+    
+    # If packed, unpack first
+    if was_packed:
+        image.unpack(method='USE_ORIGINAL')
+    
+    # Save the image (this saves all tiles)
+    if image.filepath and '.<UDIM>.' in image.filepath:
+        # Already has a valid filepath with UDIM marker
+        image.save()
+    else:
+        # No filepath or missing UDIM marker, save to temp directory with UDIM marker
+        # Construct a filepath with UDIM marker
+        temp_dir = bpy.app.tempdir
+        # Use image name or a default name
+        image_name = image.name.replace(' ', '_')
+        # Create filepath with UDIM marker - Blender will replace <UDIM> with tile numbers
+        temp_filepath = os.path.join(temp_dir, f"{image_name}.<UDIM>.png")
+        with bpy.context.temp_override(edit_image=image):
+            bpy.ops.image.save_as(filepath=temp_filepath)
+
+def blender_image_to_numpy(image: Image):
+    """
+    Convert Blender image to numpy array.
+    For UDIM images, returns a dictionary mapping tile numbers to numpy arrays.
+    For non-UDIM images, returns a single numpy array.
+    """
+    start_time = time.time()
+    if image is None:
+        return None
+    
+    # Check if this is a UDIM tiled image
+    is_udim = image.source == 'TILED' and len(image.tiles) > 1
+    
+    if not is_udim:
+        # Non-UDIM image - use the fast path
+        width, height = image.size
+        
+        # Use foreach_get for much faster pixel access
+        pixels = np.empty(len(image.pixels), dtype=np.float32)
+        image.pixels.foreach_get(pixels)
+        
+        # Reshape to (height, width, channels)
+        if image.channels == 4:  # RGBA
+            pixels = pixels.reshape((height, width, 4))
+        else:
+            raise ValueError(f"Unsupported image format with {image.channels} channels")
+        
+        # Flip vertically (Blender uses bottom-left origin, numpy uses top-left)
+        pixels = np.flipud(pixels)
+        end_time = time.time()
+        if debug_mode:
+            print(f"Blender image to numpy took {(end_time - start_time)*1000} milliseconds")
+        return pixels
+    
+    # UDIM image - need to load all tiles from disk
+    if not PIL_AVAILABLE:
+        raise ImportError("PIL (Pillow) is required to process UDIM images. Please install Pillow.")
+    
+    # Remember original state
+    was_packed = image.packed_file is not None
+    original_filepath = image.filepath
+    
+    # Save image to ensure all tiles are on disk
+    temp_save_image(image)
+    
+    # Get the directory and filename pattern
+    # After temp_save_image, filepath should be set (either original or temp with UDIM marker)
+    if image.filepath:
+        directory = os.path.dirname(bpy.path.abspath(image.filepath))
+        filename = bpy.path.basename(image.filepath)
+    else:
+        # Fallback: construct from image name (shouldn't happen after temp_save_image)
+        directory = bpy.app.tempdir
+        image_name = image.name.replace(' ', '_')
+        filename = f"{image_name}.<UDIM>.png"
+    
+    # Extract prefix (filename before .<UDIM>.)
+    if '.<UDIM>.' in filename:
+        prefix = filename.split('.<UDIM>.')[0]
+        extension = filename.split('.<UDIM>.')[-1]
+    else:
+        # Try to find files with tile numbers
+        prefix = os.path.splitext(filename)[0]
+        extension = os.path.splitext(filename)[1]
+    
+    # Load all tiles
+    tiles_dict = {}
+    width, height = image.size
+    
+    # Build a map of tile numbers to file paths by searching the directory
+    tile_files = {}
+    if os.path.exists(directory):
+        for f in os.listdir(directory):
+            # Try to match UDIM tile pattern: prefix.number.extension
+            for sep in ['.', '_', '-']:
+                pattern = rf'^{re.escape(prefix)}{re.escape(sep)}(\d{{4}})(\..+)?$'
+                match = re.match(pattern, f)
+                if match:
+                    tile_num = int(match.group(1))
+                    tile_files[tile_num] = os.path.join(directory, f)
+                    break
+    
+    for tile in image.tiles:
+        tile_number = tile.number
+        
+        # Try to find the tile file
+        tile_path = None
+        if tile_number in tile_files:
+            tile_path = tile_files[tile_number]
+        else:
+            # Construct expected filename pattern
+            # UDIM tiles are typically named like: prefix.1001.png, prefix.1002.png, etc.
+            for sep in ['.', '_', '-']:
+                tile_filename = f"{prefix}{sep}{tile_number}{extension}"
+                potential_path = os.path.join(directory, tile_filename)
+                if os.path.exists(potential_path):
+                    tile_path = potential_path
+                    break
+        
+        if tile_path and os.path.exists(tile_path):
+            # Load tile using PIL
+            pil_img = PILImage.open(tile_path)
+            if pil_img.mode != 'RGBA':
+                pil_img = pil_img.convert('RGBA')
+            
+            # Convert to numpy
+            img_uint8 = np.array(pil_img, dtype=np.uint8)
+            pixels = img_uint8.astype(np.float32) / 255.0
+            
+            # Ensure correct dimensions
+            if pixels.shape[:2] != (height, width):
+                # Resize if needed
+                pil_img = pil_img.resize((width, height), PILImage.Resampling.LANCZOS)
+                img_uint8 = np.array(pil_img, dtype=np.uint8)
+                pixels = img_uint8.astype(np.float32) / 255.0
+            
+            # Flip vertically (Blender uses bottom-left origin, numpy uses top-left)
+            pixels = np.flipud(pixels)
+            
+            tiles_dict[tile_number] = pixels
+        else:
+            # Tile file not found, try to get from Blender's pixel data (first tile only)
+            if tile_number == image.tiles[0].number:
+                # This is the active tile, we can access pixels
+                pixels = np.empty(len(image.pixels), dtype=np.float32)
+                image.pixels.foreach_get(pixels)
+                if image.channels == 4:
+                    pixels = pixels.reshape((height, width, 4))
+                    pixels = np.flipud(pixels)
+                    tiles_dict[tile_number] = pixels
+            else:
+                # Create empty tile
+                tiles_dict[tile_number] = np.zeros((height, width, 4), dtype=np.float32)
+    
+    end_time = time.time()
+    if debug_mode:
+        print(f"Blender UDIM image to numpy took {(end_time - start_time)*1000} milliseconds for {len(tiles_dict)} tiles")
+    
+    return tiles_dict
+
+def numpy_to_blender_image(array, image_name="BrushPainted", create_new=True) -> Image:
+    """Convert numpy array back to Blender image."""
+    start_time = time.time()
+    # Flip vertically back to Blender coordinate system
+    array = np.flipud(array)
+    
+    # Ensure array is in [0, 1] range
+    array = np.clip(array, 0, 1)
+    
+    # Get dimensions
+    height, width = array.shape[:2]
+    channels = array.shape[2] if len(array.shape) == 3 else 1
+    
+    # Flatten array and ensure it's float32 for Blender
+    pixels = array.ravel().astype(np.float32)
+    
+    # Try to get the image
+    if create_new:
+        new_image = bpy.data.images.new(image_name, width=width, height=height, alpha=True)
+    else:
+        new_image = bpy.data.images.get(image_name)
+        if new_image is None:
+            raise ValueError(f"Image {image_name} not found")
+    
+    # Use foreach_set for much faster pixel setting
+    if channels == 4:
+        new_image.pixels.foreach_set(pixels)
+    else:
+        raise ValueError(f"Unsupported image format with {channels} channels")
+    
+    # Update image
+    new_image.update()
+    end_time = time.time()
+    if debug_mode:
+        print(f"Numpy to blender image took {(end_time - start_time)*1000} milliseconds")
+    return new_image
+
+def numpy_to_pil(numpy_array):
+    if not PIL_AVAILABLE:
+        raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
+    img_uint8 = (np.clip(numpy_array, 0, 1) * 255).astype(np.uint8)
+    img_pil = PILImage.fromarray(img_uint8, mode='RGBA')
+    return img_pil
+
+def pil_to_numpy(pil_image):
+    if not PIL_AVAILABLE:
+        raise ImportError("PIL (Pillow) is not available. Please install Pillow to use this feature.")
+    img_uint8 = np.array(pil_image, dtype=np.uint8)
+    img_float = img_uint8.astype(np.float64) / 255.0
+    return img_float
+
+def switch_image_content(image1: Image, image2: Image):
+    """Switch the contents of two images."""
+    start_time = time.time()
+    # Use foreach_get for much faster pixel access
+    pixels_1 = np.empty(len(image1.pixels), dtype=np.float32)
+    pixels_2 = np.empty(len(image2.pixels), dtype=np.float32)
+    image1.pixels.foreach_get(pixels_1)
+    image2.pixels.foreach_get(pixels_2)
+    image1.pixels.foreach_set(pixels_2)
+    image2.pixels.foreach_set(pixels_1)
+    image1.update()
+    image1.update_tag()
+    image2.update()
+    image2.update_tag()
+    end_time = time.time()
+    if debug_mode:
+        print(f"Switch image content took {(end_time - start_time)*1000} milliseconds")
+
+def set_image_pixels(image: Image, array_or_tiles):
+    """
+    Set image pixels from numpy array or dictionary of tiles.
+    For UDIM images, pass a dictionary mapping tile numbers to numpy arrays.
+    For non-UDIM images, pass a single numpy array.
+    """
+    start_time = time.time()
+    
+    # Check if this is a UDIM tiled image
+    is_udim = image.source == 'TILED' and len(image.tiles) > 1
+    
+    if isinstance(array_or_tiles, dict):
+        # Dictionary of tiles (UDIM)
+        if not PIL_AVAILABLE:
+            raise ImportError("PIL (Pillow) is required to process UDIM images. Please install Pillow.")
+        
+        # Remember original state
+        was_packed = image.packed_file is not None
+        
+        # Unpack if needed
+        if was_packed:
+            image.unpack(method='USE_ORIGINAL')
+        
+        # Get directory and filename pattern
+        if image.filepath:
+            directory = os.path.dirname(bpy.path.abspath(image.filepath))
+            filename = bpy.path.basename(image.filepath)
+        else:
+            directory = bpy.app.tempdir
+            filename = image.name
+        
+        # Extract prefix
+        if '.<UDIM>.' in filename:
+            prefix = filename.split('.<UDIM>.')[0]
+            extension = filename.split('.<UDIM>.')[-1]
+        else:
+            prefix = os.path.splitext(filename)[0]
+            extension = os.path.splitext(filename)[1]
+        
+        # Save each tile
+        for tile_number, array in array_or_tiles.items():
+            # Flip vertically back to Blender coordinate system
+            array = np.flipud(array.copy())
+            
+            # Ensure array is in [0, 1] range
+            array = np.clip(array, 0, 1)
+            
+            # Convert to uint8 for PIL
+            img_uint8 = (array * 255).astype(np.uint8)
+            pil_img = PILImage.fromarray(img_uint8, mode='RGBA')
+            
+            # Construct tile filename
+            tile_filename = f"{prefix}.{tile_number}.{extension}"
+            tile_path = os.path.join(directory, tile_filename)
+            
+            # Try alternative patterns if file doesn't exist
+            if not os.path.exists(tile_path):
+                for sep in ['.', '_', '-']:
+                    alt_filename = f"{prefix}{sep}{tile_number}{extension}"
+                    alt_path = os.path.join(directory, alt_filename)
+                    if os.path.exists(alt_path):
+                        tile_path = alt_path
+                        break
+            
+            # Save tile
+            pil_img.save(tile_path)
+        
+        # Reload image to update tiles
+        image.reload()
+        image.update()
+        image.update_tag()
+        
+        # Repack if it was originally packed
+        if was_packed:
+            image.pack()
+    else:
+        # Single array (non-UDIM)
+        array = array_or_tiles
+        # Flip vertically back to Blender coordinate system
+        array = np.flipud(array)
+        
+        # Ensure array is in [0, 1] range
+        array = np.clip(array, 0, 1)
+        array = array.ravel().astype(np.float32)
+        # Set the pixels
+        image.pixels.foreach_set(array)
+        image.update()
+        image.update_tag()
+    
+    end_time = time.time()
+    if debug_mode:
+        print(f"Set image pixels took {(end_time - start_time)*1000} milliseconds")

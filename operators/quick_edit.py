@@ -4,9 +4,11 @@ from bpy.types import Operator
 from bpy.utils import register_classes_factory
 import os
 
+
 from ..custom_icons import get_icon, get_image_editor_icon
 
 from ..paintsystem.data import EDIT_EXTERNAL_MODE_ENUM
+from ..paintsystem.image import save_image
 from .common import PSContextMixin, scale_content
 import numpy as np
 import pathlib
@@ -294,7 +296,7 @@ class PAINTSYSTEM_OT_QuickEdit(PSContextMixin, Operator):
             # Save the image
             image.filepath_raw = filepath
             image.file_format = 'PNG'
-        image.save()
+        save_image(image)
         
         # Get the absolute filepath
         filepath = bpy.path.abspath(image.filepath)
