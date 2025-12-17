@@ -1898,6 +1898,7 @@ class Channel(BaseNestedListManager):
             # Change the active object to the ps_object
             ps_context.active_object.select_set(False)
             ps_context.ps_object.select_set(True)
+            context.view_layer.objects.active = ps_context.ps_object
         
         ps_context = parse_context(context)
         if force_alpha:
