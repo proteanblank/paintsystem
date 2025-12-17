@@ -2,6 +2,7 @@ import bpy
 from bpy.types import UIList, Menu
 from bpy.utils import register_classes_factory
 from bpy.types import Panel
+from bpy_extras.node_utils import find_base_socket_type
 from .common import (
     PSContextMixin,
     get_icon_from_channel,
@@ -45,13 +46,19 @@ class PAINTSYSTEM_UL_channels(PSContextMixin, UIList):
             bake_row = row.row(align=True)
             bake_row.label(text="Baked", icon="TEXTURE_DATA")
             return
-        split = layout.split(factor=0.6)
+        split = layout.split(factor=0.7)
         group_node = ps_ctx.active_group.get_group_node(ps_ctx.active_material.node_tree)
         icon_row = split.row(align=True)
         icon_row.prop(channel, "type", text="", icon_only=True, emboss=False)
         icon_row.prop(channel, "name", text="", emboss=False)
-        if group_node and channel.type == "FLOAT" and channel.name in group_node.inputs:
-            split.prop(group_node.inputs[channel.name], "default_value", text="")
+        if group_node and channel.name in group_node.inputs:
+            socket = group_node.inputs[channel.name]
+            if socket.enabled and len(socket.links) == 0:
+                socket_type = find_base_socket_type(socket)
+                if socket_type == "NodeSocketColor":
+                    split.prop(socket, "default_value", text="", icon="COLOR")
+                elif socket_type == "NodeSocketFloat":
+                    split.prop(socket, "default_value", text="")
 
     # def filter_items(self, context, data, propname):
     #     channels = getattr(data, propname)
@@ -175,6 +182,12 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
         col.prop(active_channel, "type", text="Type")
         col.prop(active_channel, "color_space", text="Color Space")
         col.prop(active_channel, "use_alpha", text="Use Alpha")
+        if active_channel.use_alpha:
+            group_node = ps_ctx.active_group.get_group_node(ps_ctx.active_material.node_tree)
+            if group_node:
+                socket = group_node.inputs[f"{active_channel.name} Alpha"]
+                if socket.enabled and len(socket.links) == 0:
+                    col.prop(socket, "default_value", text="Alpha")
         if active_channel.type == "VECTOR":
             box = col.box()
             col = box.column()
