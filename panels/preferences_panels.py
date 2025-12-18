@@ -97,7 +97,8 @@ class PaintSystemPreferences(AddonPreferences):
         items=(
             ('UNAVAILABLE', 'Unavailable', ''),
             ('AVAILABLE', 'Available', ''),
-            ('LOADING', 'Loading', '')
+            ('LOADING', 'Loading', ''),
+            ("ERROR", 'Error', '')
         ),
         default='UNAVAILABLE',
         options={'SKIP_SAVE'}
