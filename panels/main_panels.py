@@ -54,13 +54,12 @@ class MAT_PT_Support(PSContextMixin, Panel):
             col = donations_box.column(align=True)
             row = align_center(col)
             row.template_icon(get_icon("star"))
-            row.label(text=f"Total Donations")
+            row.label(text=f"Recent Donations:")
             row.template_icon(get_icon("star"))
             
             if ps_ctx.ps_settings is None or ps_ctx.ps_settings.loading_donations:
                 align_center(col).label(text="Loading...", icon="INFO")
             if donation_info:
-                align_center(col).label(text=f"*~~   ${str(donation_info['totalSales'])}   ~~*")
                 if donation_info['recentDonations'] and len(donation_info['recentDonations']) > 0:
                     line_separator(col)
                     date_format = '%d-%m-%y %H:%M'

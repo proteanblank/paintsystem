@@ -93,12 +93,13 @@ def thread_check_update():
                 ps_ctx.ps_settings.update_state = 'AVAILABLE'
             else:
                 ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
+        else:
+            ps_ctx.ps_settings.update_state = 'ERROR'
     except Exception as e:
         print(f"Error checking for updates: {e}", file=sys.stderr)
-        if ps_ctx.ps_settings is not None:
-            ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
+        ps_ctx.ps_settings.update_state = 'ERROR'
     finally:
-        if ps_ctx.ps_settings is not None:
+        if ps_ctx.ps_settings is not None and ps_ctx.ps_settings.update_state != 'ERROR':
             if ps_ctx.ps_settings.update_state == 'LOADING':
                 ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
 
@@ -211,6 +212,9 @@ def get_latest_version() -> Optional[str]:
         return None
     
     if ps_ctx.ps_settings is None:
+        return None
+    
+    if ps_ctx.ps_settings.update_state == 'ERROR':
         return None
     
     # Check if already loading
