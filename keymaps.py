@@ -38,7 +38,7 @@ def _remove_default_rmb_menu() -> None:
 
 
 def _add_keymap_entry(
-    kc,
+    kc: bpy.types.KeyConfig,
     name: str,
     space_type: str,
     idname: str,
@@ -47,10 +47,13 @@ def _add_keymap_entry(
     shift: bool = False,
     ctrl: bool = False,
     alt: bool = False,
+    repeat: bool = False,
     properties: dict | None = None,
 ):
     km = kc.keymaps.new(name=name, space_type=space_type)
     kmi = km.keymap_items.new(idname, type=key, value=value, shift=shift, ctrl=ctrl, alt=alt)
+    if repeat:
+        kmi.repeat = repeat
     if properties:
         for prop, prop_value in properties.items():
             try:
@@ -80,9 +83,10 @@ def register() -> None:
                     kc,
                     name=km_name,
                     space_type=space,
-                    idname='paint_system.open_texpaint_menu',
+                    idname='wm.call_panel',
                     key='RIGHTMOUSE',
                     value='PRESS',
+                    properties={'name': 'MAT_PT_TexPaintRMBMenu'},
                 )
 
         # Optional Shift+RMB fallback
@@ -96,6 +100,23 @@ def register() -> None:
                 value='PRESS',
                 shift=True,
             )
+
+        # Color Sampler ('I') and Toggle Erase Alpha ('E')
+        _add_keymap_entry(
+            kc,
+            name='3D View',
+            space_type='VIEW_3D',
+            idname='paint_system.color_sampler',
+            key='I',
+            repeat=True,
+        )
+        _add_keymap_entry(
+            kc,
+            name='3D View',
+            space_type='VIEW_3D',
+            idname='paint_system.toggle_brush_erase_alpha',
+            key='E',
+        )
     except Exception:
         # Keymap setup is best-effort; failures shouldn't block add-on load
         pass

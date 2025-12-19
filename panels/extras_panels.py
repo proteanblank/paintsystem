@@ -299,7 +299,7 @@ class MAT_PT_TexPaintRMBMenu(PSContextMixin, Panel, UnifiedPaintPanel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "WINDOW"
     bl_options = {"INSTANCED"}
-    bl_ui_units_x = 14
+    bl_ui_units_x = 10
 
     @classmethod
     def poll(cls, context):
@@ -355,8 +355,7 @@ class MAT_PT_TexPaintRMBMenu(PSContextMixin, Panel, UnifiedPaintPanel):
         sample_col = swatch_row.column(align=True)
         sample_col.scale_y = 0.95
         sample_col.alignment = 'RIGHT'
-        primary_sample = sample_col.operator("paint_system.color_sampler", text="", icon='EYEDROPPER')
-        primary_sample.target = 'PRIMARY'
+        # primary_sample = sample_col.operator("paint_system.color_sampler", text="", icon='EYEDROPPER')
 
         # HSV sliders (optional based on preferences)
         if show_hsv and ps_ctx.ps_scene_data:
@@ -367,11 +366,11 @@ class MAT_PT_TexPaintRMBMenu(PSContextMixin, Panel, UnifiedPaintPanel):
             sub_col.prop(ps_ctx.ps_scene_data, "value", text="Value")
 
         # Palette selection and history remain with color settings
-        if show_palette:
-            color_col.separator()
-            color_col.template_ID(settings, "palette", new="palette.new")
-            if settings.palette:
-                color_col.template_palette(settings, "palette", color=True)
+        # if show_palette:
+        #     color_col.separator()
+        #     color_col.template_ID(settings, "palette", new="palette.new")
+        #     if settings.palette:
+        #         color_col.template_palette(settings, "palette", color=True)
 
         if show_brush_controls:
             # Brush settings container

@@ -153,16 +153,6 @@ class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
     bl_idname = "paint_system.color_sampler"
     bl_label = "Color Sampler"
 
-    target: EnumProperty(
-        name="Target Color",
-        description="Choose which brush color to set",
-        items=(
-            ('PRIMARY', "Primary", "Sample the primary brush color"),
-            ('SECONDARY', "Secondary", "Sample the secondary brush color"),
-        ),
-        default='PRIMARY',
-    )
-
     x: IntProperty()
     y: IntProperty()
     
@@ -172,7 +162,8 @@ class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
 
     def execute(self, context):
         if is_newer_than(4,4):
-            bpy.ops.paint.sample_color('INVOKE_DEFAULT', merged=True)
+            bpy.ops.paint.sample_color('INVOKE_DEFAULT', merged=True, palette=False)
+            context.scene.ps_scene_data.update_hsv_color(context)
             return {'FINISHED'}
 
         x, y = self.x, self.y
@@ -185,13 +176,10 @@ class PAINTSYSTEM_OT_ColorSampler(PSContextMixin, Operator):
         brush_settings = tool_settings.brush
         unified_settings = get_unified_settings(context, "use_unified_color")
 
-        if self.target == 'PRIMARY':
-            if unified_settings:
-                unified_settings.color = pix_value
-            brush_settings.color = pix_value
-        else:
-            brush_settings.secondary_color = pix_value
-
+        brush_settings = tool_settings.brush
+        unified_settings.color = pix_value
+        brush_settings.color = pix_value
+        context.scene.ps_scene_data.update_hsv_color(context)
         return {'FINISHED'}
 
     def invoke(self, context, event):
@@ -407,26 +395,6 @@ class PAINTSYSTEM_OT_ToggleTransformGizmos(Operator):
         return {'FINISHED'}
 
 
-class PAINTSYSTEM_OT_OpenTexPaintMenu(Operator):
-    """Open Texture Paint right-click menu with color wheel and brush options"""
-    bl_idname = "paint_system.open_texpaint_menu"
-    bl_label = "Paint System Menu"
-    bl_options = {'REGISTER'}
-    bl_description = "Open the Texture Paint right-click menu"
-
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'PAINT_TEXTURE'
-
-    def execute(self, context):
-        # Call the popover panel
-        bpy.ops.wm.call_panel(name="MAT_PT_TexPaintRMBMenu", keep_open=False)
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        return self.execute(context)
-
-
 classes = (
     PAINTSYSTEM_OT_TogglePaintMode,
     PAINTSYSTEM_OT_AddPresetBrushes,
@@ -442,27 +410,12 @@ classes = (
     PAINTSYSTEM_OT_HidePaintingTips,
     PAINTSYSTEM_OT_DuplicatePaintSystemData,
     PAINTSYSTEM_OT_ToggleTransformGizmos,
-    PAINTSYSTEM_OT_OpenTexPaintMenu,
 )
-
-addon_keymaps = []
 
 _register, _unregister = register_classes_factory(classes)
 
 def register():
     _register()
-    wm = bpy.context.window_manager
-    kc = wm.keyconfigs.addon
-    if kc:
-        km = kc.keymaps.new(name="3D View", space_type='VIEW_3D')
-        kmi = km.keymap_items.new(
-            PAINTSYSTEM_OT_ColorSampler.bl_idname, 'I', 'PRESS', repeat=True)
-        kmi = km.keymap_items.new(
-            PAINTSYSTEM_OT_ToggleBrushEraseAlpha.bl_idname, type='E', value='PRESS')
-        addon_keymaps.append((km, kmi))
 
 def unregister():
-    for km, kmi in addon_keymaps:
-        km.keymap_items.remove(kmi)
-    addon_keymaps.clear()
     _unregister()
