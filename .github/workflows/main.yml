@@ -2,8 +2,8 @@
 name: Release
 
 on:
-    pull_request:
-        branches: ['**']
+    # pull_request:
+    #     branches: ['**']
     workflow_dispatch:
         inputs:
             version:
