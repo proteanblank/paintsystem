@@ -2231,7 +2231,10 @@ class Group(PropertyGroup):
         
         expected_sockets: List[ExpectedSocket] = []
         for channel in self.channels:
-            expected_sockets.append(ExpectedSocket(channel.name, f"NodeSocket{channel.type.title()}", channel.use_max_min, channel.factor_min, channel.factor_max))
+            # Map channel type to valid socket type
+            type_map = {"COLOR": "NodeSocketColor", "VECTOR": "NodeSocketVector", "FLOAT": "NodeSocketFloat"}
+            socket_type = type_map.get(channel.type, "NodeSocketColor")
+            expected_sockets.append(ExpectedSocket(channel.name, socket_type, channel.use_max_min, channel.factor_min, channel.factor_max))
             if channel.use_alpha:
                 expected_sockets.append(ExpectedSocket(f"{channel.name} Alpha", "NodeSocketFloat", True, 0, 1))
         
