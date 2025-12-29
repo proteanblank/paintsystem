@@ -521,29 +521,11 @@ def ensure_udim_tiles(image: bpy.types.Image, objects: list[bpy.types.Object], u
         if tile.channels == 0:
             image.tiles.remove(tile)
 
-    tile_new_fn = getattr(image.tiles, "new", None)
     for tile_number in udim_tiles:
         if any(tile_number == tile.number for tile in image.tiles):
             continue
-        created = False
-        if callable(tile_new_fn):
-            # Blender 4.0+ exposes image.tiles.new which works without operator context
-            for call in (
-                lambda: tile_new_fn(tile_number),
-                lambda: tile_new_fn(number=tile_number),
-            ):
-                try:
-                    call()
-                    created = True
-                    break
-                except TypeError:
-                    continue
-                except RuntimeError:
-                    continue
-        if not created:
-            # Fallback to operator for older versions
-            with bpy.context.temp_override(edit_image=image):
-                bpy.ops.image.tile_add(number=tile_number, color=(0, 0, 0, 0), width=width, height=height)
+        with bpy.context.temp_override(edit_image=image):
+            bpy.ops.image.tile_add(number=tile_number, color=(0, 0, 0, 0), width=width, height=height)
     # Delete unused tiles
     for tile in image.tiles:
         if tile.number not in udim_tiles:
