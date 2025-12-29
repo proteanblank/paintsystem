@@ -43,7 +43,7 @@ from ..utils.version import is_newer_than
 from ..utils.nodes import find_node, get_material_output, get_node_socket_enum, get_nodetree_socket_enum
 from ..preferences import get_preferences
 from ..utils import get_next_unique_name
-from .context import get_global_layer, parse_context
+from .context import get_legacy_global_layer, parse_context
 from .graph import (
     NodeTreeBuilder,
     Add_Node,
@@ -1358,6 +1358,28 @@ class Layer(BaseNestedListItem):
         default=True,
         options={'SKIP_SAVE'}
     )
+    
+    def add_action(self, name: str, action_bind: str, action_type: str, frame: int|None = None, marker_name: str|None = None):
+        action = self.actions.add()
+        action.name = name
+        action.action_bind = action_bind
+        action.action_type = action_type
+        if action_bind == 'FRAME':
+            if frame is None:
+                raise ValueError("Frame is required")
+            action.frame = frame
+        elif action_bind == 'MARKER':
+            if marker_name is None:
+                raise ValueError("Marker name is required")
+            action.marker_name = marker_name
+        return action
+    
+    def remove_action(self, index: int):
+        self.actions.remove(index)
+    
+    def remove_active_action(self):
+        self.actions.remove(self.active_action_index)
+        self.active_action_index = min(self.active_action_index, len(self.actions) - 1)
     
     @property
     def uses_coord_type(self) -> bool:

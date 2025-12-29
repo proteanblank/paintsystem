@@ -1,7 +1,8 @@
 import bpy
 
+from .versioning import get_layer_parent_map, migrate_global_layer_data, migrate_blend_mode, migrate_source_node, migrate_socket_names, update_layer_version
 from .version_check import get_latest_version
-from .data import get_global_layer, sort_actions, parse_context, get_all_layers, is_valid_uuidv4
+from .data import sort_actions, parse_context, get_all_layers, is_valid_uuidv4
 from .image import save_image
 from .graph.basic_layers import get_layer_version_for_type
 import time
@@ -56,94 +57,18 @@ def load_paint_system_data(scene: bpy.types.Scene):
             except Exception as e:
                 print(f"Error updating layer {global_layer.name}: {e}")
     
-    seen_global_layers_map = {}
-    checked_layers = set()
-    # Layer Versioning
-    for mat in bpy.data.materials:
-        if hasattr(mat, 'ps_mat_data'):
-            for group in mat.ps_mat_data.groups:
-                for channel in group.channels:
-                    has_migrated_global_layer = False
-                    for layer in channel.layers:
-                        checked_layers.add(layer.name)
-                        # Check if layer has valid uuid
-                        if not is_valid_uuidv4(layer.uid):
-                            layer.uid = str(uuid.uuid4())
-                        if layer.name and not layer.layer_name: # data from global layer is not copied to layer
-                            global_layer = get_global_layer(layer)
-                            if global_layer:
-                                layer.auto_update_node_tree = False
-                                print(f"Migrating global layer data ({global_layer.name}) to layer data ({layer.name}) ({layer.layer_name})")
-                                has_migrated_global_layer = True
-                                layer.layer_name = layer.name
-                                layer.uid = global_layer.name
-                                if global_layer.name not in seen_global_layers_map:
-                                    seen_global_layers_map[global_layer.name] = [mat, global_layer]
-                                    for prop in global_layer.bl_rna.properties:
-                                        pid = getattr(prop, 'identifier', '')
-                                        if not pid or getattr(prop, 'is_readonly', False):
-                                            continue
-                                        if pid in {"layer_name"}:
-                                            continue
-                                        if pid in {"name", "uid"}:
-                                            continue
-                                        setattr(layer, pid, getattr(global_layer, pid))
-                                else:
-                                    # as linked layer, properties will not be copied
-                                    print(f"Layer {layer.name} is linked to {global_layer.name}")
-                                    mat, global_layer = seen_global_layers_map[global_layer.name]
-                                    layer.linked_layer_uid = global_layer.name
-                                    layer.linked_material = mat
-                                layer.auto_update_node_tree = True
-                                layer.update_node_tree(bpy.context)
-                        
-                        # Current version of the layer
-                        layer = layer.get_layer_data()
-                        mix_node = layer.mix_node
-                        blend_mode = "MIX"
-                        if mix_node:
-                            blend_mode = str(mix_node.blend_type)
-                        if blend_mode != layer.blend_mode and layer.blend_mode != "PASSTHROUGH":
-                            print(f"Layer {layer.name} has blend mode {blend_mode} but {layer.blend_mode} is set")
-                            layer.blend_mode = blend_mode
-                        # Update every source node to have label 'source'
-                        source_node = layer.source_node
-                        if source_node and source_node.name != "source":
-                            source_node.name = "source"
-                            source_node.label = "source"
-                        # If type == NODE_GROUP, update the color and alpha input and output sockets
-                        if layer.type == "NODE_GROUP" and layer.custom_node_tree:
-                            # Get the color and alpha input and output sockets names from the custom node tree
-                            custom_node_tree: bpy.types.NodeTree = layer.custom_node_tree
-                            items = custom_node_tree.interface.items_tree
-                            inputs = [item for item in items if item.item_type == 'SOCKET' and item.in_out == 'INPUT']
-                            outputs = [item for item in items if item.item_type == 'SOCKET' and item.in_out == 'OUTPUT']
-                            layer.auto_update_node_tree = False
-                            if layer.custom_color_input != -1:
-                                layer.color_input_name = inputs[layer.custom_color_input].name
-                                layer.custom_color_input = -1
-                            if layer.custom_alpha_input != -1:
-                                layer.alpha_input_name = inputs[layer.custom_alpha_input].name
-                                layer.custom_alpha_input = -1
-                            if layer.custom_color_output != -1:
-                                layer.color_output_name = outputs[layer.custom_color_output].name
-                                layer.custom_color_output = -1
-                            if layer.custom_alpha_output != -1:
-                                layer.alpha_output_name = outputs[layer.custom_alpha_output].name
-                                layer.custom_alpha_output = -1
-                            layer.auto_update_node_tree = True
-                            layer.update_node_tree(bpy.context)
-                        # Updating layer to the target version
-                        target_version = get_layer_version_for_type(layer.type)
-                        if get_nodetree_version(layer.node_tree) != target_version:
-                            print(f"Updating layer {layer.name} to version {target_version}")
-                            try:
-                                layer.update_node_tree(bpy.context)
-                            except Exception as e:
-                                print(f"Error updating layer {layer.name}: {e}")
-                    if has_migrated_global_layer:
-                        channel.update_node_tree(bpy.context)
-    # ps_scene_data Versioning
+    layer_parent_map = get_layer_parent_map()
+    for layer, layer_parent in layer_parent_map.items():
+        # Check if layer has valid uuid
+        if not is_valid_uuidv4(layer.uid):
+            layer.uid = str(uuid.uuid4())
+    migrate_global_layer_data(layer_parent_map)
+    # Current version of the layer
+    migrate_blend_mode(layer_parent_map)
+    migrate_source_node(layer_parent_map)
+    migrate_socket_names(layer_parent_map)
+    update_layer_version(layer_parent_map)
+
     # As layers in ps_scene_data is not used anymore, we can remove it in the future
     ps_scene_data = getattr(bpy.context.scene, 'ps_scene_data', None)
     if ps_scene_data and hasattr(ps_scene_data, 'layers') and len(ps_scene_data.layers) > 0:
@@ -152,7 +77,7 @@ def load_paint_system_data(scene: bpy.types.Scene):
         ps_scene_data.last_selected_ps_object = None
         ps_scene_data.last_selected_material = None
             
-    print(f"Paint System: Checked {len(checked_layers)} layers in {round((time.time() - start_time) * 1000, 2)} ms")
+    print(f"Paint System: Checked layers in {round((time.time() - start_time) * 1000, 2)} ms")
 
 
 @bpy.app.handlers.persistent
@@ -256,7 +181,7 @@ def color_history_handler(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph
 
 @bpy.app.handlers.persistent
 def paint_system_object_update(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph = None):
-    """Handle object changes and update paint canvas - based on UcuPaint's ypaint_last_object_update"""
+    """Handle object changes and update paint canvas"""
     
     try: 
         obj = bpy.context.object
