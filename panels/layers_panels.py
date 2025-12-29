@@ -531,7 +531,8 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     col = box.column()
                     scale_content(context, col, 1.2, 1.2)
                     if not active_layer.external_image:
-                        col.operator("paint_system.quick_edit", text="Edit Externally")
+                        icon_value = get_image_editor_icon(context.preferences.filepaths.image_editor) or get_icon('image')
+                        col.operator("paint_system.quick_edit", text="Edit Externally", icon_value=icon_value)
                     else:
                         if active_layer.edit_external_mode == 'IMAGE_EDIT':
                             row = col.row(align=True)
