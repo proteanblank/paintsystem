@@ -1987,8 +1987,6 @@ class Channel(BaseNestedListManager):
         temp_alpha_image = ps_bake(context, ps_objects, mat, uv_layer, temp_alpha_image, use_gpu, margin=margin, margin_type=margin_type)
 
         if bake_image and temp_alpha_image:
-            print(f"Pixel length: {len(bake_image.pixels)}")
-            print(f"Pixel length: {len(temp_alpha_image.pixels)}")
             # pixels_bake = np.empty(len(bake_image.pixels), dtype=np.float32)
             # pixels_temp_alpha = np.empty(len(temp_alpha_image.pixels), dtype=np.float32)
             pixels_bake = blender_image_to_numpy(bake_image)
