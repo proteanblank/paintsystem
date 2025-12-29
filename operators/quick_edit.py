@@ -607,7 +607,7 @@ class PAINTSYSTEM_OT_QuickEdit(PSContextMixin, Operator):
                 box = layout.box()
                 box.alert = True
                 box.label(text="No image on active layer!", icon="ERROR")
-            else:
+            elif image_needs_save(active_layer.image):
                 # image = active_layer.image
                 box = layout.box()
                 box.label(text=f"Save Directory:", icon="IMAGE_DATA")
