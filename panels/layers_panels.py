@@ -693,16 +693,12 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                     col.enabled = not active_layer.lock_layer
                     col.use_property_decorate = False
                     col.use_property_split = True
-                    col.prop(active_layer, "texture_type", text="Texture Type")
                     draw_input_sockets(col, context, only_output=True)
+                    col.prop(active_layer, "texture_type", text="Texture Type")
                     texture_node = active_layer.source_node
                     if texture_node:
-                        box = layout.box()
-                        header, panel = box.panel("texture_node_settings_panel")
-                        header.label(text="Texture Settings:", icon='TEXTURE')
-                        if panel:
-                            panel.use_property_split = False
-                            panel.template_node_inputs(texture_node)
+                        col.use_property_split = False
+                        col.template_node_inputs(texture_node)
             if active_layer.type == 'ATTRIBUTE':
                 header, panel = layout.panel("attribute_node_settings_panel", default_closed=True)
                 header.label(text="Attribute", icon='MESH_DATA')
