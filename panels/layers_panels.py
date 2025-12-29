@@ -370,7 +370,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                         text="", icon='COLLAPSEMENU')
                 col.separator()
                 col.operator("paint_system.delete_item",
-                                text="", icon="TRASH")
+                                text="", icon_value=get_icon('trash'))
                 col.separator()
                 col.operator("paint_system.move_up", icon="TRIA_UP", text="")
                 col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
@@ -385,7 +385,7 @@ class MAT_PT_Layers(PSContextMixin, Panel):
                         text="", icon='COLLAPSEMENU')
                 line_separator(col)
                 col.operator("paint_system.delete_item",
-                                text="", icon="TRASH")
+                                text="", icon_value=get_icon('trash'))
                 line_separator(col)
                 col.operator("paint_system.move_up", icon="TRIA_UP", text="")
                 col.operator("paint_system.move_down", icon="TRIA_DOWN", text="")
@@ -579,8 +579,9 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                                 err_col = err_box.column(align=True)
                                 err_col.label(text="Gradient Empty not found", icon='ERROR')
                                 err_col.operator("paint_system.fix_missing_gradient_empty", text="Fix Missing Gradient Empty")
-                        box = layout.box()
-                        header, panel = box.panel("gradient_node_settings_panel")
+                            box = layout.box()
+                            col = box.column()
+                        header, panel = col.panel("gradient_node_settings_panel")
                         header.label(text="Gradient Settings:", icon='SHADERFX')
                         if panel:
                             panel.template_node_inputs(gradient_node)
@@ -760,7 +761,7 @@ class MAT_PT_LayerTransformSettings(PSContextMixin, Panel):
     
     def draw_header(self, context):
         layout = self.layout
-        layout.label(icon="EMPTY_ARROWS")
+        layout.label(icon_value=get_icon('transform'))
     
     def draw(self, context):
         layout = self.layout
@@ -874,7 +875,7 @@ class MAT_PT_ImageLayerSettings(PSContextMixin, Panel):
         layer = ps_ctx.active_layer
         if not ps_ctx.ps_settings.use_legacy_ui:
             if ps_ctx.ps_object.type == 'MESH' and layer.type == 'IMAGE':
-                layout.operator("wm.call_menu", text="Filters", icon="IMAGE_DATA").name = "MAT_MT_ImageFilterMenu"
+                layout.operator("wm.call_menu", text="Filters").name = "MAT_MT_ImageFilterMenu"
     
     def draw(self, context):
         ps_ctx = self.parse_context(context)
