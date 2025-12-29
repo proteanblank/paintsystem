@@ -587,6 +587,8 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                             header, panel = panel.panel("map_range_node_settings_panel", default_closed=True)
                             header.label(text="Map Range:", icon='SHADERFX')
                             if panel:
+                                panel.use_property_split = True
+                                panel.use_property_decorate = False
                                 panel.prop(map_range_node, "interpolation_type", text="Interpolation")
                                 if map_range_node.interpolation_type in ('STEPPED'):
                                     panel.prop(map_range_node.inputs[5], "default_value", text="Steps")
