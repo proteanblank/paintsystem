@@ -67,6 +67,7 @@ def find_node_by_name(node_tree: NodeTree, name: str) -> Node:
 
 class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
     bl_idname = "paint_system.update_paint_system_data"
+    bl_description = "Update Paint System Data"
     bl_label = "Update Paint System Data"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -214,6 +215,7 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
 class PAINTSYSTEM_OT_CheckForUpdates(PSContextMixin, Operator):
     bl_idname = "paint_system.check_for_updates"
     bl_label = "Check for Updates"
+    bl_description = "Check for Updates"
     bl_options = {'REGISTER', 'UNDO'}
     
     @classmethod
@@ -233,6 +235,7 @@ class PAINTSYSTEM_OT_CheckForUpdates(PSContextMixin, Operator):
 class PAINTSYSTEM_OT_OpenExtensionPreferences(Operator):
     bl_idname = "paint_system.open_extension_preferences"
     bl_label = "Open Extension Preferences"
+    bl_description = "Open Extension Preferences"
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
@@ -257,6 +260,7 @@ class PAINTSYSTEM_OT_OpenExtensionPreferences(Operator):
 class PAINTSYSTEM_OT_DismissUpdate(PSContextMixin, Operator):
     bl_idname = "paint_system.dismiss_update"
     bl_label = "Dismiss Update"
+    bl_description = "Dismiss Update"
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
