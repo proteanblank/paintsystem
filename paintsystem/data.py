@@ -299,7 +299,7 @@ def find_channels_containing_layer(check_layer: "Layer") -> list["Channel"]:
                     for layer in channel.layers:
                         if layer == check_layer or layer.linked_layer_uid == check_layer.uid:
                             channels.append(channel)
-    print(f"Found {len(channels)} channels containing layer {check_layer.layer_name}")
+    # print(f"Found {len(channels)} channels containing layer {check_layer.layer_name}")
     return channels
 
 def get_node_from_nodetree(node_tree: NodeTree, identifier: str) -> Node | None:
