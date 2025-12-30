@@ -530,7 +530,7 @@ class PAINTSYSTEM_OT_QuickEdit(PSContextMixin, Operator):
             # Save the image
             image.filepath_raw = filepath
             image.file_format = 'PNG'
-        save_image(image)
+        save_image(image, force_save=True)
         
         # Get the absolute filepath
         filepath = bpy.path.abspath(image.filepath)

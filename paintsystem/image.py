@@ -47,8 +47,8 @@ class ImageTiles:
             raise KeyError(f"Tile {tile_number} not found")
         return self.tiles[tile_number]
 
-def save_image(image: Image):
-    if not image.is_dirty:
+def save_image(image: Image, force_save: bool = False):
+    if not image.is_dirty and not force_save:
         return
     if image.packed_file or image.filepath == '':
         image.pack()
