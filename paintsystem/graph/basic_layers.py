@@ -370,8 +370,10 @@ def get_layer_version_for_type(type: str) -> int:
             return GEOMETRY_LAYER_VERSION
         case "NODE_GROUP":
             return CUSTOM_LAYER_VERSION
+        case "BLANK":
+            return 0
         case _:
-            raise ValueError(f"Invalid layer type: {type}")
+            return 0
 
 def get_texture_identifier(texture_type: str) -> str:
     identifier_mapping = {
