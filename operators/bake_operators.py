@@ -217,8 +217,9 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
             # Get the active channel for the material
             _, _, active_channel, _ = parse_material(mat)
             self.image_name = f"{mat.name}_Baked"
-            self.image_width = int(self.image_resolution)
-            self.image_height = int(self.image_resolution)
+            if self.image_resolution != 'CUSTOM':
+                self.image_width = int(self.image_resolution)
+                self.image_height = int(self.image_resolution)
             bake_image = None
             if self.as_layer:
                 bake_image = self.create_image(context)
@@ -308,8 +309,9 @@ class PAINTSYSTEM_OT_BakeAllChannels(BakeOperator):
         # Set cursor to wait
         context.window.cursor_set('WAIT')
         
-        self.image_width = int(self.image_resolution)
-        self.image_height = int(self.image_resolution)
+        if self.image_resolution != 'CUSTOM':
+            self.image_width = int(self.image_resolution)
+            self.image_height = int(self.image_resolution)
         ps_ctx = self.parse_context(context)
         for mat in bake_materials:
             _, active_group, _, _ = parse_material(mat)
