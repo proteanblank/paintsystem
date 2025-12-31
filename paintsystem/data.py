@@ -1892,7 +1892,7 @@ class Channel(BaseNestedListManager):
             uv_layer: str,
             use_gpu: bool = True,
             use_group_tree: bool = True,
-            force_alpha: bool = False, # Force to use alpha
+            force_alpha: bool = True, # Force to use alpha
             as_tangent_normal: bool = False, # Bake as tangent normal
             margin: int = 8, # Margin
             margin_type: Literal['ADJACENT_FACES', 'EXTEND'] = "ADJACENT_FACES" # Margin type
