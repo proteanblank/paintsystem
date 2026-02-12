@@ -302,12 +302,6 @@ class PAINTSYSTEM_OT_NewGeometry(PSContextMixin, MultiMaterialOperator):
         items=GEOMETRY_TYPE_ENUM,
         default='WORLD_NORMAL'
     )
-    normalize_normal: BoolProperty(
-        name="Normalize Normal",
-        description="Normalize the normal",
-        default=False,
-        options={'SKIP_SAVE'}
-    )
 
     @classmethod
     def poll(cls, context):
@@ -316,13 +310,15 @@ class PAINTSYSTEM_OT_NewGeometry(PSContextMixin, MultiMaterialOperator):
     
     def process_material(self, context):
         ps_ctx = self.parse_context(context)
+        active_channel = ps_ctx.active_channel
         layer_name = next(name for geometry_type, name, description in GEOMETRY_TYPE_ENUM if geometry_type == self.geometry_type)
+        use_normalize_normal = active_channel.normalize_input if active_channel.type == 'VECTOR' else False
         ps_ctx.active_channel.create_layer(
             context,
             layer_name,
             layer_type="GEOMETRY",
             geometry_type=self.geometry_type,
-            normalize_normal=self.normalize_normal
+            normalize_normal=use_normalize_normal
         )
         return {'FINISHED'}
 
