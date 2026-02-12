@@ -719,7 +719,7 @@ class MAT_PT_LayerSettings(PSContextMixin, Panel):
                             panel.use_property_split = False
                             col = panel.column()
                             col.template_node_inputs(mapping_node)
-                else:
+                elif ps_ctx.ps_settings.use_panel_quick_access:
                     if active_layer.coord_type == 'UV':
                         row = layout.row(align=True)
                         row.label(icon="BLANK1")

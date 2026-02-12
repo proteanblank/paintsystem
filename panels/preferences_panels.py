@@ -83,6 +83,12 @@ class PaintSystemPreferences(AddonPreferences):
         description="Use the legacy UI",
         default=False
     )
+    
+    use_panel_quick_access: BoolProperty(
+        name="Use Panel Quick Access",
+        description="Use the panel quick access",
+        default=False
+    )
 
     # RMB popover options
     show_hsv_sliders_rmb: BoolProperty(
@@ -177,6 +183,7 @@ class PaintSystemPreferences(AddonPreferences):
         layout.prop(self, "use_compact_design", text="Use Compact Design")
         layout.prop(self, "show_opacity_in_layer_list", text="Show Opacity in Layer List")
         layout.prop(self, "use_legacy_ui", text="Use Legacy UI")
+        layout.prop(self, "use_panel_quick_access", text="Use Panel Quick Access")
         # layout.prop(self, "name_layers_group",
         #             text="Name Layers According to Group Name")
 

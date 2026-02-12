@@ -187,7 +187,7 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
             col.prop(active_channel, "default_value", text="Default Value")
             box = col.box()
             box.use_property_split = False
-            header, panel = box.panel("vector_space_settings_panel", default_closed=True)
+            header, panel = box.panel("vector_space_settings_panel")
             header.label(text="Vector Transform")
             if panel:
                 row = panel.row(align=True)
