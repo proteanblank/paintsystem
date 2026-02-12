@@ -185,6 +185,8 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
         layout = self.layout
         ps_ctx = self.parse_context(context)
         row = layout.row(align=True)
+        if ps_ctx.ps_mat_data is None:
+            return
         groups = ps_ctx.ps_mat_data.groups
         if ps_ctx.ps_mat_data and groups:
             if len(groups) > 1:
