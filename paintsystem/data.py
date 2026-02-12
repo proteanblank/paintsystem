@@ -2083,7 +2083,8 @@ class Channel(BaseNestedListManager):
             force_alpha: bool = True, # Force to use alpha
             as_tangent_normal: bool = False, # Bake as tangent normal
             margin: int = 8, # Margin
-            margin_type: Literal['ADJACENT_FACES', 'EXTEND'] = "ADJACENT_FACES" # Margin type
+            margin_type: Literal['ADJACENT_FACES', 'EXTEND'] = "ADJACENT_FACES", # Margin type
+            disable_deform_modifiers: bool = False, # Disable deform modifiers
             ):
         """Bake the channel
 
@@ -2124,6 +2125,20 @@ class Channel(BaseNestedListManager):
             self.disable_output_transform = True
         try:
             ps_objects = ps_context.ps_objects
+            
+            # Disable deform modifiers if requested
+            saved_modifier_states = []
+            if disable_deform_modifiers:
+                DEFORM_MODIFIER_TYPES = {
+                    'ARMATURE', 'CAST', 'CURVE', 'DISPLACE', 'HOOK', 'LAPLACIANDEFORM',
+                    'LATTICE', 'MESH_DEFORM', 'SHRINKWRAP', 'SIMPLE_DEFORM', 'SMOOTH',
+                    'CORRECTIVE_SMOOTH', 'LAPLACIANSMOOTH', 'SURFACE_DEFORM', 'WARP', 'WAVE'
+                }
+                for obj in ps_objects:
+                    for mod in obj.modifiers:
+                        if mod.type in DEFORM_MODIFIER_TYPES:
+                            saved_modifier_states.append((obj, mod.name, mod.show_render))
+                            mod.show_render = False
             
             material_output = get_material_output(node_tree)
             surface_socket = material_output.inputs['Surface']
@@ -2210,6 +2225,11 @@ class Channel(BaseNestedListManager):
                 self.output_vector_space = orig_output_vector_space
             else:
                 self.disable_output_transform = orig_disable_output_transform
+            
+            # Restore deform modifiers
+            for obj, mod_name, orig_show_render in saved_modifier_states:
+                if mod_name in obj.modifiers:
+                    obj.modifiers[mod_name].show_render = orig_show_render
         except Exception as e:
             print(f"Error baking channel: {e}")
             try:
@@ -2219,6 +2239,10 @@ class Channel(BaseNestedListManager):
                 self.disable_output_transform = orig_disable_output_transform
             except Exception as e:
                 print(f"Error restoring channel settings: {e}")
+            # Restore deform modifiers on error
+            for obj, mod_name, orig_show_render in saved_modifier_states:
+                if mod_name in obj.modifiers:
+                    obj.modifiers[mod_name].show_render = orig_show_render
         
     @property
     def item_type(self):

@@ -156,6 +156,14 @@ class BakeOperator(PSContextMixin, PSImageCreateMixin, Operator):
         if ps_ctx.active_channel.type == "VECTOR":
             box = layout.box()
             box.prop(self, "as_tangent_normal")
+            if self.as_tangent_normal:
+                import textwrap
+                wrapp = textwrap.TextWrapper(width=48) #50 = maximum length
+                info_box = box.box()
+                col = info_box.column(align=True)
+                wList = wrapp.wrap(text="Deform Modifiers such as Armature will be disabled")
+                for i, chunk in enumerate(wList):
+                    col.label(text=chunk, icon='INFO' if not i else 'BLANK1')
 
 
 class PAINTSYSTEM_OT_SelectAllBakedObjects(BakeOperator):
@@ -233,7 +241,8 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
                     as_tangent_normal=self.as_tangent_normal,
                     use_gpu=self.use_gpu,
                     margin=self.margin,
-                    margin_type=self.margin_type
+                    margin_type=self.margin_type,
+                    disable_deform_modifiers=self.as_tangent_normal and active_channel.type == 'VECTOR'
                 )
                 active_channel.create_layer(
                     context, 
@@ -264,7 +273,8 @@ class PAINTSYSTEM_OT_BakeChannel(BakeOperator):
                     as_tangent_normal=self.as_tangent_normal,
                     use_gpu=self.use_gpu,
                     margin=self.margin,
-                    margin_type=self.margin_type
+                    margin_type=self.margin_type,
+                    disable_deform_modifiers=self.as_tangent_normal and active_channel.type == 'VECTOR'
                 )
                 if self.as_tangent_normal:
                     active_channel.bake_vector_space = 'TANGENT'
