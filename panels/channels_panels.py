@@ -10,6 +10,7 @@ from .common import (
     get_icon_from_channel,
     check_group_multiuser,
     get_icon,
+    ensure_invoke_context,
 )
 
 class MAT_MT_PaintSystemChannelsMergeAndExport(PSContextMixin, Menu):
@@ -200,7 +201,7 @@ class MAT_PT_ChannelsSettings(PSContextMixin, Panel):
                 row.prop(active_channel, "input_vector_space", text="Input Space")
                 row = panel.row(align=True)
                 row.enabled = active_channel.use_space_transform_output or active_channel.use_space_transform_input
-                row.prop(active_channel, "vector_space", text="Painting Space")
+                row.prop(active_channel, "vector_space", text="Layer Space")
                 if active_channel.vector_space != "TANGENT":
                     row.prop(active_channel, "normalize_input", text="", icon="NORMALS_VERTEX_FACE")
                 row = panel.row(align=True)
@@ -228,10 +229,7 @@ class MAT_MT_AddChannelMenu(PSContextMixin, Menu):
 
     def draw(self, context):
         layout = self.layout
-        
-        if layout.operator_context == 'EXEC_REGION_WIN':
-            layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.operator_context = 'INVOKE_REGION_WIN'
+        ensure_invoke_context(layout)
         
         ps_ctx = self.parse_context(context)
         col = layout.column()
