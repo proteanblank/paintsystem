@@ -484,10 +484,11 @@ class PAINTSYSTEM_OT_QuickEdit(PSContextMixin, Operator):
             app_path = _get_application_path(self.external_application, program_files, program_files_x86, local_appdata)
             if app_path:
                 context.preferences.filepaths.image_editor = app_path
+                current_image_editor = app_path
             else:
                 self.report({'WARNING'}, f"Could not find {self.external_application} installation")
-        
-        current_image_editor = context.preferences.filepaths.image_editor
+        else:
+            current_image_editor = context.preferences.filepaths.image_editor
         if not current_image_editor:
             self.report({'ERROR'}, "No image editor set")
             return {'CANCELLED'}
@@ -538,6 +539,8 @@ class PAINTSYSTEM_OT_QuickEdit(PSContextMixin, Operator):
         
         # Store as external image for apply operation
         active_layer.external_image = image
+        
+        print(f"filepath: {filepath}")
         
         # Open in external editor
         try:
