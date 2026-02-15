@@ -212,6 +212,7 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
             self.report({'WARNING'}, "\n".join(warning_messages))
         return {'FINISHED'}
 
+
 class PAINTSYSTEM_OT_CheckForUpdates(PSContextMixin, Operator):
     bl_idname = "paint_system.check_for_updates"
     bl_label = "Check for Updates"
@@ -231,6 +232,7 @@ class PAINTSYSTEM_OT_CheckForUpdates(PSContextMixin, Operator):
         # Check for updates
         get_latest_version()
         return {'FINISHED'}
+
 
 class PAINTSYSTEM_OT_OpenExtensionPreferences(Operator):
     bl_idname = "paint_system.open_extension_preferences"
@@ -256,6 +258,7 @@ class PAINTSYSTEM_OT_OpenExtensionPreferences(Operator):
         if not show_expanded:
             bpy.ops.preferences.addon_expand(module=addon_package())
         return {'FINISHED'}
+
 
 class PAINTSYSTEM_OT_DismissUpdate(PSContextMixin, Operator):
     bl_idname = "paint_system.dismiss_update"
