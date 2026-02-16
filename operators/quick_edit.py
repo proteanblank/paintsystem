@@ -545,6 +545,12 @@ class PAINTSYSTEM_OT_ReloadImage(PSContextMixin, Operator):
     bl_label = "Reload Image"
     bl_options = {'REGISTER'}
     bl_description = "Reload the image"
+    
+    @classmethod
+    def poll(cls, context):
+        ps_ctx = cls.parse_context(context)
+        active_layer = ps_ctx.active_layer
+        return active_layer and active_layer.external_image
 
     def execute(self, context):
         ps_ctx = self.parse_context(context)

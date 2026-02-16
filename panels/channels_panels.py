@@ -245,8 +245,8 @@ classes = (
     MAT_MT_PaintSystemChannelsMergeAndExport,
     PAINTSYSTEM_UL_channels,
     MAT_PT_ChannelsSelect,
-    MAT_PT_ChannelsPanel,
-    MAT_PT_ChannelsSettings,
+    # MAT_PT_ChannelsPanel,
+    # MAT_PT_ChannelsSettings,
     MAT_MT_AddChannelMenu,
 )
 
