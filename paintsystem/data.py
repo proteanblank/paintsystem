@@ -48,17 +48,8 @@ from .context import get_legacy_global_layer, parse_context
 from .graph import (
     NodeTreeBuilder,
     Add_Node,
-    create_adjustment_graph,
-    create_attribute_graph,
-    create_custom_graph,
-    create_folder_graph,
-    create_gradient_graph,
-    create_image_graph,
-    create_random_graph,
-    create_solid_graph,
+    create_layer_graph,
     get_alpha_over_nodetree,
-    create_texture_graph,
-    create_geometry_graph,
     get_layer_blend_type,
     set_layer_blend_type,
 )
@@ -77,6 +68,21 @@ MASK_BLEND_MODE_ENUM = [
     ('SUBTRACT', "Subtract", "Subtract"),
     ('ADD', "Add", "Add"),
     ('MULTIPLY', "Multiply", "Multiply"),
+]
+
+MASK_TYPE_ENUM = [
+    ('VALUE', "Value", "Value mask"),
+    ('IMAGE', "Image", "Image mask"),
+    ('ATTRIBUTE', "Attribute", "Attribute mask"),
+    ('TEXTURE', "Texture", "Texture mask"),
+]
+
+MASK_COORDINATE_TYPE_ENUM = [
+    ('AUTO', "Auto UV", "Automatically create a new UV Map"),
+    ('UV', "UV", "Open an existing UV Map"),
+    ('OBJECT', "Object", "Use a object output of Texture Coordinate node"),
+    ('POSITION', "Position", "Use a position output of Geometry node"),
+    ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
 ]
 
 TEMPLATE_ENUM = [
@@ -139,21 +145,6 @@ TEXTURE_TYPE_ENUM = [
 ]
 
 COORDINATE_TYPE_ENUM = [
-    ('AUTO', "Auto UV", "Automatically create a new UV Map"),
-    ('UV', "UV", "Open an existing UV Map"),
-    ('OBJECT', "Object", "Use a object output of Texture Coordinate node"),
-    ('CAMERA', "Camera", "Use a camera output of Texture Coordinate node"),
-    ('WINDOW', "Window", "Use a window output of Texture Coordinate node"),
-    ('REFLECTION', "Reflection", "Use a reflection output of Texture Coordinate node"),
-    ('POSITION', "Position", "Use a position output of Geometry node"),
-    ('GENERATED', "Generated", "Use a generated output of Texture Coordinate node"),
-    ('DECAL', "Decal", "Use a decal output of Geometry node"),
-    ('PROJECT', "Projection", "Define a projection coordinate"),
-    ('PARALLAX', 'Parallax', 'Use a parallax coordinate'),
-]
-
-MASK_COORDINATE_TYPE_ENUM = [
-    ('LAYER', "Layer", "Use the layer's coordinate type"),
     ('AUTO', "Auto UV", "Automatically create a new UV Map"),
     ('UV', "UV", "Open an existing UV Map"),
     ('OBJECT', "Object", "Use a object output of Texture Coordinate node"),
@@ -773,17 +764,18 @@ class LayerMask(PropertyGroup):
         description="Name of the mask",
         default="Mask",
     )
+    node_tree: PointerProperty(
+        name="Node Tree",
+        type=NodeTree,
+    )
     type: EnumProperty(
-        items=[
-            ('IMAGE', "Image", "Image mask"),
-            ('GEOMETRY', "Geometry", "Geometry mask"),
-        ],
+        items=MASK_TYPE_ENUM,
         name="Mask Type",
         description="Mask type",
-        default='IMAGE',
+        default='VALUE',
     )
     coord_type: EnumProperty(
-        items=COORDINATE_TYPE_ENUM,
+        items=MASK_COORDINATE_TYPE_ENUM,
         name="Coordinate Type",
         description="Coordinate type",
         default='UV',
@@ -838,10 +830,15 @@ class Layer(BaseNestedListItem):
         if self.get_layer_data().coord_type == 'AUTO':
             ensure_paint_system_uv_map(context)
         
+        # If the layer is linked, do nothing
         if self.is_linked:
             return
+        
+        # Ensure a valid UUID
         if not is_valid_uuidv4(self.uid):
             self.uid = str(uuid.uuid4())
+        
+        # If the layer is blank, do nothing
         if self.type == "BLANK":
             return
         
@@ -885,15 +882,6 @@ class Layer(BaseNestedListItem):
             case "IMAGE":
                 if self.image:
                     self.image.name = self.name
-                layer_graph = create_image_graph(self)
-            case "FOLDER":
-                layer_graph = create_folder_graph(self)
-            case "SOLID_COLOR":
-                layer_graph = create_solid_graph(self)
-            case "ATTRIBUTE":
-                layer_graph = create_attribute_graph(self)
-            case "ADJUSTMENT":
-                layer_graph = create_adjustment_graph(self)
             case "GRADIENT":
                 if self.gradient_type in ('LINEAR', 'RADIAL', 'FAKE_LIGHT'):
                     if not self.empty_object:
@@ -908,17 +896,6 @@ class Layer(BaseNestedListItem):
                             self.empty_object.empty_display_type = 'SINGLE_ARROW'
                     elif self.empty_object.name not in context.view_layer.objects:
                         add_empty_to_collection(context, self.empty_object)
-                layer_graph = create_gradient_graph(self)
-            case "RANDOM":
-                layer_graph = create_random_graph(self)
-            case "NODE_GROUP":
-                layer_graph = create_custom_graph(self)
-            case "TEXTURE":
-                layer_graph = create_texture_graph(self)
-            case "GEOMETRY":
-                layer_graph = create_geometry_graph(self)
-            case _:
-                raise ValueError(f"Invalid layer type: {self.type}")
         
         # Clean up
         if self.empty_object and self.type not in ["GRADIENT", "IMAGE", "TEXTURE", "FAKE_LIGHT"]:
@@ -929,10 +906,8 @@ class Layer(BaseNestedListItem):
             collection = get_paint_system_collection(context)
             if self.empty_object.name in collection.objects:
                 collection.objects.unlink(self.empty_object)
-
-        if not self.enabled:
-            layer_graph.link("group_input", "group_output", "Color", "Color")
-            layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
+        
+        layer_graph = create_layer_graph(self)
         layer_graph.compile()
         
         # For fake light, we need to update the empty object rotation via drivers
@@ -1357,6 +1332,18 @@ class Layer(BaseNestedListItem):
         update=update_node_tree
     )
     
+    # Layer masks
+    masks: CollectionProperty(
+        name="Layer Masks",
+        type=LayerMask,
+    )
+    
+    active_mask_index: IntProperty(
+        name="Active Mask Index",
+        description="Active mask index",
+        update=update_node_tree
+    )
+    
     def update_blend_mode(self, context: Context):
         layer_data = self.get_layer_data()
         layer_data.update_node_tree(context)
@@ -1403,6 +1390,17 @@ class Layer(BaseNestedListItem):
         options={'SKIP_SAVE'}
     )
     
+    def create_mask(self, mask_type: str):
+        mask = self.masks.add()
+        mask.type = mask_type
+        return mask
+    
+    def remove_mask(self, index: int):
+        self.masks.remove(index)
+    
+    def remove_active_mask(self):
+        self.masks.remove(self.active_mask_index)
+        
     def add_action(self, name: str, action_bind: str, action_type: str, frame: int|None = None, marker_name: str|None = None):
         action = self.actions.add()
         action.name = name
@@ -3266,6 +3264,7 @@ class LegacyPaintSystemContextParser:
 classes = (
     MarkerAction,
     GlobalLayer,
+    LayerMask,
     Layer,
     Channel,
     Group,

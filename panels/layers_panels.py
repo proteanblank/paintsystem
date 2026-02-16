@@ -941,6 +941,18 @@ class MAT_MT_AddLayerMenu(Menu):
                      text="Custom Layer", icon='NODETREE')
 
 
+class MAT_MT_AddMaskMenu(Menu):
+    bl_label = "Add Mask"
+    bl_idname = "MAT_MT_AddMaskMenu"
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("paint_system.new_value_mask", text="Value Mask", icon='VALUE')
+        layout.operator("paint_system.new_image_mask", text="Image Mask", icon='IMAGE')
+        layout.operator("paint_system.new_attribute_mask", text="Attribute Mask", icon='ATTRIBUTE')
+        layout.operator("paint_system.new_texture_mask", text="Texture Mask", icon='TEXTURE')
+
+
 class PAINTSYSTEM_UL_Actions(PSContextMixin, UIList):
     bl_idname = "PAINTSYSTEM_UL_Actions"
     bl_label = "Actions"
@@ -981,6 +993,7 @@ classes = (
     MAT_PT_GreasePencilMaskSettings,
     MAT_PT_GreasePencilOnionSkinningSettings,
     PAINTSYSTEM_UL_Actions,
+    MAT_MT_AddMaskMenu,
 )
 
 register, unregister = register_classes_factory(classes)

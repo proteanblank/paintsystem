@@ -614,3 +614,33 @@ def get_alpha_over_nodetree():
     create_mixing_graph(builder, None, "group_input", "Over Color", "group_input", "Over Alpha")
     builder.compile()
     return node_tree
+
+def create_layer_graph(layer: "Layer"):
+    layer_graph = None
+    match layer.type:
+        case "IMAGE":
+            layer_graph = create_image_graph(layer)
+        case "FOLDER":
+            layer_graph = create_folder_graph(layer)
+        case "SOLID_COLOR":
+            layer_graph = create_solid_graph(layer)
+        case "ATTRIBUTE":
+            layer_graph = create_attribute_graph(layer)
+        case "ADJUSTMENT":
+            layer_graph = create_adjustment_graph(layer)
+        case "GRADIENT":
+            layer_graph = create_gradient_graph(layer)
+        case "RANDOM":
+            layer_graph = create_random_graph(layer)
+        case "NODE_GROUP":
+            layer_graph = create_custom_graph(layer)
+        case "TEXTURE":
+            layer_graph = create_texture_graph(layer)
+        case "GEOMETRY":
+            layer_graph = create_geometry_graph(layer)
+    if not layer_graph:
+        return None
+    if not layer.enabled:
+        layer_graph.link("group_input", "group_output", "Color", "Color")
+        layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
+    return layer_graph
