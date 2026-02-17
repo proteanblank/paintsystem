@@ -76,9 +76,15 @@ class MAT_PT_Brush(PSContextMixin, Panel, UnifiedPaintPanel):
         layout = self.layout
         layout.label(icon_value=get_icon('brush'))
 
-    # def draw_header_preset(self, context):
-    #     layout = self.layout
-    #     ps_ctx = self.parse_context(context)
+    def draw_header_preset(self, context):
+        layout = self.layout
+        ps_ctx = self.parse_context(context)
+        if ps_ctx.ps_settings.show_tooltips:
+            layout.popover(
+                panel="MAT_PT_BrushTooltips",
+                text='',
+                icon='INFO_LARGE' if is_newer_than(4,3) else 'INFO'
+            )
     #     settings = self.paint_settings(context)
     #     brush = settings.brush
     #     obj = ps_ctx.ps_object
@@ -104,16 +110,7 @@ class MAT_PT_Brush(PSContextMixin, Panel, UnifiedPaintPanel):
             layout.template_ID_preview(settings, "brush",
                                        new="brush.add", rows=3, cols=8, hide_buttons=False)
         box = layout.box()
-        row = box.row()
-        row.label(text="Settings:", icon="SETTINGS")
-        if ps_ctx.ps_settings.show_tooltips:
-            row.popover(
-                panel="MAT_PT_BrushTooltips",
-                text='Shortcuts!',
-                icon='INFO_LARGE' if is_newer_than(4,3) else 'INFO'
-            )
         col = box.column(align=True)
-        scale_content(context, col, scale_x=1, scale_y=1.2)
         brush_settings(col, context, brush, popover=self.is_popover)
         
         brush_imported = False
