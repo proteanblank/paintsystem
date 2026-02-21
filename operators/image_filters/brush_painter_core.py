@@ -9,7 +9,7 @@ from ..common import blender_image_to_numpy
 from ...paintsystem.image import set_image_pixels, ImageTiles
 
 DEBUG_SEAM = False  # Set to False to disable seam duplication debug prints
-DEBUG_CANCEL = True  # Set to False to disable brush cancellation debug prints
+DEBUG_CANCEL = False  # Set to False to disable brush cancellation debug prints
 DEBUG_ROTATION = False  # Set to False to disable rotation debug prints (limited to first 20 samples)
 
 @dataclass
@@ -487,8 +487,10 @@ class BrushPainterCore:
 
     def _uv_to_tile_and_local(self, uv: Tuple[float, float]) -> Tuple[int, float, float]:
         uv_u, uv_v = uv
-        tile_u = int(np.floor(uv_u))
-        tile_v = int(np.floor(uv_v))
+        # Use ceil-1 (clamped to 0) to match get_udim_tiles convention:
+        # boundary points (e.g. u=1.0) belong to the lower tile, not the higher one.
+        tile_u = max(0, int(np.ceil(uv_u)) - 1)
+        tile_v = max(0, int(np.ceil(uv_v)) - 1)
         tile_num = self._tile_from_uv_int(tile_u, tile_v)
         local_u = uv_u - tile_u
         local_v = uv_v - tile_v
@@ -614,6 +616,7 @@ class BrushPainterCore:
         center_x: float,
         rotated_brush: np.ndarray,
     ) -> bool:
+        """Returns True if any part of the brush overlaps the canvas (not entirely outside)."""
         brush_h, brush_w = rotated_brush.shape
         canvas_y = int(round(center_y)) + state.offset_y
         canvas_x = int(round(center_x)) + state.offset_x
@@ -621,7 +624,7 @@ class BrushPainterCore:
         start_x = canvas_x - brush_w // 2
         end_y = start_y + brush_h
         end_x = start_x + brush_w
-        return start_y >= 0 and end_y <= state.extended_h and start_x >= 0 and end_x <= state.extended_w
+        return start_y < state.extended_h and end_y > 0 and start_x < state.extended_w and end_x > 0
 
     def _blend_rotated_brush(
         self,
@@ -634,9 +637,10 @@ class BrushPainterCore:
         rotated_brush: np.ndarray,
     ) -> bool:
         if rotated_brush.size == 0 or float(np.max(rotated_brush)) <= 1e-6:
-            return False
-
-        if not self._can_place_rotated_brush(state, center_y, center_x, rotated_brush):
+            if DEBUG_CANCEL:
+                print(f"[CANCEL] _blend_rotated_brush: brush is empty or zero "
+                      f"(size={rotated_brush.size}, max={float(np.max(rotated_brush)) if rotated_brush.size > 0 else 0:.6f}) "
+                      f"at center=({center_x:.1f},{center_y:.1f}) tile={state.tile_num}")
             return False
 
         brush_h, brush_w = rotated_brush.shape
@@ -647,9 +651,33 @@ class BrushPainterCore:
         end_y = start_y + brush_h
         end_x = start_x + brush_w
 
-        canvas_region = state.canvas[start_y:end_y, start_x:end_x]
-        brush_color_layer = np.tile(sampled_pixel[:3], (brush_h, brush_w, 1))
-        final_alpha = rotated_brush * sampled_alpha * opacity
+        # Clip to canvas bounds — allow partial overlaps, cancel only if entirely outside
+        clip_y0 = max(0, start_y)
+        clip_x0 = max(0, start_x)
+        clip_y1 = min(state.extended_h, end_y)
+        clip_x1 = min(state.extended_w, end_x)
+
+        if clip_y0 >= clip_y1 or clip_x0 >= clip_x1:
+            if DEBUG_CANCEL:
+                print(f"[CANCEL] _blend_rotated_brush: entirely outside canvas "
+                      f"at center=({center_x:.1f},{center_y:.1f}) tile={state.tile_num} "
+                      f"brush=({brush_w}x{brush_h}) "
+                      f"brush_region=[{start_x}:{end_x}, {start_y}:{end_y}] "
+                      f"canvas_size=({state.extended_w}x{state.extended_h})")
+            return False
+
+        # Corresponding slice into the brush array
+        brush_y0 = clip_y0 - start_y
+        brush_x0 = clip_x0 - start_x
+        clip_h = clip_y1 - clip_y0
+        clip_w = clip_x1 - clip_x0
+        brush_y1 = brush_y0 + clip_h
+        brush_x1 = brush_x0 + clip_w
+
+        canvas_region = state.canvas[clip_y0:clip_y1, clip_x0:clip_x1]
+        brush_slice = rotated_brush[brush_y0:brush_y1, brush_x0:brush_x1]
+        brush_color_layer = np.tile(sampled_pixel[:3], (clip_h, clip_w, 1))
+        final_alpha = brush_slice * sampled_alpha * opacity
         final_alpha_3d = final_alpha[..., np.newaxis]
 
         canvas_rgb = canvas_region[:, :, :3]
@@ -748,11 +776,17 @@ class BrushPainterCore:
                 tile0, local_u0, local_v0 = self._uv_to_tile_and_local(fu0)
                 tile1, local_u1, local_v1 = self._uv_to_tile_and_local(fu1)
                 if tile0 != tile1:
+                    if DEBUG_SEAM:
+                        print(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
+                              f"UV endpoints span different tiles ({tile0} vs {tile1}), skipping side")
                     sides_data.append(None)
                     continue
 
                 tile_shape = tile_shapes.get(tile0)
                 if tile_shape is None:
+                    if DEBUG_SEAM:
+                        print(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
+                              f"tile {tile0} not in tile_shapes, skipping side")
                     sides_data.append(None)
                     continue
 
@@ -784,6 +818,10 @@ class BrushPainterCore:
 
             # Both sides must be valid to form a seam pair
             if sides_data[0] is None or sides_data[1] is None:
+                if DEBUG_SEAM:
+                    print(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
+                          f"one or both sides invalid (sides[0]={'None' if sides_data[0] is None else 'ok'}, "
+                          f"sides[1]={'None' if sides_data[1] is None else 'ok'}), skipping pair")
                 continue
 
             # Create paired seam edges (counterparts point to each other)
@@ -810,25 +848,27 @@ class BrushPainterCore:
         bm.free()
 
         if not seam_edges:
+            if DEBUG_SEAM:
+                print("[SEAM-BUILD] No valid seam edges found — seam duplication disabled")
             return None
 
         tile_to_edges: Dict[int, List[int]] = {}
         for edge_index, seam_edge in enumerate(seam_edges):
             tile_to_edges.setdefault(seam_edge.tile_num, []).append(edge_index)
 
-        if DEBUG_SEAM:
-            matched = sum(1 for e in seam_edges if e.counterpart_index >= 0)
-            print(f"[SEAM] Built {len(seam_edges)} seam edges ({len(seam_edges)//2} pairs), "
-                  f"{matched}/{len(seam_edges)} matched")
-            for ei, se in enumerate(seam_edges):
-                cp = se.counterpart_index
-                cp_tile = seam_edges[cp].tile_num if cp >= 0 else None
-                print(f"  edge[{ei}] tile={se.tile_num} verts=({se.vert0},{se.vert1}) "
-                      f"px0=({se.px0[0]:.1f},{se.px0[1]:.1f}) px1=({se.px1[0]:.1f},{se.px1[1]:.1f}) "
-                      f"face_side={se.face_side} len_uv={se.length_uv:.4f} "
-                      f"counterpart={cp}(tile={cp_tile})")
-            for tile_num, indices in tile_to_edges.items():
-                print(f"  tile {tile_num}: {len(indices)} seam edges")
+        # if DEBUG_SEAM:
+        #     matched = sum(1 for e in seam_edges if e.counterpart_index >= 0)
+        #     print(f"[SEAM] Built {len(seam_edges)} seam edges ({len(seam_edges)//2} pairs), "
+        #           f"{matched}/{len(seam_edges)} matched")
+        #     for ei, se in enumerate(seam_edges):
+        #         cp = se.counterpart_index
+        #         cp_tile = seam_edges[cp].tile_num if cp >= 0 else None
+        #         print(f"  edge[{ei}] tile={se.tile_num} verts=({se.vert0},{se.vert1}) "
+        #               f"px0=({se.px0[0]:.1f},{se.px0[1]:.1f}) px1=({se.px1[0]:.1f},{se.px1[1]:.1f}) "
+        #               f"face_side={se.face_side} len_uv={se.length_uv:.4f} "
+        #               f"counterpart={cp}(tile={cp_tile})")
+        #     for tile_num, indices in tile_to_edges.items():
+        #         print(f"  tile {tile_num}: {len(indices)} seam edges")
 
         return UVSeamIndex(edges=seam_edges, tile_to_edges=tile_to_edges)
 
@@ -949,6 +989,9 @@ class BrushPainterCore:
         sampled_pixel = self.apply_color_shift(sampled_pixel)
         sampled_alpha = sampled_pixel[3] if source_state.has_alpha else 1.0
         if sampled_alpha <= 1e-6:
+            # if DEBUG_CANCEL:
+            #     print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num}: "
+            #           f"sampled_alpha {sampled_alpha:.6f} <= 1e-6 (pixel is fully transparent)")
             return False
 
         magnitude = source_state.g_normalized[y, x]
@@ -1044,7 +1087,7 @@ class BrushPainterCore:
                 computed = int(round(base_brush_size * ratio))
                 print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
                       f"duplicate size {computed} out of bounds [{source_state.min_size_px}, {source_state.max_size_px}] "
-                      f"(base={base_brush_size}, ratio={ratio:.3f})")
+                      f"(base={base_brush_size}, ratio={ratio:.3f}) — source brush also not applied")
             return False
 
         # Project brush center onto source edge
@@ -1126,23 +1169,23 @@ class BrushPainterCore:
             # dup_angle = brush_angle + (target_edge_angle - source_edge_angle)
             duplicate_angle = brush_angle + (target_edge_angle_deg - source_edge_angle_deg)
 
-        if DEBUG_SEAM:
-            print(f"[SEAM-STAMP] src=({x},{y}) tile={source_tile_num} "
-                  f"edge[{seam_triggered_edge}]→cpt[{counterpart_index}] "
-                  f"t={projected_t:.3f} perp={signed_perp:.1f}")
-            print(f"  src_edge: px0=({source_edge.px0[0]:.1f},{source_edge.px0[1]:.1f}) "
-                  f"px1=({source_edge.px1[0]:.1f},{source_edge.px1[1]:.1f}) "
-                  f"verts=({source_edge.vert0},{source_edge.vert1}) face_side={source_edge.face_side}")
-            print(f"  cpt_edge: px0=({counterpart_edge.px0[0]:.1f},{counterpart_edge.px0[1]:.1f}) "
-                  f"px1=({counterpart_edge.px1[0]:.1f},{counterpart_edge.px1[1]:.1f}) "
-                  f"verts=({counterpart_edge.vert0},{counterpart_edge.vert1}) face_side={counterpart_edge.face_side}")
-            print(f"  swapped={swapped} src_side={source_side} cpt_eff_side={counterpart_effective_side} "
-                  f"need_reflection={need_reflection}")
-            print(f"  src_edge_angle={source_edge_angle_deg:.1f}° cpt_edge_angle={target_edge_angle_deg:.1f}°")
-            print(f"  brush_angle={brush_angle:.1f}° → dup_angle={duplicate_angle:.1f}°")
-            print(f"  mapped_perp={mapped_perp if (cpt_len_px > 1e-8 and src_len_px > 1e-8) else 0:.1f} "
-                  f"target=({target_center_x:.1f},{target_center_y:.1f}) "
-                  f"target_tile={counterpart_edge.tile_num} target_size={target_size_px}")
+        # if DEBUG_SEAM:
+        #     print(f"[SEAM-STAMP] src=({x},{y}) tile={source_tile_num} "
+        #           f"edge[{seam_triggered_edge}]→cpt[{counterpart_index}] "
+        #           f"t={projected_t:.3f} perp={signed_perp:.1f}")
+        #     print(f"  src_edge: px0=({source_edge.px0[0]:.1f},{source_edge.px0[1]:.1f}) "
+        #           f"px1=({source_edge.px1[0]:.1f},{source_edge.px1[1]:.1f}) "
+        #           f"verts=({source_edge.vert0},{source_edge.vert1}) face_side={source_edge.face_side}")
+        #     print(f"  cpt_edge: px0=({counterpart_edge.px0[0]:.1f},{counterpart_edge.px0[1]:.1f}) "
+        #           f"px1=({counterpart_edge.px1[0]:.1f},{counterpart_edge.px1[1]:.1f}) "
+        #           f"verts=({counterpart_edge.vert0},{counterpart_edge.vert1}) face_side={counterpart_edge.face_side}")
+        #     print(f"  swapped={swapped} src_side={source_side} cpt_eff_side={counterpart_effective_side} "
+        #           f"need_reflection={need_reflection}")
+        #     print(f"  src_edge_angle={source_edge_angle_deg:.1f}° cpt_edge_angle={target_edge_angle_deg:.1f}°")
+        #     print(f"  brush_angle={brush_angle:.1f}° → dup_angle={duplicate_angle:.1f}°")
+        #     print(f"  mapped_perp={mapped_perp if (cpt_len_px > 1e-8 and src_len_px > 1e-8) else 0:.1f} "
+        #           f"target=({target_center_x:.1f},{target_center_y:.1f}) "
+        #           f"target_tile={counterpart_edge.tile_num} target_size={target_size_px}")
 
         if target_size_px == base_brush_size:
             duplicate_brush = selected_brush
@@ -1153,7 +1196,8 @@ class BrushPainterCore:
         if duplicate_rotated.size == 0 or float(np.max(duplicate_rotated)) <= 1e-6:
             if DEBUG_CANCEL:
                 print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
-                      f"duplicate_rotated empty or zero (size={duplicate_rotated.size}, max={float(np.max(duplicate_rotated)) if duplicate_rotated.size > 0 else 0:.6f})")
+                      f"duplicate_rotated empty or zero (size={duplicate_rotated.size}, max={float(np.max(duplicate_rotated)) if duplicate_rotated.size > 0 else 0:.6f}) "
+                      f"— source brush also not applied")
             return False
 
         can_place_source = self._can_place_rotated_brush(source_state, float(y), float(x), source_rotated)
@@ -1163,7 +1207,8 @@ class BrushPainterCore:
                 print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
                       f"placement failed (can_place_source={can_place_source}, can_place_target={can_place_target}) "
                       f"src_brush={source_rotated.shape} tgt_brush={duplicate_rotated.shape} "
-                      f"tgt_center=({target_center_x:.1f},{target_center_y:.1f}) tgt_tile={counterpart_edge.tile_num}")
+                      f"tgt_center=({target_center_x:.1f},{target_center_y:.1f}) tgt_tile={counterpart_edge.tile_num} "
+                      f"— source brush also not applied")
             return False
 
         source_applied = self._blend_rotated_brush(
