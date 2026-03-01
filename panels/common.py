@@ -571,3 +571,9 @@ def draw_layer_icon(layer: "Layer", layout: bpy.types.UILayout):
             layout.label(icon='MESH_DATA')
         case _:
             layout.label(icon='BLANK1')
+
+def draw_indent(layout: bpy.types.UILayout, level: int):
+    row = layout.row(align=True)
+    for _ in range(level):
+        row.separator()
+    return row.column()

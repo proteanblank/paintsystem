@@ -2,6 +2,12 @@ import bpy
 from datetime import datetime
 from bpy.utils import register_classes_factory
 from bpy.types import Panel, Menu, UIList
+from bl_ui.properties_paint_common import (
+    UnifiedPaintPanel
+)
+
+from .channels_panels import draw_channels_settings_panel, poll_channels_panel, draw_channels_panel
+from .extras_panels import poll_brush_color_settings, draw_brush_color_settings, poll_brush_settings, draw_brush_settings
 
 from ..paintsystem.version_check import get_latest_version
 
@@ -10,7 +16,9 @@ from ..utils.version import is_newer_than, is_online
 from ..paintsystem.donations import get_donation_info
 from .common import (
     PSContextMixin,
+    draw_indent,
     get_icon,
+    get_icon_from_channel,
     line_separator,
     scale_content,
     check_group_multiuser,
@@ -289,6 +297,58 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
             return
         # layout.label(text="Welcome to the Paint System!")
         # layout.operator("paint_system.new_image_layer", text="Create New Image Layer")
+        
+        if poll_channels_panel(context):
+            header, panel = layout.panel("MAT_PT_ChannelsPanel", default_closed=True)
+            header.label(text="Channels", icon_value=get_icon('channel'))
+            if panel:
+                draw_channels_panel(panel, context)
+            else:
+                row = header.row(align=True)
+                row.scale_x = 1.1
+                row.alignment = 'RIGHT'
+                row.popover(
+                    panel="MAT_PT_ChannelsSelect",
+                    text=ps_ctx.active_channel.name if ps_ctx.active_channel else "No Channel",
+                    icon_value=get_icon_from_channel(ps_ctx.active_channel)
+                )
+        if poll_brush_settings(context):
+            header, panel = layout.panel("MAT_PT_Brush", default_closed=True)
+            header.label(text="Brush", icon_value=get_icon('brush'))
+            if ps_ctx.ps_settings.show_tooltips:
+                header.popover(
+                    panel="MAT_PT_BrushTooltips",
+                    text='',
+                    icon='INFO_LARGE' if is_newer_than(4,3) else 'INFO'
+                )
+            if panel:
+                draw_brush_settings(panel, context)
+        if poll_brush_color_settings(context):
+            header, panel = layout.panel("MAT_PT_BrushColor", default_closed=True)
+            header.label(text="Color", icon_value=get_icon('color'))
+            if panel:
+                row = header.row(align=True)
+                row.scale_x = 1.1
+                row.alignment = 'RIGHT'
+                row.popover(
+                    panel="MAT_PT_BrushColorSettings",
+                    text="Settings",
+                    icon="SETTINGS"
+                )
+                draw_brush_color_settings(panel, context)
+            else:
+                settings = UnifiedPaintPanel.paint_settings(context)
+                brush = settings.brush
+                row = header.row(align=True)
+                row.scale_x = 1.1
+                row.alignment = 'RIGHT'
+                if ps_ctx.ps_object.type == 'MESH':
+                    split = row.split(factor=0.5, align=True)
+                    split.alignment = 'RIGHT'
+                    UnifiedPaintPanel.prop_unified_color(split, context, brush, "color", text="")
+                    UnifiedPaintPanel.prop_unified_color(split, context, brush, "secondary_color", text="")
+                elif ps_ctx.ps_object.type == 'GREASEPENCIL':
+                    row.prop(brush, "color", text="")
 
 class MAT_MT_DeleteGroupMenu(PSContextMixin, Menu):
     bl_label = "Delete Group"
