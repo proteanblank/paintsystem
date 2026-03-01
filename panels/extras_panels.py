@@ -231,28 +231,27 @@ class MAT_PT_BrushColor(PSContextMixin, Panel, UnifiedPaintPanel):
             if ps_ctx.ps_settings.show_hex_color:
                 row = col.row()
                 row.prop(ps_ctx.ps_scene_data, "hex_color", text="Hex")
-            if is_newer_than(4,5):
-                # Bforartists/Blender variants may not expose color_jitter_panel; fail gracefully
-                try:
-                    from bl_ui.properties_paint_common import color_jitter_panel
-                    color_jitter_panel(col, context, brush)
-                except Exception:
-                    pass
-                try:
-                    header, panel = col.panel("paintsystem_color_history_palette", default_closed=True)
-                    header.label(text="Color History")
-                    if panel:
-                        if not ps_ctx.ps_scene_data.color_history_palette:
-                            panel.label(text="No color history yet")
-                        else:
-                            panel.template_palette(ps_ctx.ps_scene_data, "color_history_palette", color=True)
-                    header, panel = col.panel("paintsystem_color_palette", default_closed=True)
-                    header.label(text="Color Palette")
-                    panel.template_ID(settings, "palette", new="palette.new")
-                    if panel and settings.palette:
-                        panel.template_palette(settings, "palette", color=True)
-                except Exception:
-                    pass
+            # Bforartists/Blender variants may not expose color_jitter_panel; fail gracefully
+            try:
+                from bl_ui.properties_paint_common import color_jitter_panel
+                color_jitter_panel(col, context, brush)
+            except Exception:
+                pass
+            try:
+                header, panel = col.panel("paintsystem_color_history_palette", default_closed=True)
+                header.label(text="Color History")
+                if panel:
+                    if not ps_ctx.ps_scene_data.color_history_palette:
+                        panel.label(text="No color history yet")
+                    else:
+                        panel.template_palette(ps_ctx.ps_scene_data, "color_history_palette", color=True)
+                header, panel = col.panel("paintsystem_color_palette", default_closed=True)
+                header.label(text="Color Palette")
+                panel.template_ID(settings, "palette", new="palette.new")
+                if panel and settings.palette:
+                    panel.template_palette(settings, "palette", color=True)
+            except Exception:
+                pass
             # draw_color_settings(context, col, brush)
         if ps_ctx.ps_object.type == 'GREASEPENCIL':
             row = col.row()
