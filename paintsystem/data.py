@@ -2116,6 +2116,11 @@ class Channel(BaseNestedListManager):
             context.view_layer.objects.active = ps_context.ps_object
         
         ps_context = parse_context(context)
+        
+        if ps_context.ps_mat_data.preview_channel:
+            orig_preview_channel = bool(ps_context.ps_mat_data.preview_channel)
+            self.isolate_channel(context)
+        
         if force_alpha:
             orig_use_alpha = bool(self.use_alpha)
             self.use_alpha = True
@@ -2230,6 +2235,9 @@ class Channel(BaseNestedListManager):
                 self.output_vector_space = orig_output_vector_space
             else:
                 self.disable_output_transform = orig_disable_output_transform
+            
+            if orig_preview_channel:
+                self.isolate_channel(context)
             
             # Restore deform modifiers
             for obj, mod_name, orig_show_render in saved_modifier_states:
