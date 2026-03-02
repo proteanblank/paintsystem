@@ -21,6 +21,9 @@ from .operators_utils import redraw_panel
 from bl_ui.properties_paint_common import (
     UnifiedPaintPanel,
 )
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 class PAINTSYSTEM_OT_TogglePaintMode(PSContextMixin, Operator):
     bl_idname = "paint_system.toggle_paint_mode"
@@ -202,7 +205,7 @@ class PAINTSYSTEM_OT_OpenPaintSystemPreferences(Operator):
                 mod = mod
                 break
         if mod is None:
-            print("Paint System not found")
+            logger.error("Paint System not found")
             return {'FINISHED'}
         bl_info = addon_utils.module_bl_info(mod)
         show_expanded = bl_info["show_expanded"]

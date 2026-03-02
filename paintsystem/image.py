@@ -6,8 +6,9 @@ import os
 import re
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
+from ..utils.logging import get_logger
 
-debug_mode = False
+logger = get_logger(__name__)
 
 # --- UDIM helpers ---
 
@@ -113,7 +114,7 @@ def save_image(image: Image, force_save: bool = False):
         else:
             image.save()
     except Exception as e:
-        print(f"Failed to save image {image.name}: {e}. Use packing instead.")
+        logger.warning(f"Failed to save image {image.name}: {e}. Use packing instead.")
         image.filepath_raw = ''
         image.pack()
 
@@ -179,8 +180,7 @@ def blender_image_to_numpy(image: Image) -> Optional[ImageTiles]:
         # For non-UDIM images, use tile number 1001 (standard default)
         tiles_dict = {1001: pixels}
         end_time = time.time()
-        if debug_mode:
-            print(f"Blender image to numpy took {(end_time - start_time)*1000} milliseconds")
+        logger.debug(f"Blender image to numpy took {(end_time - start_time)*1000} milliseconds")
         return ImageTiles(tiles=tiles_dict, ori_path=image.filepath, ori_packed=(image.packed_file or image.filepath == ''))
     
     # UDIM image - read each tile directly from Blender
@@ -238,8 +238,7 @@ def blender_image_to_numpy(image: Image) -> Optional[ImageTiles]:
                 tiles_dict[tile_number] = np.zeros((height, width, 4), dtype=np.float32)
     
     end_time = time.time()
-    if debug_mode:
-        print(f"Blender UDIM image to numpy took {(end_time - start_time)*1000} milliseconds for {len(tiles_dict)} tiles")
+    logger.debug(f"Blender UDIM image to numpy took {(end_time - start_time)*1000} milliseconds for {len(tiles_dict)} tiles")
     
     return ImageTiles(tiles=tiles_dict, ori_path=original_filepath, ori_packed=was_packed)
 
@@ -276,8 +275,7 @@ def numpy_to_blender_image(array, image_name="BrushPainted", create_new=True) ->
     # Update image
     new_image.update()
     end_time = time.time()
-    if debug_mode:
-        print(f"Numpy to blender image took {(end_time - start_time)*1000} milliseconds")
+    logger.debug(f"Numpy to blender image took {(end_time - start_time)*1000} milliseconds")
     return new_image
 
 def is_temp_filepath(filepath: str) -> bool:
@@ -313,16 +311,14 @@ def delete_temp_image_files(image: Image):
                 if os.path.exists(tile_path):
                     os.remove(tile_path)
             except OSError as e:
-                if debug_mode:
-                    print(f"Failed to delete temp tile file {tile_path}: {e}")
+                logger.debug(f"Failed to delete temp tile file {tile_path}: {e}")
     else:
         abs_filepath = bpy.path.abspath(image.filepath)
         try:
             if os.path.exists(abs_filepath):
                 os.remove(abs_filepath)
         except OSError as e:
-            if debug_mode:
-                print(f"Failed to delete temp file {abs_filepath}: {e}")
+            logger.debug(f"Failed to delete temp file {abs_filepath}: {e}")
 
 def switch_image_content(image1: Image, image2: Image):
     """Switch the contents of two images."""
@@ -339,8 +335,7 @@ def switch_image_content(image1: Image, image2: Image):
     image2.update()
     image2.update_tag()
     end_time = time.time()
-    if debug_mode:
-        print(f"Switch image content took {(end_time - start_time)*1000} milliseconds")
+    logger.debug(f"Switch image content took {(end_time - start_time)*1000} milliseconds")
 
 def set_image_pixels(image: Image, image_tiles: ImageTiles):
     """
@@ -412,5 +407,4 @@ def set_image_pixels(image: Image, image_tiles: ImageTiles):
         image.update_tag()
     
     end_time = time.time()
-    if debug_mode:
-        print(f"Set image pixels took {(end_time - start_time)*1000} milliseconds")
+    logger.debug(f"Set image pixels took {(end_time - start_time)*1000} milliseconds")

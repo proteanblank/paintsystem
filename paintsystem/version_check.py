@@ -5,6 +5,9 @@ from typing import Optional, Tuple
 from .context import parse_context
 from ..utils.version import is_newer_than, is_online
 from .cache_utils import JsonFileCache
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 ADDON_ID = 'paint_system'
 
@@ -48,7 +51,7 @@ def load_version_cache() -> Optional[str]:
 
 def thread_check_update():
     """Check for updates in a background thread - combines latest version check and update availability."""
-    print(f"Checking for updates...")
+    logger.debug(f"Checking for updates...")
     ps_ctx = parse_context(bpy.context)
     
     try:
@@ -58,7 +61,7 @@ def thread_check_update():
         # Get latest version and check if update is available in one go
         latest_version, update_available = _get_latest_version_and_check_update_internal(current_version)
         
-        print(f"Latest version: {latest_version}, Update available: {update_available}")
+        logger.debug(f"Latest version: {latest_version}, Update available: {update_available}")
         
         if latest_version is not None:
             save_version_cache(latest_version)
@@ -72,7 +75,7 @@ def thread_check_update():
             else:
                 ps_ctx.ps_settings.update_state = 'UNAVAILABLE'
     except Exception as e:
-        print(f"Error checking for updates: {e}", file=sys.stderr)
+        logger.error(f"Error checking for updates: {e}")
         if ps_ctx.ps_settings is not None:
             ps_ctx.ps_settings.update_state = 'ERROR'
     finally:
@@ -289,7 +292,7 @@ def _get_current_version_internal() -> Optional[str]:
             pass
         return None
     except Exception as e:
-        print(f"Error getting current version: {e}", file=sys.stderr)
+        logger.error(f"Error getting current version: {e}")
         return None
     
     return None

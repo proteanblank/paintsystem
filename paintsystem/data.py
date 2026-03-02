@@ -1,5 +1,8 @@
 from dataclasses import dataclass
-from typing import Dict, Generator, List, Literal
+from typing import Dict, Generator, List, Literal, Optional, Any
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 import re
 import mathutils
 import numpy as np
@@ -312,7 +315,7 @@ def is_valid_ps_nodetree(node_tree: NodeTree) -> bool:
         has_alpha_output = False
         for interface_item in node_tree.interface.items_tree:
             if interface_item.item_type == "SOCKET":
-                # print(interface_item.name, interface_item.socket_type, interface_item.in_out)
+                # logger.debug(interface_item.name, interface_item.socket_type, interface_item.in_out)
                 if interface_item.name == "Color" and interface_item.socket_type == "NodeSocketColor":
                     if interface_item.in_out == "INPUT":
                         has_color_input = True
@@ -381,7 +384,7 @@ def hex_string_to_blender_color(hex_string):
     
     # 2. Validation Check
     if not _is_valid_hex_code(cleaned_hex):
-        print(f"Warning: Invalid hex code received: {hex_string}. Returning white.")
+        logger.warning(f"Invalid hex code received: {hex_string}. Returning white.")
         return WHITE_COLOR
         
     # --- If Valid, proceed to conversion ---
@@ -530,7 +533,7 @@ def ensure_udim_tiles(image: bpy.types.Image, objects: list[bpy.types.Object], u
     # Delete unused tiles
     for tile in image.tiles:
         if tile.number not in udim_tiles:
-            print(f"Removing tile {tile.number}")
+            logger.debug(f"Removing tile {tile.number}")
             image.tiles.remove(tile)
     save_image(image)
 
@@ -1368,7 +1371,7 @@ class Layer(BaseNestedListItem):
     # Linked layer data
     @property
     def is_linked(self) -> bool:
-        # print(f"Linked layer {self.linked_layer_uid} to material {self.linked_material.name if self.linked_material else 'None'}")
+        # logger.debug(f"Linked layer {self.linked_layer_uid} to material {self.linked_material.name if self.linked_material else 'None'}")
         return bool(self.linked_layer_uid and self.linked_material)
     
     linked_layer_uid: StringProperty(
@@ -1497,7 +1500,7 @@ class Layer(BaseNestedListItem):
     def get_layer_data(self) -> "Layer":
         if self.is_linked:
             if not self.linked_material or not self.linked_material.ps_mat_data:
-                print(f"Linked material {self.linked_material.name if self.linked_material else 'None'} not found")
+                logger.error(f"Linked material {self.linked_material.name if self.linked_material else 'None'} not found")
                 return None
             
             # Use cached UID lookup dictionary for O(1) access instead of nested loops
@@ -1534,10 +1537,10 @@ class Layer(BaseNestedListItem):
         """
         layer = self.get_layer_data()
         if is_layer_linked(layer) and not self.is_linked:
-            print(f"Transferring layer data for {layer.name} to linked layers")
+            logger.debug(f"Transferring layer data for {layer.name} to linked layers")
             self.transfer_linked_data()
         else:
-            print(f"Deleting layer data for {self.name}")
+            logger.debug(f"Deleting layer data for {self.name}")
             if self.empty_object:
                 bpy.data.objects.remove(self.empty_object, do_unlink=True)
             # TODO: The following causes some issue when undoing
@@ -1560,7 +1563,7 @@ class Layer(BaseNestedListItem):
         # If some properties failed, force update_node_tree first and then apply the properties again
         failed_props = []
         if retry_props:
-            print(f"Warning: Could not apply properties {retry_props} for {to_layer.name}, retrying...")
+            logger.warning(f"Could not apply properties {retry_props} for {to_layer.name}, retrying...")
             original_auto_update_node_tree = bool(to_layer.auto_update_node_tree)
             to_layer.auto_update_node_tree = False
             to_layer.update_node_tree(bpy.context)
@@ -1572,7 +1575,7 @@ class Layer(BaseNestedListItem):
                     failed_props.append(pid)
             to_layer.auto_update_node_tree = original_auto_update_node_tree
         if failed_props:
-            print(f"Warning: Could not apply properties {failed_props} for {to_layer.name}")
+            logger.warning(f"Could not apply properties {failed_props} for {to_layer.name}")
     
     @property
     def modifies_color_data(self) -> bool:
@@ -1681,7 +1684,7 @@ def ps_bake(context, objects: list[Object], mat: Material, uv_layer, bake_image,
             bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=use_clear)
         except Exception as e:
             # Try baking with CPU if GPU fails
-            print(f"GPU baking failed, trying CPU")
+            logger.debug(f"GPU baking failed, trying CPU")
             cycles.device = 'CPU'
             bpy.ops.object.bake(**bake_params, uv_layer=uv_layer, use_clear=use_clear)
 
@@ -2057,7 +2060,7 @@ class Channel(BaseNestedListManager):
         item_id = layer.id
         order = int(layer.order)
         parent_id = int(layer.parent_id)
-        print(f"Deleting layer {layer.name} with id {item_id} and order {order} and parent_id {parent_id}")
+        logger.debug(f"Deleting layer {layer.name} with id {item_id} and order {order} and parent_id {parent_id}")
         def on_delete(item: "Layer"):
             item.delete_layer_data()
         if item_id != -1 and self.remove_item_and_children(item_id, on_delete):
@@ -2244,14 +2247,14 @@ class Channel(BaseNestedListManager):
                 if mod_name in obj.modifiers:
                     obj.modifiers[mod_name].show_render = orig_show_render
         except Exception as e:
-            print(f"Error baking channel: {e}")
+            logger.error(f"Error baking channel: {e}")
             try:
                 self.use_alpha = orig_use_alpha
                 self.tangent_uv_map = orig_tangent_uv_map
                 self.output_vector_space = orig_output_vector_space
                 self.disable_output_transform = orig_disable_output_transform
             except Exception as e:
-                print(f"Error restoring channel settings: {e}")
+                logger.error(f"Error restoring channel settings: {e}")
             # Restore deform modifiers on error
             for obj, mod_name, orig_show_render in saved_modifier_states:
                 if mod_name in obj.modifiers:
@@ -2722,7 +2725,7 @@ class Group(PropertyGroup):
     def delete_channel(self, context, channel: "Channel"):
         active_index = self.channels.find(channel.name)
         if active_index < 0 or active_index >= len(self.channels):
-            print(f"Warning: No valid channel selected for deletion")
+            logger.warning(f"No valid channel selected for deletion")
             return
         
         self.channels.remove(active_index)

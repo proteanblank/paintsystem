@@ -7,6 +7,9 @@ from uuid import uuid4
 import re
 import time
 from bpy_extras.node_utils import connect_sockets
+from ...utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 pattern_increment = re.compile(r"^(.+?_)(\d+)\.(\d+)$")
 pattern_normalize = re.compile(r"^(.+?)[._](\d+)$")
@@ -61,10 +64,10 @@ def capture_node_properties(node: bpy.types.Node) -> dict:
                 try:
                     node_props[pid] = getattr(node, pid)
                 except Exception as e:
-                    # print(f"Warning: Could not capture property '{pid}' for '{node.name}'. Error: {e}")
+                    # logger.debug(f"Warning: Could not capture property '{pid}' for '{node.name}'. Error: {e}")
                     pass
     except Exception as e:
-        # print(f"Warning: Could not capture node state for '{node.name}'. Error: {e}")
+        # logger.debug(f"Warning: Could not capture node state for '{node.name}'. Error: {e}")
         # If introspection fails on this node type, skip silently
         pass
     return node_props
@@ -89,10 +92,10 @@ def capture_node_defaults(node: bpy.types.Node) -> dict:
                         except TypeError:
                             defaults[sock.name] = val
                     except Exception as e:
-                        # print(f"Warning: Could not set default value for input '{sock.name}' to '{val}'. Error: {e}")
+                        # logger.debug(f"Warning: Could not set default value for input '{sock.name}' to '{val}'. Error: {e}")
                         pass
         except Exception as e:
-            # print(f"Warning: Could not capture node defaults for '{node.name}'. Error: {e}")
+            # logger.debug(f"Warning: Could not capture node defaults for '{node.name}'. Error: {e}")
             pass
         return defaults
         
@@ -135,7 +138,7 @@ def apply_node_properties(node: bpy.types.Node, properties: dict) -> None:
                     try:
                         elements.remove(elements[-1])
                     except Exception as e:
-                        print(f"Warning: Could not remove extra color ramp element for '{node.name}'. Error: {e}")
+                        logger.warning(f"Could not remove extra color ramp element for '{node.name}'. Error: {e}")
                         break
 
                 # Apply desired values if provided
@@ -153,7 +156,7 @@ def apply_node_properties(node: bpy.types.Node, properties: dict) -> None:
                     setattr(node, pid, value)
         # except Exception as e:
         #     # pass
-        #     print(f"Warning: Could not apply property '{pid}' for '{node.name}'. Error: {e}")
+        #     logger.warning(f"Could not apply property '{pid}' for '{node.name}'. Error: {e}")
 
 
 def apply_node_defaults(node: bpy.types.Node, defaults: dict, outputs: dict) -> None:
@@ -161,18 +164,18 @@ def apply_node_defaults(node: bpy.types.Node, defaults: dict, outputs: dict) -> 
         try:
             if input_name in node.inputs and hasattr(node.inputs[input_name], 'default_value') and value != node.inputs[input_name].default_value:
                 node.inputs[input_name].default_value = value
-                # print(f"Applied input '{input_name}' for '{node.name}'")
+                # logger.debug(f"Applied input '{input_name}' for '{node.name}'")
         except Exception as e:
             pass
-            # print(f"Warning: Could not apply input '{input_name}' for '{node.name}'. Error: {e}")
+            # logger.warning(f"Could not apply input '{input_name}' for '{node.name}'. Error: {e}")
     for output_name, value in outputs.items():
         try:
             if output_name in node.outputs and hasattr(node.outputs[output_name], 'default_value') and value != node.outputs[output_name].default_value:
                 node.outputs[output_name].default_value = value
-                # print(f"Applied output '{output_name}' for '{node.name}'")
+                # logger.debug(f"Applied output '{output_name}' for '{node.name}'")
         except Exception as e:
             pass
-            # print(f"Warning: Could not apply output '{output_name}' for '{node.name}'. Error: {e}")
+            # logger.warning(f"Could not apply output '{output_name}' for '{node.name}'. Error: {e}")
 
 
 def apply_node_state(node: bpy.types.Node, state: dict) -> None:
@@ -299,7 +302,7 @@ class NodeTreeBuilder:
 
     def _log(self, message: str) -> None:
         if self.verbose:
-            print(self.frame.label, message)
+            logger.info(f"{self.frame.label} {message}")
 
     def _find_or_create_frame(self, frame_name: str, frame_color: Optional[Sequence[float]]) -> bpy.types.Node:
         """Find an existing frame by label or create a new one.

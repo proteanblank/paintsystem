@@ -6,6 +6,9 @@ from .graph.basic_layers import get_layer_version_for_type
 from .graph.nodetree_builder import get_nodetree_version
 from .data import get_legacy_global_layer, iter_all_layers, Layer, Group, Channel
 from typing import TypedDict
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 class LayerParent(TypedDict):
     mat: Material
@@ -27,7 +30,7 @@ def migrate_global_layer_data(layer_parent_map: dict[Layer, LayerParent]):
             global_layer = get_legacy_global_layer(layer)
             if global_layer:
                 layer.auto_update_node_tree = False
-                print(f"Migrating global layer data ({global_layer.name}) to layer data ({layer.name}) ({layer.layer_name})")
+                logger.info(f"Migrating global layer data ({global_layer.name}) to layer data ({layer.name}) ({layer.layer_name})")
                 has_migrated_global_layer = True
                 layer.layer_name = layer.name
                 layer.uid = global_layer.name
@@ -45,7 +48,7 @@ def migrate_global_layer_data(layer_parent_map: dict[Layer, LayerParent]):
                         setattr(layer, pid, getattr(global_layer, pid))
                 else:
                     # as linked layer, properties will not be copied
-                    print(f"Layer {layer.name} is linked to {global_layer.name}")
+                    logger.debug(f"Layer {layer.name} is linked to {global_layer.name}")
                     mat, global_layer = seen_global_layers_map[global_layer.name]
                     layer.linked_layer_uid = global_layer.name
                     layer.linked_material = mat
@@ -62,7 +65,7 @@ def migrate_blend_mode(layer_parent_map: dict[Layer, LayerParent]):
         if mix_node:
             blend_mode = str(mix_node.blend_type)
         if blend_mode != layer.blend_mode and layer.blend_mode != "PASSTHROUGH":
-            print(f"Layer {layer.name} has blend mode {blend_mode} but {layer.blend_mode} is set")
+            logger.debug(f"Layer {layer.name} has blend mode {blend_mode} but {layer.blend_mode} is set")
             layer.blend_mode = blend_mode
 
 def migrate_source_node(layer_parent_map: dict[Layer, LayerParent]):
@@ -105,11 +108,11 @@ def update_layer_version(layer_parent_map: dict[Layer, LayerParent]):
             continue
         target_version = get_layer_version_for_type(layer.type)
         if get_nodetree_version(layer.node_tree) != target_version:
-            print(f"Updating layer {layer.name} to version {target_version}")
+            logger.info(f"Updating layer {layer.name} to version {target_version}")
             try:
                 layer.update_node_tree(bpy.context)
             except Exception as e:
-                print(f"Error updating layer {layer.name}: {e}")
+                logger.error(f"Error updating layer {layer.name}: {e}")
 
 def update_layer_name(layer_parent_map: dict[Layer, LayerParent]):
     for layer, layer_parent in layer_parent_map.items():
@@ -131,5 +134,5 @@ def update_library_nodetree_version():
     for node_tree in ps_nodetrees:
         target_version = LIBRARY_NODE_TREE_VERSIONS[node_tree.name]
         if get_nodetree_version(node_tree) != target_version:
-            print(f"Updating library nodetree {node_tree.name} to version {target_version}")
+            logger.info(f"Updating library nodetree {node_tree.name} to version {target_version}")
             get_library_nodetree(node_tree.name, force_append=True)

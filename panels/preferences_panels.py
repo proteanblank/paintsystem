@@ -89,6 +89,12 @@ class PaintSystemPreferences(AddonPreferences):
         description="Use the panel quick access",
         default=False
     )
+    
+    developer_mode: BoolProperty(
+        name="Developer Mode",
+        description="Enable developer mode for verbose logging",
+        default=False
+    )
 
     # RMB popover options
     show_hsv_sliders_rmb: BoolProperty(
@@ -186,6 +192,10 @@ class PaintSystemPreferences(AddonPreferences):
         layout.prop(self, "use_panel_quick_access", text="Use Panel Quick Access")
         # layout.prop(self, "name_layers_group",
         #             text="Name Layers According to Group Name")
+
+        dev_box = layout.box()
+        dev_box.label(text="Advanced", icon='PREFERENCES')
+        dev_box.prop(self, "developer_mode", text="Developer Mode")
 
         # --- Texture Paint Right Click Menu ---
         rmb_box = layout.box()

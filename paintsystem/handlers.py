@@ -9,6 +9,9 @@ from .graph.basic_layers import get_layer_version_for_type
 import time
 from .graph.nodetree_builder import get_nodetree_version
 import uuid
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 _COLOR_HISTORY_PALETTE_NAME = "Paint System History"
 
@@ -42,7 +45,7 @@ def frame_change_pre(scene: bpy.types.Scene):
             match action.action_bind:
                 case 'FRAME':
                     if action.frame <= scene.frame_current:
-                        # print(f"Frame {action.frame} found at frame {scene.frame_current}")
+                        # logger.debug(f"Frame {action.frame} found at frame {scene.frame_current}")
                         if action.action_type == 'ENABLE' and update_task.get(layer, layer.enabled) == False:
                             update_task[layer] = True
                         elif action.action_type == 'DISABLE' and update_task.get(layer, layer.enabled) == True:
@@ -50,7 +53,7 @@ def frame_change_pre(scene: bpy.types.Scene):
                 case 'MARKER':
                     marker = scene.timeline_markers.get(action.marker_name)
                     if marker and marker.frame <= scene.frame_current:
-                        # print(f"Marker {marker.frame} found at frame {scene.frame_current}")
+                        # logger.debug(f"Marker {marker.frame} found at frame {scene.frame_current}")
                         if action.action_type == 'ENABLE' and update_task.get(layer, layer.enabled) == False:
                             update_task[layer] = True
                         elif action.action_type == 'DISABLE' and update_task.get(layer, layer.enabled) == True:
@@ -63,7 +66,7 @@ def frame_change_pre(scene: bpy.types.Scene):
 
 
 def load_paint_system_data():
-    print(f"Loading Paint System data...")
+    logger.debug("Loading Paint System data...")
     start_time = time.time()
     ps_scene_data = get_ps_scene_data(bpy.context.scene)
     if not ps_scene_data:
@@ -73,11 +76,11 @@ def load_paint_system_data():
     for global_layer in ps_scene_data.layers:
         target_version = get_layer_version_for_type(global_layer.type)
         if get_nodetree_version(global_layer.node_tree) != target_version:
-            print(f"Updating layer {global_layer.name} to version {target_version}")
+            logger.info(f"Updating layer {global_layer.name} to version {target_version}")
             try:
                 global_layer.update_node_tree(bpy.context)
             except Exception as e:
-                print(f"Error updating layer {global_layer.name}: {e}")
+                logger.error(f"Error updating layer {global_layer.name}: {e}")
     
     layer_parent_map = get_layer_parent_map()
     for layer, layer_parent in layer_parent_map.items():
@@ -95,12 +98,12 @@ def load_paint_system_data():
 
     # As layers in ps_scene_data is not used anymore, we can remove it in the future
     if ps_scene_data and hasattr(ps_scene_data, 'layers') and len(ps_scene_data.layers) > 0:
-        # print(f"Removing ps_scene_data")
+        # logger.debug(f"Removing ps_scene_data")
         ps_scene_data.layers.clear()
         ps_scene_data.last_selected_ps_object = None
         ps_scene_data.last_selected_material = None
             
-    print(f"Paint System: Checked layers in {round((time.time() - start_time) * 1000, 2)} ms")
+    logger.debug(f"Paint System: Checked layers in {round((time.time() - start_time) * 1000, 2)} ms")
 
 
 @bpy.app.handlers.persistent
@@ -172,7 +175,7 @@ def color_history_handler(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph
 
                 item = palette.colors.new()
                 item.color = (current_color[0], current_color[1], current_color[2])
-                # print(f"Color added: {item.color[:]}")
+                # logger.debug(f"Color added: {item.color[:]}")
                 
                 for col in colors_to_save:
                     if len(palette.colors) >= 20:
@@ -180,7 +183,7 @@ def color_history_handler(scene: bpy.types.Scene, depsgraph: bpy.types.Depsgraph
                     item = palette.colors.new()
                     item.color = col
     except Exception as e:
-        print(f"Color History Error: {e}")
+        logger.error(f"Color History Error: {e}")
         pass
 
 @bpy.app.handlers.persistent

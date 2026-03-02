@@ -2,6 +2,9 @@ import bpy
 from bpy.types import Node, NodeTree, NodeSocket, Context
 from bpy_extras.node_utils import find_base_socket_type
 from ..custom_icons import get_icon_from_socket_type
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 def traverse_connected_nodes(node: Node, input: bool = True, output: bool = False) -> set[Node]:
     visited = set()
@@ -65,7 +68,7 @@ def transfer_connection(node_tree: NodeTree, source_socket: NodeSocket, target_s
         try:
             target_socket.default_value = source_socket.default_value
         except Exception as e:
-            print(f"Failed to transfer connection from {source_socket.name} ({source_socket.type}) to {target_socket.name} ({target_socket.type}): {e}")
+            logger.error(f"Failed to transfer connection from {source_socket.name} ({source_socket.type}) to {target_socket.name} ({target_socket.type}): {e}")
         return False
 
 def find_nodes(node_tree: NodeTree, properties: dict) -> list[Node]:
@@ -153,22 +156,22 @@ def dissolve_nodes(node_tree: NodeTree, nodes: list[Node]):
     end_node = None
     start_node_input = None
     end_node_output = None
-    print(f"Dissolving nodes: {nodes}")
+    logger.debug(f"Dissolving nodes: {nodes}")
     for node in nodes:
-        print(f"Checking node: {node.name}")
+        logger.debug(f"Checking node: {node.name}")
         for input_socket in node.inputs:
             for link in input_socket.links:
-                print(f"Checking link: {link.from_node.name}")
+                logger.debug(f"Checking link: {link.from_node.name}")
                 if link.from_node not in nodes:
-                    print(f"Found start node: {link.from_node.name}")
+                    logger.debug(f"Found start node: {link.from_node.name}")
                     start_node = link.from_node
                     start_node_input = input_socket
                     break
         for output_socket in node.outputs:
             for link in output_socket.links:
-                print(f"Checking link: {link.to_node.name} in {nodes}")
+                logger.debug(f"Checking link: {link.to_node.name} in {nodes}")
                 if link.to_node not in nodes:
-                    print(f"Found end node: {link.to_node.name}")
+                    logger.debug(f"Found end node: {link.to_node.name}")
                     end_node = link.to_node
                     end_node_output = output_socket
                     break

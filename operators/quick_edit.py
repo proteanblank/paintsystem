@@ -12,6 +12,9 @@ from ..paintsystem.image import save_image
 from .common import PSContextMixin, scale_content
 import numpy as np
 import pathlib
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def image_needs_save(image) -> bool:
@@ -115,11 +118,11 @@ def set_rgb_to_zero_if_alpha_zero(image):
         bool: True if the operation was successful, False otherwise.
     """
     if not image:
-        print("Error: No image provided.")
+        logger.error("No image provided.")
         return False
 
     if not isinstance(image, bpy.types.Image):
-        print(f"Error: Input '{image.name}' is not a bpy.types.Image.")
+        logger.error(f"Input '{image.name}' is not a bpy.types.Image.")
         return False
 
     # --- Method 1: Using Numpy (Generally Faster for large images) ---
@@ -128,8 +131,8 @@ def set_rgb_to_zero_if_alpha_zero(image):
     channels = image.channels  # Usually 4 (RGBA)
 
     if channels != 4:
-        print(
-            f"Error: Image '{image.name}' does not have 4 channels (RGBA). Found {channels}.")
+        logger.error(
+            f"Image '{image.name}' does not have 4 channels (RGBA). Found {channels}.")
         # Or handle images with 3 channels differently if needed
         return False
 

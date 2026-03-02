@@ -10,6 +10,9 @@ from bpy.props import BoolProperty, EnumProperty, StringProperty
 
 from ..paintsystem.graph.common import DEFAULT_PS_UV_MAP_NAME
 from ..paintsystem.image import *
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 icons = bpy.types.UILayout.bl_rna.functions["prop"].parameters["icon"].enum_items.keys()
 
@@ -356,5 +359,5 @@ def execute_operator_in_area(area: bpy.types.Area, operator_idname: str, **kwarg
             run_operator_by_id(operator_idname, **kwargs)
             return True
         except RuntimeError as e:
-            print(f"Could not execute operator in {area.type}: {e}")
+            logger.error(f"Could not execute operator in {area.type}: {e}")
             return False

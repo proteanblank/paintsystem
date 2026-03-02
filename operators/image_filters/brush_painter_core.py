@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional
 from ..common import blender_image_to_numpy
 from ...paintsystem.image import set_image_pixels, ImageTiles
+from ...utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 DEBUG_SEAM = False  # Set to False to disable seam duplication debug prints
 DEBUG_CANCEL = False  # Set to False to disable brush cancellation debug prints
@@ -277,7 +280,7 @@ class BrushPainterCore:
             return brush_mask
             
         except Exception as e:
-            print(f"Error loading brush texture: {e}. Using fallback circular brush.")
+            logger.error(f"Error loading brush texture: {e}. Using fallback circular brush.")
             return self.create_circular_brush(50)
     
     def load_multiple_brushes(self, folder_path):
@@ -302,7 +305,7 @@ class BrushPainterCore:
                 brush_mask = self.load_brush_texture(brush_file)
                 brush_list.append(brush_mask)
             except Exception as e:
-                print(f"Error loading brush '{brush_file}': {e}. Skipping.")
+                logger.error(f"Error loading brush '{brush_file}': {e}. Skipping.")
                 continue
         
         if not brush_list:
@@ -638,7 +641,7 @@ class BrushPainterCore:
     ) -> bool:
         if rotated_brush.size == 0 or float(np.max(rotated_brush)) <= 1e-6:
             if DEBUG_CANCEL:
-                print(f"[CANCEL] _blend_rotated_brush: brush is empty or zero "
+                logger.debug(f"[CANCEL] _blend_rotated_brush: brush is empty or zero "
                       f"(size={rotated_brush.size}, max={float(np.max(rotated_brush)) if rotated_brush.size > 0 else 0:.6f}) "
                       f"at center=({center_x:.1f},{center_y:.1f}) tile={state.tile_num}")
             return False
@@ -659,7 +662,7 @@ class BrushPainterCore:
 
         if clip_y0 >= clip_y1 or clip_x0 >= clip_x1:
             if DEBUG_CANCEL:
-                print(f"[CANCEL] _blend_rotated_brush: entirely outside canvas "
+                logger.debug(f"[CANCEL] _blend_rotated_brush: entirely outside canvas "
                       f"at center=({center_x:.1f},{center_y:.1f}) tile={state.tile_num} "
                       f"brush=({brush_w}x{brush_h}) "
                       f"brush_region=[{start_x}:{end_x}, {start_y}:{end_y}] "
@@ -777,7 +780,7 @@ class BrushPainterCore:
                 tile1, local_u1, local_v1 = self._uv_to_tile_and_local(fu1)
                 if tile0 != tile1:
                     if DEBUG_SEAM:
-                        print(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
+                        logger.debug(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
                               f"UV endpoints span different tiles ({tile0} vs {tile1}), skipping side")
                     sides_data.append(None)
                     continue
@@ -785,7 +788,7 @@ class BrushPainterCore:
                 tile_shape = tile_shapes.get(tile0)
                 if tile_shape is None:
                     if DEBUG_SEAM:
-                        print(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
+                        logger.debug(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
                               f"tile {tile0} not in tile_shapes, skipping side")
                     sides_data.append(None)
                     continue
@@ -819,7 +822,7 @@ class BrushPainterCore:
             # Both sides must be valid to form a seam pair
             if sides_data[0] is None or sides_data[1] is None:
                 if DEBUG_SEAM:
-                    print(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
+                    logger.debug(f"[SEAM-BUILD] edge verts=({v0_idx},{v1_idx}): "
                           f"one or both sides invalid (sides[0]={'None' if sides_data[0] is None else 'ok'}, "
                           f"sides[1]={'None' if sides_data[1] is None else 'ok'}), skipping pair")
                 continue
@@ -849,7 +852,7 @@ class BrushPainterCore:
 
         if not seam_edges:
             if DEBUG_SEAM:
-                print("[SEAM-BUILD] No valid seam edges found — seam duplication disabled")
+                logger.debug("[SEAM-BUILD] No valid seam edges found — seam duplication disabled")
             return None
 
         tile_to_edges: Dict[int, List[int]] = {}
@@ -858,17 +861,17 @@ class BrushPainterCore:
 
         # if DEBUG_SEAM:
         #     matched = sum(1 for e in seam_edges if e.counterpart_index >= 0)
-        #     print(f"[SEAM] Built {len(seam_edges)} seam edges ({len(seam_edges)//2} pairs), "
+        #     logger.debug(f"[SEAM] Built {len(seam_edges)} seam edges ({len(seam_edges)//2} pairs), "
         #           f"{matched}/{len(seam_edges)} matched")
         #     for ei, se in enumerate(seam_edges):
         #         cp = se.counterpart_index
         #         cp_tile = seam_edges[cp].tile_num if cp >= 0 else None
-        #         print(f"  edge[{ei}] tile={se.tile_num} verts=({se.vert0},{se.vert1}) "
+        #         logger.debug(f"  edge[{ei}] tile={se.tile_num} verts=({se.vert0},{se.vert1}) "
         #               f"px0=({se.px0[0]:.1f},{se.px0[1]:.1f}) px1=({se.px1[0]:.1f},{se.px1[1]:.1f}) "
         #               f"face_side={se.face_side} len_uv={se.length_uv:.4f} "
         #               f"counterpart={cp}(tile={cp_tile})")
         #     for tile_num, indices in tile_to_edges.items():
-        #         print(f"  tile {tile_num}: {len(indices)} seam edges")
+        #         logger.debug(f"  tile {tile_num}: {len(indices)} seam edges")
 
         return UVSeamIndex(edges=seam_edges, tile_to_edges=tile_to_edges)
 
@@ -990,14 +993,14 @@ class BrushPainterCore:
         sampled_alpha = sampled_pixel[3] if source_state.has_alpha else 1.0
         if sampled_alpha <= 1e-6:
             # if DEBUG_CANCEL:
-            #     print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num}: "
+            #     logger.debug(f"[CANCEL] pos=({x},{y}) tile={source_tile_num}: "
             #           f"sampled_alpha {sampled_alpha:.6f} <= 1e-6 (pixel is fully transparent)")
             return False
 
         magnitude = source_state.g_normalized[y, x]
         if magnitude < self.gradient_threshold:
             if DEBUG_CANCEL:
-                print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num}: "
+                logger.debug(f"[CANCEL] pos=({x},{y}) tile={source_tile_num}: "
                       f"magnitude {magnitude:.4f} < threshold {self.gradient_threshold:.4f}")
             return False
 
@@ -1010,7 +1013,7 @@ class BrushPainterCore:
         
         if DEBUG_ROTATION and hasattr(self, '_debug_rotation_count'):
             if self._debug_rotation_count < 20:
-                print(f"[ROTATION] pos=({x},{y}) tile={source_tile_num}: "
+                logger.debug(f"[ROTATION] pos=({x},{y}) tile={source_tile_num}: "
                       f"gradient_angle={angle_deg:.1f}° brush_angle={brush_angle:.1f}° "
                       f"bin={angle_bin}/{self.rotation_bins} quantized={(angle_bin/self.rotation_bins)*360:.1f}°")
                 self._debug_rotation_count += 1
@@ -1018,7 +1021,7 @@ class BrushPainterCore:
         source_rotated = self._get_rotated_brush_cached(selected_brush, brush_angle)
         if source_rotated.size == 0 or float(np.max(source_rotated)) <= 1e-6:
             if DEBUG_CANCEL:
-                print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num}: "
+                logger.debug(f"[CANCEL] pos=({x},{y}) tile={source_tile_num}: "
                       f"source_rotated empty or zero (size={source_rotated.size}, max={float(np.max(source_rotated)) if source_rotated.size > 0 else 0:.6f})")
             return False
 
@@ -1048,7 +1051,7 @@ class BrushPainterCore:
         counterpart_index = source_edge.counterpart_index
         if counterpart_index < 0:
             if DEBUG_SEAM:
-                print(f"[SEAM-STAMP] edge[{seam_triggered_edge}] has no counterpart, skip dup")
+                logger.debug(f"[SEAM-STAMP] edge[{seam_triggered_edge}] has no counterpart, skip dup")
             return self._blend_rotated_brush(
                 source_state,
                 float(y),
@@ -1063,7 +1066,7 @@ class BrushPainterCore:
         target_state = tile_states.get(counterpart_edge.tile_num)
         if target_state is None:
             if DEBUG_SEAM:
-                print(f"[SEAM-STAMP] counterpart tile {counterpart_edge.tile_num} not in tile_states, skip dup")
+                logger.debug(f"[SEAM-STAMP] counterpart tile {counterpart_edge.tile_num} not in tile_states, skip dup")
             return self._blend_rotated_brush(
                 source_state,
                 float(y),
@@ -1085,7 +1088,7 @@ class BrushPainterCore:
             if DEBUG_CANCEL:
                 ratio = counterpart_edge.length_uv / source_edge.length_uv if source_edge.length_uv > 1e-8 else 1.0
                 computed = int(round(base_brush_size * ratio))
-                print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
+                logger.debug(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
                       f"duplicate size {computed} out of bounds [{source_state.min_size_px}, {source_state.max_size_px}] "
                       f"(base={base_brush_size}, ratio={ratio:.3f}) — source brush also not applied")
             return False
@@ -1170,20 +1173,20 @@ class BrushPainterCore:
             duplicate_angle = brush_angle + (target_edge_angle_deg - source_edge_angle_deg)
 
         # if DEBUG_SEAM:
-        #     print(f"[SEAM-STAMP] src=({x},{y}) tile={source_tile_num} "
+        #     logger.debug(f"[SEAM-STAMP] src=({x},{y}) tile={source_tile_num} "
         #           f"edge[{seam_triggered_edge}]→cpt[{counterpart_index}] "
         #           f"t={projected_t:.3f} perp={signed_perp:.1f}")
-        #     print(f"  src_edge: px0=({source_edge.px0[0]:.1f},{source_edge.px0[1]:.1f}) "
+        #     logger.debug(f"  src_edge: px0=({source_edge.px0[0]:.1f},{source_edge.px0[1]:.1f}) "
         #           f"px1=({source_edge.px1[0]:.1f},{source_edge.px1[1]:.1f}) "
         #           f"verts=({source_edge.vert0},{source_edge.vert1}) face_side={source_edge.face_side}")
-        #     print(f"  cpt_edge: px0=({counterpart_edge.px0[0]:.1f},{counterpart_edge.px0[1]:.1f}) "
+        #     logger.debug(f"  cpt_edge: px0=({counterpart_edge.px0[0]:.1f},{counterpart_edge.px0[1]:.1f}) "
         #           f"px1=({counterpart_edge.px1[0]:.1f},{counterpart_edge.px1[1]:.1f}) "
         #           f"verts=({counterpart_edge.vert0},{counterpart_edge.vert1}) face_side={counterpart_edge.face_side}")
-        #     print(f"  swapped={swapped} src_side={source_side} cpt_eff_side={counterpart_effective_side} "
+        #     logger.debug(f"  swapped={swapped} src_side={source_side} cpt_eff_side={counterpart_effective_side} "
         #           f"need_reflection={need_reflection}")
-        #     print(f"  src_edge_angle={source_edge_angle_deg:.1f}° cpt_edge_angle={target_edge_angle_deg:.1f}°")
-        #     print(f"  brush_angle={brush_angle:.1f}° → dup_angle={duplicate_angle:.1f}°")
-        #     print(f"  mapped_perp={mapped_perp if (cpt_len_px > 1e-8 and src_len_px > 1e-8) else 0:.1f} "
+        #     logger.debug(f"  src_edge_angle={source_edge_angle_deg:.1f}° cpt_edge_angle={target_edge_angle_deg:.1f}°")
+        #     logger.debug(f"  brush_angle={brush_angle:.1f}° → dup_angle={duplicate_angle:.1f}°")
+        #     logger.debug(f"  mapped_perp={mapped_perp if (cpt_len_px > 1e-8 and src_len_px > 1e-8) else 0:.1f} "
         #           f"target=({target_center_x:.1f},{target_center_y:.1f}) "
         #           f"target_tile={counterpart_edge.tile_num} target_size={target_size_px}")
 
@@ -1195,7 +1198,7 @@ class BrushPainterCore:
         duplicate_rotated = self._get_rotated_brush_cached(duplicate_brush, duplicate_angle)
         if duplicate_rotated.size == 0 or float(np.max(duplicate_rotated)) <= 1e-6:
             if DEBUG_CANCEL:
-                print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
+                logger.debug(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
                       f"duplicate_rotated empty or zero (size={duplicate_rotated.size}, max={float(np.max(duplicate_rotated)) if duplicate_rotated.size > 0 else 0:.6f}) "
                       f"— source brush also not applied")
             return False
@@ -1204,7 +1207,7 @@ class BrushPainterCore:
         can_place_target = self._can_place_rotated_brush(target_state, target_center_y, target_center_x, duplicate_rotated)
         if not (can_place_source and can_place_target):
             if DEBUG_CANCEL:
-                print(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
+                logger.debug(f"[CANCEL] pos=({x},{y}) tile={source_tile_num} edge[{seam_triggered_edge}]: "
                       f"placement failed (can_place_source={can_place_source}, can_place_target={can_place_target}) "
                       f"src_brush={source_rotated.shape} tgt_brush={duplicate_rotated.shape} "
                       f"tgt_center=({target_center_x:.1f},{target_center_y:.1f}) tgt_tile={counterpart_edge.tile_num} "
@@ -1364,13 +1367,13 @@ class BrushPainterCore:
             bins_used = set()
             for angle in rotation_angles:
                 bins_used.add(self._quantize_angle(angle + self.brush_rotation_offset))
-            print(f"[ROTATION STATS] Sampled {len(rotation_angles)} angles:")
-            print(f"  Range: [{rotation_angles.min():.1f}°, {rotation_angles.max():.1f}°]")
-            print(f"  Mean: {rotation_angles.mean():.1f}° Std: {rotation_angles.std():.1f}°")
-            print(f"  Unique angles (0.1° precision): {len(unique_angles)}")
-            print(f"  Rotation bins used: {len(bins_used)}/{self.rotation_bins}")
+            logger.debug(f"[ROTATION STATS] Sampled {len(rotation_angles)} angles:")
+            logger.debug(f"  Range: [{rotation_angles.min():.1f}°, {rotation_angles.max():.1f}°]")
+            logger.debug(f"  Mean: {rotation_angles.mean():.1f}° Std: {rotation_angles.std():.1f}°")
+            logger.debug(f"  Unique angles (0.1° precision): {len(unique_angles)}")
+            logger.debug(f"  Rotation bins used: {len(bins_used)}/{self.rotation_bins}")
             if len(bins_used) <= 10:
-                print(f"  Bins: {sorted(bins_used)}")
+                logger.debug(f"  Bins: {sorted(bins_used)}")
 
         result_tiles = {}
         for tile_num, tile_state in tile_states.items():

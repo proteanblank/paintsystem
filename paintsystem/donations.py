@@ -1,12 +1,14 @@
 import bpy
 import json
-import sys
 from datetime import datetime
 from typing import Dict, Any, Optional
 from .context import parse_context
 import threading
 from ..utils.version import is_online
 from .cache_utils import JsonFileCache
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 try:
     import requests
@@ -26,7 +28,7 @@ def thread_request_donation_info(base_url: str = "https://paintsystem-backend.ve
     Note: Blender context access is not fully thread-safe. State updates
     to ps_settings are wrapped in try/except as a precaution.
     """
-    print(f"Requesting donation info...")
+    logger.debug(f"Requesting donation info...")
     ps_ctx = parse_context(bpy.context)
     
     def _set_loading(value):
@@ -47,15 +49,15 @@ def thread_request_donation_info(base_url: str = "https://paintsystem-backend.ve
         data['recentDonations'].sort(key=lambda x: datetime.fromisoformat(x['timestamp']), reverse=True)
         _donation_cache.save(data)
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching donation info: {e}", file=sys.stderr)
+        logger.error(f"Error fetching donation info: {e}")
         if hasattr(e, 'response') and e.response is not None:
             try:
                 error_data = e.response.json()
-                print(f"Error details: {error_data}", file=sys.stderr)
+                logger.error(f"Error details: {error_data}")
             except Exception:
-                print(f"Status code: {e.response.status_code}", file=sys.stderr)
+                logger.error(f"Status code: {e.response.status_code}")
     except json.JSONDecodeError as e:
-        print(f"Error parsing JSON response: {e}", file=sys.stderr)
+        logger.error(f"Error parsing JSON response: {e}")
     finally:
         _set_loading(False)
 
@@ -83,7 +85,7 @@ def get_donation_info(base_url: str = "https://paintsystem-backend.vercel.app") 
 
     ps_ctx.ps_settings.loading_donations = True
     if not REQUESTS_AVAILABLE:
-        print("Error: requests library is not available", file=sys.stderr)
+        logger.error("requests library is not available")
         return None
     
     threading.Thread(target=lambda: thread_request_donation_info(base_url)).start()

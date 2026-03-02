@@ -30,7 +30,11 @@ bl_info = {
 
 bl_info_copy = bl_info.copy()
 
-print("Paint System: Registering...")
+from .utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+logger.info("Paint System: Registering...")
 
 submodules = [
     "paintsystem",
@@ -48,4 +52,4 @@ def register():
 def unregister():
     _unregister()
     unload_icons()
-    print("Paint System: Unregistered", __package__)
+    logger.info(f"Paint System: Unregistered {__package__}")

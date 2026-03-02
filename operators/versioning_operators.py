@@ -16,6 +16,9 @@ from bpy_extras.node_utils import connect_sockets
 from ..utils.version import is_online
 from ..preferences import addon_package
 import addon_utils
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 pid_mapping = {
     "name": "name",
@@ -109,7 +112,7 @@ class PAINTSYSTEM_OT_UpdatePaintSystemData(PSContextMixin, Operator):
             ps_ctx = self.parse_context(context)
             for legacy_layer in legacy_group.items:
                 if legacy_layer.type not in [layer[0] for layer in LAYER_TYPE_ENUM]:
-                    print(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
+                    logger.warning(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
                     warning_messages.append(f"Skipping layer {legacy_layer.name} of type {legacy_layer.type} because it is not supported anymore")
                     continue
                 new_layer = new_channel.create_layer(context, legacy_layer.name, legacy_layer.type)
@@ -251,7 +254,7 @@ class PAINTSYSTEM_OT_OpenExtensionPreferences(Operator):
                 mod = mod
                 break
         if mod is None:
-            print("Paint System not found")
+            logger.error("Paint System not found")
             return {'FINISHED'}
         bl_info = addon_utils.module_bl_info(mod)
         show_expanded = bl_info["show_expanded"]

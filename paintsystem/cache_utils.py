@@ -2,9 +2,12 @@
 
 import json
 import os
-import sys
 import time
 from typing import Any, Dict, Optional
+
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _get_addon_root() -> str:
@@ -38,7 +41,7 @@ class JsonFileCache:
             with open(self.path, 'w') as f:
                 json.dump(cache_data, f, indent=2)
         except Exception as e:
-            print(f"Error saving {self._label} cache: {e}", file=sys.stderr)
+            logger.error(f"Error saving {self._label} cache: {e}")
 
     def load(self, max_age_seconds: float) -> Optional[Dict[str, Any]]:
         """Load cached data if the file exists and is younger than *max_age_seconds*.
@@ -59,11 +62,11 @@ class JsonFileCache:
 
             return cache_data.get("data")
         except Exception as e:
-            print(f"Error loading {self._label} cache: {e}", file=sys.stderr)
+            logger.error(f"Error loading {self._label} cache: {e}")
             return None
 
     def reset(self) -> None:
         """Delete the cache file if it exists."""
         if os.path.exists(self.path):
             os.remove(self.path)
-        print(f"{self._label.capitalize()} cache reset")
+        logger.info(f"{self._label.capitalize()} cache reset")
