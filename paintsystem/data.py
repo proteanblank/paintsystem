@@ -2120,6 +2120,7 @@ class Channel(BaseNestedListManager):
         
         ps_context = parse_context(context)
         
+        orig_preview_channel = False
         if ps_context.ps_mat_data.preview_channel:
             orig_preview_channel = bool(ps_context.ps_mat_data.preview_channel)
             self.isolate_channel(context)
