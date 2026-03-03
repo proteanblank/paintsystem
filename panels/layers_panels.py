@@ -82,14 +82,16 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                 else:
                     row.label(icon='BLANK1')
             row.enabled = linked_item.opacity > 0 and linked_item.enabled
+            if linked_item.is_clip:
+                clipping_row = row.row(align=True)
+                clipping_row.scale_x = 0.6
+                clipping_row.label(icon_value=get_icon('clipping'))
             draw_layer_icon(linked_item, row)
             main_row.separator()
             main_row.prop(linked_item, "name", text="", emboss=False)
 
             row = main_row.row(align=True)
             row.alignment = 'RIGHT'
-            if linked_item.is_clip:
-                row.label(icon="SELECT_INTERSECT")
             if linked_item.lock_layer:
                 row.label(icon=icon_parser('VIEW_LOCKED', 'LOCKED'))
             if len(linked_item.actions) > 0:
