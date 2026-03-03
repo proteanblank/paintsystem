@@ -83,8 +83,8 @@ class MAT_PT_UL_LayerList(PSContextMixin, UIList):
                     row.label(icon='BLANK1')
             row.enabled = linked_item.opacity > 0 and linked_item.enabled
             if linked_item.is_clip:
-                clipping_row = row.row(align=True)
-                clipping_row.scale_x = 0.6
+                clipping_row = row.row()
+                clipping_row.scale_x = 0.7
                 clipping_row.label(icon_value=get_icon('clipping'))
             draw_layer_icon(linked_item, row)
             main_row.separator()
