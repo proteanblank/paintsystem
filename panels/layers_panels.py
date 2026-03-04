@@ -171,6 +171,7 @@ class MAT_MT_PaintSystemMergeAndExport(PSContextMixin, Menu):
 def draw_layer_settings(layout, context):
     ps_ctx = PSContextMixin.parse_context(context)
     active_layer = ps_ctx.active_layer
+    layout.enabled = not active_layer.lock_layer
     if ps_ctx.ps_settings.use_legacy_ui:
         box = layout.box()
         layer_settings_ui(box, context)
@@ -641,7 +642,6 @@ class MAT_PT_Layers(PSContextMixin, Panel):
             col = row.column(align=True)
             draw_layer_sidebar(col, ps_ctx.ps_settings.use_legacy_ui)
             
-            layout.enabled = not ps_ctx.active_layer.lock_layer
             active_layer = ps_ctx.active_layer
             if not active_layer:
                 return
