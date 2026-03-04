@@ -340,13 +340,14 @@ class MAT_PT_PaintSystemMainPanel(PSContextMixin, Panel):
                 settings = UnifiedPaintPanel.paint_settings(context)
                 brush = settings.brush
                 row = header.row(align=True)
-                row.scale_x = 1.1
                 row.alignment = 'RIGHT'
                 if ps_ctx.ps_object.type == 'MESH':
                     split = row.split(factor=0.5, align=True)
+                    split.scale_x = 1
                     split.alignment = 'RIGHT'
                     UnifiedPaintPanel.prop_unified_color(split, context, brush, "color", text="")
                     UnifiedPaintPanel.prop_unified_color(split, context, brush, "secondary_color", text="")
+                    row.operator('paint.brush_colors_flip', icon='FILE_REFRESH', text="")
                 elif ps_ctx.ps_object.type == 'GREASEPENCIL':
                     row.prop(brush, "color", text="")
 
