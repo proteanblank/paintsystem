@@ -72,29 +72,27 @@ def register() -> None:
 
         _remove_default_rmb_menu()
 
+        km_name = 'Image Paint'
+        space = 'EMPTY'
         # Plain RMB override in Texture Paint tool context (preferred)
         if ENABLE_RMB_OVERRIDE_IN_TEXPAINT:
             # Tool-specific keymap names vary slightly across versions; add to a couple of common ones
-            for km_name, space in (
-                ('3D View Tool: Paint Draw', 'VIEW_3D'),
-                ('Image Paint', 'EMPTY'),
-            ):
-                _add_keymap_entry(
-                    kc,
-                    name=km_name,
-                    space_type=space,
-                    idname='wm.call_panel',
-                    key='RIGHTMOUSE',
-                    value='PRESS',
-                    properties={'name': 'MAT_PT_TexPaintRMBMenu'},
-                )
+            _add_keymap_entry(
+                kc,
+                name=km_name,
+                space_type=space,
+                idname='wm.call_panel',
+                key='RIGHTMOUSE',
+                value='PRESS',
+                properties={'name': 'MAT_PT_TexPaintRMBMenu'},
+            )
 
         # Optional Shift+RMB fallback
         if ENABLE_SHIFT_RMB_FALLBACK:
             _add_keymap_entry(
                 kc,
-                name='3D View',
-                space_type='VIEW_3D',
+                name=km_name,
+                space_type=space,
                 idname='paint_system.open_texpaint_menu',
                 key='RIGHTMOUSE',
                 value='PRESS',
@@ -104,15 +102,15 @@ def register() -> None:
         # Color Sampler ('I') and Toggle Erase Alpha ('E')
         _add_keymap_entry(
             kc,
-            name='3D View',
-            space_type='VIEW_3D',
+            name=km_name,
+            space_type=space,
             idname='paint_system.color_sample',
             key='I',
         )
         _add_keymap_entry(
             kc,
-            name='3D View',
-            space_type='VIEW_3D',
+            name=km_name,
+            space_type=space,
             idname='paint_system.toggle_brush_erase_alpha',
             key='E',
         )
