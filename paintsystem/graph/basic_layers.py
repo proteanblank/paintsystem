@@ -7,16 +7,16 @@ from .common import create_mixing_graph, NodeTreeBuilder, create_coord_graph, ge
 if TYPE_CHECKING:
     from ..data import Layer
 
-IMAGE_LAYER_VERSION = 4
-FOLDER_LAYER_VERSION = 2
-SOLID_COLOR_LAYER_VERSION = 2
-ATTRIBUTE_LAYER_VERSION = 2
-ADJUSTMENT_LAYER_VERSION = 2
-GRADIENT_LAYER_VERSION = 2
-RANDOM_LAYER_VERSION = 3
-CUSTOM_LAYER_VERSION = 2
-TEXTURE_LAYER_VERSION = 2
-GEOMETRY_LAYER_VERSION = 2
+IMAGE_LAYER_VERSION = 5
+FOLDER_LAYER_VERSION = 3
+SOLID_COLOR_LAYER_VERSION = 3
+ATTRIBUTE_LAYER_VERSION = 3
+ADJUSTMENT_LAYER_VERSION = 3
+GRADIENT_LAYER_VERSION = 3
+RANDOM_LAYER_VERSION = 4
+CUSTOM_LAYER_VERSION = 3
+TEXTURE_LAYER_VERSION = 3
+GEOMETRY_LAYER_VERSION = 3
 
 ALPHA_OVER_LAYER_VERSION = 1
 
@@ -69,14 +69,14 @@ class PSNodeTreeBuilder:
         
         # Create the mixing graph automatically, but don't link color/alpha yet
         # We'll link them after modifiers are added (or at compile time)
-        create_mixing_graph(
-            self._builder,
-            layer,
-            None,  # Don't link color yet - will be done after modifiers
-            None,
-            None,  # Don't link alpha yet - will be done after modifiers
-            None
-        )
+        # create_mixing_graph(
+        #     self._builder,
+        #     layer,
+        #     None,  # Don't link color yet - will be done after modifiers
+        #     None,
+        #     None,  # Don't link alpha yet - will be done after modifiers
+        #     None
+        # )
         
         # Now link the sources (or final modifier outputs) to the mixing graph
         self._update_mixing_graph_links()
@@ -114,6 +114,7 @@ class PSNodeTreeBuilder:
         if final_color_node is not None and final_color_socket is not None:
             self._remove_final_color_link()
             self._builder.link(final_color_node, "mix_rgb", final_color_socket, "B")
+            # self._builder.link(final_color_node, "pd_over", final_color_socket, "Over Color")
         
         # Determine final alpha source (last modifier or original source)
         if self._alpha_modifiers:
@@ -125,8 +126,16 @@ class PSNodeTreeBuilder:
         # Remove old alpha link and create new one
         if final_alpha_node is not None and final_alpha_socket is not None:
             self._remove_final_alpha_link()
-            self._builder.link(final_alpha_node, "pre_mix", final_alpha_socket, "Over Alpha")
-    
+            # self._builder.link(final_alpha_node, "pre_mix", final_alpha_socket, "Over Alpha")
+        create_mixing_graph(
+            self._builder,
+            self._layer,
+            final_color_node,
+            final_color_socket,
+            final_alpha_node,
+            final_alpha_socket
+        )
+            
     def create_coord_graph(self, node_name: str, socket_name: str) -> NodeTreeBuilder:
         """Create the coordinate graph for the layer.
 
@@ -211,13 +220,13 @@ class PSNodeTreeBuilder:
         self._builder.add_node("mapping", "ShaderNodeMapping")
         output_node_name = "mapping"
         output_socket_name = "Vector"
-        if self._layer.correct_image_aspect and self._layer.image and self._layer.type == "IMAGE":
-            resolution_x = 0
-            resolution_y = 0
-            img = self._layer.image
-            if img:
-                resolution_x = img.size[0]
-                resolution_y = img.size[1]
+        resolution_x = 0
+        resolution_y = 0
+        img = self._layer.image
+        if img:
+            resolution_x = img.size[0]
+            resolution_y = img.size[1]
+        if self._layer.correct_image_aspect and self._layer.image and self._layer.type == "IMAGE" and resolution_x != resolution_y:
             aspect_correct = get_library_nodetree(".PS Correct Aspect")
             self._builder.add_node("multiply_vector", "ShaderNodeVectorMath", {"operation": "MULTIPLY"})
             self._builder.add_node("aspect_correct", "ShaderNodeGroup", {"node_tree": aspect_correct}, default_values={0: resolution_x, 1: resolution_y}, force_default_values=True)
@@ -640,7 +649,4 @@ def create_layer_graph(layer: "Layer"):
             layer_graph = create_geometry_graph(layer)
     if not layer_graph:
         return None
-    if not layer.enabled:
-        layer_graph.link("group_input", "group_output", "Color", "Color")
-        layer_graph.link("group_input", "group_output", "Alpha", "Alpha")
     return layer_graph

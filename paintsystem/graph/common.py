@@ -113,27 +113,48 @@ def get_library_object(object_name: str, library_filename: str = LIBRARY_FILENAM
 
 def create_mixing_graph(builder: NodeTreeBuilder, layer: "Layer", color_node_name: str = None, color_socket: str = None, alpha_node_name: str = None, alpha_socket: str = None) -> NodeTreeBuilder:
     blend_mode = get_layer_blend_type(layer) if layer is not None else "MIX"
+    use_pd_over = blend_mode not in ["MIX", "PASSTHROUGH"]
     pre_mix = get_library_nodetree(".PS Pre Mix")
     post_mix = get_library_nodetree(".PS Post Mix")
+    if use_pd_over:
+        pd_over = get_library_nodetree(".PS Porter-Duff Over")
     builder.add_node("group_input", "NodeGroupInput")
     builder.add_node("group_output", "NodeGroupOutput")
     builder.add_node("pre_mix", "ShaderNodeGroup", {"node_tree": pre_mix}, {"Over Alpha": 1.0})
+    if use_pd_over:
+        builder.add_node("pd_over", "ShaderNodeGroup", {"node_tree": pd_over})
     builder.add_node("post_mix", "ShaderNodeGroup", {"node_tree": post_mix})
     builder.add_node("mix_rgb", "ShaderNodeMix", {"blend_type": blend_mode, "data_type": "RGBA"}, force_properties=True)
     if alpha_node_name is not None and alpha_socket is not None:
         builder.link(alpha_node_name, "pre_mix", alpha_socket, "Over Alpha")
     builder.link("group_input", "pre_mix", "Color", "Color")
     builder.link("group_input", "pre_mix", "Alpha", "Alpha")
-    builder.link("pre_mix", "mix_rgb", "Color", "A")
+    if use_pd_over:
+        builder.link("group_input", "mix_rgb", "Color", "A")
+    else:
+        builder.link("pre_mix", "mix_rgb", "Color", "A")
     builder.link("pre_mix", "mix_rgb", "Over Alpha", "Factor")
     if color_node_name is not None and color_socket is not None:
         builder.link(color_node_name, "mix_rgb", color_socket, "B")
-    builder.link("mix_rgb", "post_mix", "Result", "Color")
+        if use_pd_over:
+            builder.link(color_node_name, "pd_over", color_socket, "Over Color")
+    if use_pd_over:
+        builder.link("mix_rgb", "pd_over", "Result", "Blended Color")
+        builder.link("group_input", "pd_over", "Color", "Color")
+        builder.link("group_input", "pd_over", "Alpha", "Alpha")
+        builder.link("pre_mix", "pd_over", "Over Alpha", "Over Alpha")
+        builder.link("pd_over", "post_mix", "Color", "Color")
+    else:
+        builder.link("mix_rgb", "post_mix", "Result", "Color")
     builder.link("pre_mix", "post_mix", "Over Alpha", "Over Alpha")
     builder.link("group_input", "post_mix", "Alpha", "Alpha")
     builder.link("group_input", "post_mix", "Clip", "Clip")
-    builder.link("post_mix", "group_output", "Color", "Color")
-    builder.link("post_mix", "group_output", "Alpha", "Alpha")
+    if layer.enabled:
+        builder.link("post_mix", "group_output", "Color", "Color")
+        builder.link("post_mix", "group_output", "Alpha", "Alpha")
+    else:
+        builder.link("group_input", "group_output", "Color", "Color")
+        builder.link("group_input", "group_output", "Alpha", "Alpha")
     return builder
 
 
