@@ -27,9 +27,9 @@ from .common import (
     PSUVOptionsMixin,
     get_icon,
     scale_content,
+    redraw_panel,
 )
 from ..paintsystem.list_manager import ListManager
-from .operators_utils import redraw_panel
 
 
 def create_basic_setup(mat_node_tree: NodeTree, group_node_tree: NodeTree, offset: Vector):

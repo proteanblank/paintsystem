@@ -27,9 +27,10 @@ from .common import (
     get_icon_from_socket_type,
     MultiMaterialOperator,
     PSUVOptionsMixin,
-    PSImageCreateMixin
+    PSImageCreateMixin,
+    redraw_panel,
+    intern_enum_items
     )
-from .operators_utils import redraw_panel, intern_enum_items
 
 def get_object_uv_maps(self, context: Context):
     items = [

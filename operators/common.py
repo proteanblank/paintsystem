@@ -361,3 +361,32 @@ def execute_operator_in_area(area: bpy.types.Area, operator_idname: str, **kwarg
         except RuntimeError as e:
             logger.error(f"Could not execute operator in {area.type}: {e}")
             return False
+
+# Fixes UnicodeDecodeError bug
+STRING_CACHE = {}
+def intern_enum_items(items):
+    def intern_string(s):
+        if not isinstance(s, str):
+            return s
+        global STRING_CACHE
+        if s not in STRING_CACHE:
+            STRING_CACHE[s] = s
+        return STRING_CACHE[s]
+    return [tuple(intern_string(s) for s in item) for item in items]
+
+def redraw_panel(context: Context):
+    # Force the UI to update
+    if context.area:
+        context.area.tag_redraw()
+
+def timing_decorator(func_name=None):
+    def actual_decorator(func):
+        def wrapper(*args, **kwargs):
+            start_time = time.perf_counter()
+            result = func(*args, **kwargs)
+            end_time = time.perf_counter()
+            execution_time = (end_time - start_time) * 1000
+            logger.debug(f"{func.__name__ if func_name == None else func_name} took {execution_time:.4f} ms to execute.")
+            return result
+        return wrapper
+    return actual_decorator

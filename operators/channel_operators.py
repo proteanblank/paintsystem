@@ -4,9 +4,8 @@ from bpy.props import EnumProperty
 # ---
 from ..paintsystem.data import CHANNEL_TEMPLATE_ENUM, CHANNEL_TYPE_ENUM, COLOR_SPACE_ENUM
 from ..utils import get_next_unique_name
-from .common import MultiMaterialOperator, PSContextMixin
+from .common import MultiMaterialOperator, PSContextMixin, redraw_panel
 from ..paintsystem.list_manager import ListManager
-from .operators_utils import redraw_panel
 
 ADD_CHANNEL_TEMPLATE_ENUM = CHANNEL_TEMPLATE_ENUM + [("CUSTOM", "Custom", "Custom", "NONE", len(CHANNEL_TEMPLATE_ENUM))]
 

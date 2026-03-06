@@ -14,9 +14,8 @@ from ..utils.nodes import find_node, get_material_output
 from ..utils.version import is_newer_than
 from ..utils.unified_brushes import get_unified_settings
 from .brushes import get_brushes_from_library
-from .common import MultiMaterialOperator, PSContextMixin, DEFAULT_PS_UV_MAP_NAME, execute_operator_in_area, wait_for_redraw
+from .common import MultiMaterialOperator, PSContextMixin, DEFAULT_PS_UV_MAP_NAME, execute_operator_in_area, wait_for_redraw, redraw_panel
 from ..panels.common import is_editor_open
-from .operators_utils import redraw_panel
 
 from bl_ui.properties_paint_common import (
     UnifiedPaintPanel,
