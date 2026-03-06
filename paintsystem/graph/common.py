@@ -149,12 +149,12 @@ def create_mixing_graph(builder: NodeTreeBuilder, layer: "Layer", color_node_nam
     builder.link("pre_mix", "post_mix", "Over Alpha", "Over Alpha")
     builder.link("group_input", "post_mix", "Alpha", "Alpha")
     builder.link("group_input", "post_mix", "Clip", "Clip")
-    if layer.enabled:
-        builder.link("post_mix", "group_output", "Color", "Color")
-        builder.link("post_mix", "group_output", "Alpha", "Alpha")
-    else:
+    if layer and not layer.enabled:
         builder.link("group_input", "group_output", "Color", "Color")
         builder.link("group_input", "group_output", "Alpha", "Alpha")
+    else:
+        builder.link("post_mix", "group_output", "Color", "Color")
+        builder.link("post_mix", "group_output", "Alpha", "Alpha")
     return builder
 
 
