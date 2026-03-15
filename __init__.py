@@ -11,6 +11,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from .utils.logging import get_logger
 import bpy
 from bpy.utils import register_submodule_factory
 from .custom_icons import load_icons, unload_icons
@@ -20,7 +21,7 @@ bl_info = {
     "author": "Tawan Sunflower, @blastframe",
     "description": "",
     "blender": (4, 2, 0),
-    "version": (2, 1, 10),
+    "version": (2, 1, 9),
     "location": "View3D > Sidebar > Paint System",
     "warning": "",
     "category": "Paint",
@@ -30,7 +31,6 @@ bl_info = {
 
 bl_info_copy = bl_info.copy()
 
-from .utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -45,10 +45,12 @@ submodules = [
 
 _register, _unregister = register_submodule_factory(__name__, submodules)
 
+
 def register():
     load_icons()
     _register()
-    
+
+
 def unregister():
     _unregister()
     unload_icons()
