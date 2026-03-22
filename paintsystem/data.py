@@ -570,13 +570,15 @@ def ensure_paint_system_uv_map(context: bpy.types.Context):
     # Make it active
     context.view_layer.objects.active = ps_object
     original_mode = str(ps_object.mode)
-    bpy.ops.object.mode_set(mode='EDIT')
-    ps_object.update_from_editmode()
-    bpy.ops.mesh.select_all(action='SELECT')
+    
     # Apply to only the active object
     uv_layers = ps_object.data.uv_layers
     uvmap = uv_layers.new(name=DEFAULT_PS_UV_MAP_NAME)
     ps_object.data.uv_layers.active = uvmap
+    
+    bpy.ops.object.mode_set(mode='EDIT')
+    ps_object.update_from_editmode()
+    bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=30/180*math.pi, island_margin=0.005)
     bpy.ops.object.mode_set(mode=original_mode)
     # Deselect the object
